@@ -574,8 +574,8 @@ def get_enriched_analysis(ticker: str) -> dict | None:
     if base.get("week_52_high") and base["current_price"] > 0:
         upside_52w = (base["week_52_high"] - base["current_price"]) / base["current_price"] * 100
 
-    # ── Stima giornaliera (35% continuazione momentum) ──
-    daily_estimate_pct = base["day_change_pct"] * 0.35
+    # ── Stima giornaliera = variazione attuale ──
+    daily_estimate_pct = base["day_change_pct"]
     daily_estimate_price = base["current_price"] * (1 + daily_estimate_pct / 100)
 
     base.update({
