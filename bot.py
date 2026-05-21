@@ -1,3 +1,4 @@
+# Stock Bot v2.1 — professional AI edition
 import asyncio
 import json
 import logging
