@@ -6,7 +6,7 @@ from datetime import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from groq import AsyncGroq, AsyncGroqError
+from groq import AsyncGroq
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
