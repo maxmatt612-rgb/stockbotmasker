@@ -6,7 +6,7 @@ from datetime import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from groq import AsyncGroq
+from groq import AsyncGroq, AsyncGroqError
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
@@ -31,7 +31,11 @@ logger = logging.getLogger(__name__)
 
 ROME = ZoneInfo("Europe/Rome")
 DATA_FILE = Path("user_data.json")
-groq_client = AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
+
+_GROQ_KEY = os.getenv("GROQ_API_KEY")
+groq_client = AsyncGroq(api_key=_GROQ_KEY) if _GROQ_KEY else None
+if not _GROQ_KEY:
+    logging.warning("GROQ_API_KEY non trovata — funzioni AI disabilitate")
 
 
 # ─── Persistenza ─────────────────────────────────────────────────────────────
@@ -59,6 +63,8 @@ def kb(rows: list) -> InlineKeyboardMarkup:
 # ─── AI helpers ──────────────────────────────────────────────────────────────
 
 async def ai_confronto(d1: dict, d2: dict) -> str:
+    if not groq_client:
+        return "⚠️ AI non disponibile — GROQ_API_KEY mancante su Railway Variables."
     prompt = (
         f"Confronta queste due azioni e dimmi quale è migliore da acquistare ADESSO e perché.\n\n"
         f"{d1['ticker']} ({d1['name']}):\n"
@@ -90,13 +96,19 @@ async def ai_confronto(d1: dict, d2: dict) -> str:
 
 async def generate_ai_verdict(d: dict) -> dict:
     """Genera verdict + 2 bullet motivazioni per una singola azione."""
+    if not groq_client:
+        return {"verdict": "", "bullet1": "", "bullet2": ""}
+
     pe = d.get("pe_ratio")
     pe_str = f"{pe:.1f}x" if pe and pe > 0 else "N/D"
+    upside = d.get("upside_52w", 0.0)
+    upside_str = f"+{upside:.1f}%" if upside >= 0 else f"{upside:.1f}% (già sui massimi)"
+
     prompt = (
         f"Azione: {d['ticker']} ({d['name']})\n"
         f"Prezzo: ${d['current_price']:.2f}, oggi {d['day_change_pct']:+.1f}%\n"
         f"RSI: {d['rsi']:.0f}, Volatilità: {d['volatility']:.0f}%, Rischio: {d['risk_level']}\n"
-        f"Upside verso max 52w: +{d.get('upside_52w', 0):.1f}%\n"
+        f"Upside verso max 52w: {upside_str}\n"
         f"P/E: {pe_str}\n"
         f"Notizie: {d.get('news_sentiment_label', 'Neutre')}\n"
         f"Earnings oggi: {'Sì' if d.get('earnings_today') else 'No'}\n\n"
@@ -414,6 +426,9 @@ async def cmd_chiediai(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     question = " ".join(context.args)
+    if not groq_client:
+        await update.message.reply_text("❌ AI non disponibile — aggiungi <b>GROQ_API_KEY</b> nelle Variables di Railway.", parse_mode=ParseMode.HTML)
+        return
     msg = await update.message.reply_text("🤖 Sto pensando...", parse_mode=ParseMode.HTML)
     try:
         response = await groq_client.chat.completions.create(
@@ -636,25 +651,36 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
 
 async def job_evening_report(context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
-    for uid, watchlist in data["watchlists"].items():
-        if not watchlist:
-            continue
-        risultati = [d for ticker in watchlist if (d := get_full_analysis(ticker))]
-        if not risultati:
-            continue
-        risultati.sort(key=lambda x: x["day_change_pct"], reverse=True)
-        migliore, peggiore = risultati[0], risultati[-1]
-        lines = ["🌙 <b>Recap serale — chiusura mercato USA</b>\n"]
-        for d in risultati:
-            lines.append(format_report_line(d))
-        lines += [
-            "",
-            f"🏆 Migliore: <b>{migliore['ticker']}</b> {migliore['day_change_pct']:+.1f}%",
-            f"💔 Peggiore: <b>{peggiore['ticker']}</b> {peggiore['day_change_pct']:+.1f}%",
-            "\n<i>Usa /analisi domani mattina per la classifica aggiornata.</i>",
-        ]
+    all_uids = list(data["watchlists"].keys())
+    if not all_uids:
+        return
+
+    # Usa lo scanner per il recap serale (stesso metodo del mattino)
+    scanner_raw = await asyncio.to_thread(scan_cheap_stocks, 20.0, 10)
+    if not scanner_raw:
+        return
+
+    risultati = [d for r in scanner_raw if (d := get_full_analysis(r["ticker"]))]
+    if not risultati:
+        return
+
+    risultati.sort(key=lambda x: x["day_change_pct"], reverse=True)
+    migliore, peggiore = risultati[0], risultati[-1]
+
+    lines = ["🌙 <b>Recap serale — chiusura mercato USA</b>\n"]
+    for d in risultati:
+        lines.append(format_report_line(d))
+    lines += [
+        "",
+        f"🏆 Migliore oggi: <b>{migliore['ticker']}</b> {migliore['day_change_pct']:+.1f}%",
+        f"💔 Peggiore oggi: <b>{peggiore['ticker']}</b> {peggiore['day_change_pct']:+.1f}%",
+        "\n<i>Domani mattina alle 7:30 trovi la nuova classifica aggiornata.</i>",
+    ]
+    text = "\n".join(lines)
+
+    for uid in all_uids:
         try:
-            await context.bot.send_message(int(uid), "\n".join(lines), parse_mode=ParseMode.HTML)
+            await context.bot.send_message(int(uid), text, parse_mode=ParseMode.HTML)
         except Exception as e:
             logger.warning(f"Errore recap serale {uid}: {e}")
 
@@ -663,34 +689,46 @@ async def job_evening_report(context: ContextTypes.DEFAULT_TYPE):
 
 async def job_weekly_report(context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
-    for uid, watchlist in data["watchlists"].items():
-        if not watchlist:
-            continue
-        risultati = [d for ticker in watchlist if (d := get_full_analysis(ticker))]
-        if not risultati:
-            continue
-        risultati.sort(key=lambda x: (x["week_return"] or 0), reverse=True)
-        migliore = risultati[0]
-        peggiore = risultati[-1]
-        lines = ["📅 <b>Recap settimanale — come è andata questa settimana</b>\n"]
-        for d in risultati:
-            wr = d["week_return"]
-            if wr is not None:
-                sign = "+" if wr >= 0 else ""
-                emoji = "📈" if wr >= 0 else "📉"
-                lines.append(f"{emoji} <b>{d['ticker']}</b>  settimana: {sign}{wr:.1f}%  {d['risk_emoji']}")
-            else:
-                lines.append(f"❓ <b>{d['ticker']}</b>  dati insufficienti")
-        wr_best = migliore["week_return"] or 0
-        wr_worst = peggiore["week_return"] or 0
-        lines += [
-            "",
-            f"🏆 Migliore settimana: <b>{migliore['ticker']}</b> {'+' if wr_best >= 0 else ''}{wr_best:.1f}%",
-            f"💔 Peggiore settimana: <b>{peggiore['ticker']}</b> {'+' if wr_worst >= 0 else ''}{wr_worst:.1f}%",
-            "\n<i>Buon weekend! Usa /analisi lunedì per ripartire.</i>",
-        ]
+    all_uids = list(data["watchlists"].keys())
+    if not all_uids:
+        return
+
+    # Usa lo scanner per il recap settimanale
+    scanner_raw = await asyncio.to_thread(scan_cheap_stocks, 20.0, 10)
+    if not scanner_raw:
+        return
+
+    risultati = [d for r in scanner_raw if (d := get_full_analysis(r["ticker"]))]
+    if not risultati:
+        return
+
+    risultati.sort(key=lambda x: (x.get("week_return") or 0), reverse=True)
+    migliore = risultati[0]
+    peggiore = risultati[-1]
+
+    lines = ["📅 <b>Recap settimanale — come è andata questa settimana</b>\n"]
+    for d in risultati:
+        wr = d.get("week_return")
+        if wr is not None:
+            sign = "+" if wr >= 0 else ""
+            emoji = "📈" if wr >= 0 else "📉"
+            lines.append(f"{emoji} <b>{d['ticker']}</b>  settimana: {sign}{wr:.1f}%  {d['risk_emoji']}")
+        else:
+            lines.append(f"❓ <b>{d['ticker']}</b>  dati insufficienti")
+
+    wr_best = migliore.get("week_return") or 0
+    wr_worst = peggiore.get("week_return") or 0
+    lines += [
+        "",
+        f"🏆 Migliore settimana: <b>{migliore['ticker']}</b> {'+' if wr_best >= 0 else ''}{wr_best:.1f}%",
+        f"💔 Peggiore settimana: <b>{peggiore['ticker']}</b> {'+' if wr_worst >= 0 else ''}{wr_worst:.1f}%",
+        "\n<i>Buon weekend! Lunedì mattina alle 7:30 ricomincia l'analisi.</i>",
+    ]
+    text = "\n".join(lines)
+
+    for uid in all_uids:
         try:
-            await context.bot.send_message(int(uid), "\n".join(lines), parse_mode=ParseMode.HTML)
+            await context.bot.send_message(int(uid), text, parse_mode=ParseMode.HTML)
         except Exception as e:
             logger.warning(f"Errore recap settimanale {uid}: {e}")
 
