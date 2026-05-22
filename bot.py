@@ -238,8 +238,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = kb([
         [btn("📊 Analisi mercato", "help_analisi"), btn("📈 Analisi azione", "help_apr")],
         [btn("🎯 Day Trading", "help_trading"), btn("⚔️ Confronto", "help_confronto")],
-        [btn("💼 Portafoglio", "help_portafoglio"), btn("👁 Watchlist", "help_watchlist")],
-        [btn("🤖 Chiedi all'AI", "help_chiediai")],
+        [btn("💼 Portafoglio", "help_portafoglio"), btn("🤖 Chiedi all'AI", "help_chiediai")],
     ])
     await update.message.reply_text(
         "📖 <b>Comandi disponibili:</b>\n\n"
@@ -247,8 +246,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📈 /apr — analisi completa di una azione\n"
         "🎯 /trading — day trading: compra e vendi subito\n"
         "⚔️ /confronto — confronta due azioni con AI\n"
-        "💼 /portafoglio — le tue azioni\n"
-        "👁 /watchlist — lista azioni da seguire\n"
+        "💼 /portafoglio — il tuo portafoglio con P&amp;L\n"
         "🤖 /chiediai — chiedi all'AI\n\n"
         "<i>Clicca un bottone per sapere come si usa</i>",
         parse_mode=ParseMode.HTML,
@@ -572,57 +570,6 @@ async def cmd_rimuovi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ <b>{ticker}</b> rimosso.", parse_mode=ParseMode.HTML)
 
 
-# ─── /watchlist ──────────────────────────────────────────────────────────────
-
-async def cmd_watchlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    uid = str(update.effective_user.id)
-    data = load_data()
-    wl = data.get("watchlist2", {}).get(uid, [])
-    lines = ["👁 <b>La tua watchlist:</b>\n"] if wl else ["👁 <b>Watchlist vuota.</b>\n"]
-    for t in wl:
-        lines.append(f"  • {t}")
-    lines.append("\n<b>Comandi:</b>\n/wadd TICKER · /wdel TICKER")
-    rows = []
-    for i in range(0, len(wl), 3):
-        rows.append([btn(f"📈 {t}", f"apr:{t}") for t in wl[i:i+3]])
-    await update.message.reply_text(
-        "\n".join(lines), parse_mode=ParseMode.HTML,
-        reply_markup=kb(rows) if rows else None,
-    )
-
-
-async def cmd_wadd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("Usa: /wadd TICKER")
-        return
-    ticker = context.args[0].upper()
-    uid = str(update.effective_user.id)
-    data = load_data()
-    wl = data.setdefault("watchlist2", {}).setdefault(uid, [])
-    if ticker in wl:
-        await update.message.reply_text(f"<b>{ticker}</b> è già nella watchlist.", parse_mode=ParseMode.HTML)
-        return
-    wl.append(ticker)
-    save_data(data)
-    await update.message.reply_text(f"✅ <b>{ticker}</b> aggiunto alla watchlist!", parse_mode=ParseMode.HTML)
-
-
-async def cmd_wdel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("Usa: /wdel TICKER")
-        return
-    ticker = context.args[0].upper()
-    uid = str(update.effective_user.id)
-    data = load_data()
-    wl = data.get("watchlist2", {}).get(uid, [])
-    if ticker not in wl:
-        await update.message.reply_text(f"<b>{ticker}</b> non è nella watchlist.", parse_mode=ParseMode.HTML)
-        return
-    wl.remove(ticker)
-    save_data(data)
-    await update.message.reply_text(f"✅ <b>{ticker}</b> rimosso.", parse_mode=ParseMode.HTML)
-
-
 # ─── /chiediai ───────────────────────────────────────────────────────────────
 
 async def cmd_chiediai(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -733,14 +680,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = kb([
             [btn("📊 Analisi mercato", "help_analisi"), btn("📈 Analisi azione", "help_apr")],
             [btn("🎯 Day Trading", "help_trading"), btn("⚔️ Confronto", "help_confronto")],
-            [btn("💼 Portafoglio", "help_portafoglio"), btn("👁 Watchlist", "help_watchlist")],
-            [btn("🤖 Chiedi all'AI", "help_chiediai")],
+            [btn("💼 Portafoglio", "help_portafoglio"), btn("🤖 Chiedi all'AI", "help_chiediai")],
         ])
         await query.message.reply_text(
             "📖 <b>Comandi disponibili:</b>\n\n"
             "📊 /analisi · 📈 /apr · 🎯 /trading\n"
-            "⚔️ /confronto · 💼 /portafoglio\n"
-            "👁 /watchlist · 🤖 /chiediai",
+            "⚔️ /confronto · 💼 /portafoglio · 🤖 /chiediai",
             parse_mode=ParseMode.HTML, reply_markup=keyboard,
         )
     elif data == "help_analisi":
@@ -753,8 +698,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("⚔️ <b>/confronto TICKER1 TICKER2</b>\n\nConfronta due azioni su 5 criteri + valutazione AI finale.\n\nEsempio: /confronto PLTR NIO", parse_mode=ParseMode.HTML)
     elif data == "help_portafoglio":
         await query.message.reply_text("💼 <b>/portafoglio</b>\n\nVedi le tue azioni. Il report mattutino e il recap serale usano questa lista.\n\n/aggiungi TICKER — aggiungi\n/rimuovi TICKER — rimuovi", parse_mode=ParseMode.HTML)
-    elif data == "help_watchlist":
-        await query.message.reply_text("👁 <b>/watchlist</b>\n\nLista separata di azioni da tenere d'occhio (non usata nel report automatico).\n\n/wadd TICKER — aggiungi\n/wdel TICKER — rimuovi", parse_mode=ParseMode.HTML)
     elif data == "help_chiediai":
         await query.message.reply_text("🤖 <b>/chiediai [domanda]</b>\n\nFai qualsiasi domanda sul mercato azionario all'AI.\n\nEsempio: /chiediai l'oro è un buon investimento adesso?", parse_mode=ParseMode.HTML)
 
@@ -963,9 +906,6 @@ def main():
     app.add_handler(CommandHandler("portafoglio", cmd_portafoglio))
     app.add_handler(CommandHandler("aggiungi", cmd_aggiungi))
     app.add_handler(CommandHandler("rimuovi", cmd_rimuovi))
-    app.add_handler(CommandHandler("watchlist", cmd_watchlist))
-    app.add_handler(CommandHandler("wadd", cmd_wadd))
-    app.add_handler(CommandHandler("wdel", cmd_wdel))
     app.add_handler(CommandHandler("chiediai", cmd_chiediai))
     app.add_handler(CallbackQueryHandler(handle_callback))
 
