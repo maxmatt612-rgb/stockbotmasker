@@ -97,6 +97,72 @@ async def ai_confronto(d1: dict, d2: dict) -> str:
         return "⚠️ AI non disponibile al momento."
 
 
+async def generate_ai_resoconto(d: dict) -> str:
+    """Resoconto AI dettagliato: motivazioni, rischi, prospettive."""
+    if not groq_client:
+        return "❌ AI non disponibile — aggiungi <b>GROQ_API_KEY</b> nelle Variables di Railway."
+
+    pe = d.get("pe_ratio")
+    pe_str = f"{pe:.1f}x" if pe and pe > 0 else "N/D"
+    upside = d.get("upside_52w", 0.0)
+    upside_str = f"+{upside:.1f}%" if upside >= 0 else f"{upside:.1f}% (già ai massimi)"
+
+    prompt = (
+        f"Analisi approfondita dell'azione {d['ticker']} ({d['name']}):\n"
+        f"- Prezzo: ${d['current_price']:.2f}, oggi {d['day_change_pct']:+.1f}%\n"
+        f"- RSI: {d['rsi']:.0f}, Volatilità: {d['volatility']:.0f}%, Rischio: {d['risk_level']}\n"
+        f"- Settimana: {(d.get('week_return') or 0):+.1f}%, Mese: {(d.get('month_return') or 0):+.1f}%, Anno: {(d.get('ytd_return') or 0):+.1f}%\n"
+        f"- Upside verso max 52w: {upside_str}\n"
+        f"- P/E: {pe_str} | Settore: {d.get('sector','N/D')}\n"
+        f"- Notizie: {d.get('news_sentiment_label','Neutre')}\n"
+        f"- Earnings oggi: {'Sì ⚠️' if d.get('earnings_today') else 'No'}\n"
+        f"- Prossimi earnings: {d.get('next_earnings_str','N/D')}\n\n"
+        "Scrivi un resoconto professionale in italiano con queste 3 sezioni ESATTE:\n\n"
+        "PERCHE_SI: [2-3 motivi concreti per cui potrebbe andare bene, con dati]\n"
+        "RISCHI: [2-3 rischi reali e specifici da considerare]\n"
+        "CONCLUSIONE: [valutazione finale in 1-2 frasi, sii diretto]"
+    )
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=450,
+            messages=[
+                {"role": "system", "content": "Sei un analista finanziario senior. Rispondi sempre in italiano, con dati concreti. Non dare mai consigli finanziari definitivi."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+
+        # Parsing sezioni
+        perche_si = rischi = conclusione = ""
+        for line in text.split("\n"):
+            line = line.strip()
+            if line.upper().startswith("PERCHE_SI:"):
+                perche_si = line[10:].strip()
+            elif line.upper().startswith("RISCHI:"):
+                rischi = line[7:].strip()
+            elif line.upper().startswith("CONCLUSIONE:"):
+                conclusione = line[12:].strip()
+
+        # Fallback: se il modello non rispetta il formato, usa il testo grezzo
+        if not (perche_si or rischi or conclusione):
+            return f"🤖 <b>Resoconto AI — {d['ticker']}</b>\n\n{text}"
+
+        result = [f"🤖 <b>Resoconto AI — {d['ticker']} ({d['name']})</b>\n"]
+        if perche_si:
+            result += ["✅ <b>Perché potrebbe andare bene:</b>", perche_si, ""]
+        if rischi:
+            result += ["⚠️ <b>Rischi da considerare:</b>", rischi, ""]
+        if conclusione:
+            result += ["🎯 <b>Conclusione:</b>", conclusione]
+        result.append("\n<i>Non è un consiglio finanziario. Investi con cautela.</i>")
+        return "\n".join(result)
+
+    except Exception as e:
+        logger.error(f"AI resoconto {d['ticker']}: {e}")
+        return "❌ Errore AI. Riprova tra qualche secondo."
+
+
 async def generate_ai_verdict(d: dict) -> dict:
     """Genera verdict + 2 bullet motivazioni per una singola azione."""
     if not groq_client:
@@ -274,8 +340,7 @@ async def cmd_apr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     ai = await generate_ai_verdict(data)
     keyboard = kb([
-        [btn(f"🎯 Trading {ticker}", f"trading:{ticker}"), btn(f"💼 Aggiungi", f"add_portfolio:{ticker}")],
-        [btn(f"⚔️ Confronta con...", f"help_confronto")],
+        [btn(f"🤖 Resoconto AI", f"resoconto:{ticker}"), btn(f"⚔️ Confronta con...", f"help_confronto")],
     ])
     await msg.edit_text(format_apr_card(data, ai), parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
@@ -612,9 +677,26 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         ai = await generate_ai_verdict(d)
         keyboard = kb([
-            [btn(f"🎯 Trading {ticker}", f"trading:{ticker}"), btn(f"💼 Aggiungi", f"add_portfolio:{ticker}")],
+            [btn(f"🤖 Resoconto AI", f"resoconto:{ticker}"), btn(f"⚔️ Confronta con...", f"help_confronto")],
         ])
         await loading.edit_text(format_apr_card(d, ai), parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+    # Resoconto AI dettagliato
+    elif data.startswith("resoconto:"):
+        ticker = data.split(":")[1]
+        loading = await query.message.reply_text(
+            f"🤖 <b>Genero resoconto AI per {ticker}...</b>\n<i>Analisi motivazioni e rischi</i>",
+            parse_mode=ParseMode.HTML,
+        )
+        d = await asyncio.to_thread(get_enriched_analysis, ticker)
+        if not d:
+            await loading.edit_text(f"❌ Nessun dato per <b>{ticker}</b>.", parse_mode=ParseMode.HTML)
+            return
+        resoconto = await generate_ai_resoconto(d)
+        keyboard = kb([
+            [btn(f"📈 Rianalisi {ticker}", f"apr:{ticker}"), btn(f"⚔️ Confronta con...", f"help_confronto")],
+        ])
+        await loading.edit_text(resoconto, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
     # Trading
     elif data.startswith("trading:"):
