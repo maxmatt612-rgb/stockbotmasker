@@ -22,6 +22,7 @@ from analyzer import (
     format_trading_message,
     format_confronto_message,
     format_morning_card,
+    format_scan_card,
     format_report_line,
     format_apr_card,
 )
@@ -230,40 +231,26 @@ async def cmd_analisi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for r in ai_raw
     ]
 
-    # Card professionali (5 per messaggio)
+    # Tutte le card in un solo messaggio
     total = len(enriched)
-    SEP = "\n\n" + "━" * 20 + "\n\n"
-    chunks = [enriched[i:i + 5] for i in range(0, total, 5)]
-    ai_chunks = [ai_verdicts[i:i + 5] for i in range(0, total, 5)]
-    num_parts = len(chunks)
-
-    await msg.edit_text(
-        f"📊 <b>Top {total} azioni sotto $20 — analisi completa</b>",
-        parse_mode=ParseMode.HTML,
+    SEP = "\n" + "─" * 22 + "\n"
+    cards = [
+        format_scan_card(d, ai, i + 1)
+        for i, (d, ai) in enumerate(zip(enriched, ai_verdicts))
+    ]
+    body = SEP.join(cards)
+    full_msg = (
+        f"📊 <b>Top {total} azioni sotto $20 — adesso</b>\n\n"
+        + body
+        + "\n\n<i>Dati: Yahoo Finance | AI: Groq Llama 70B</i>"
     )
 
-    base_rank = 1
-    for ci, (chunk, ai_chunk) in enumerate(zip(chunks, ai_chunks)):
-        part_label = f"({ci + 1}/{num_parts})"
-        cards = [
-            format_morning_card(d, ai, base_rank + i)
-            for i, (d, ai) in enumerate(zip(chunk, ai_chunk))
-        ]
-        base_rank += len(chunk)
-        body = SEP.join(cards)
-        full_msg = (
-            f"🔝 <b>Top {total} azioni {part_label}</b>\n\n"
-            + body
-            + "\n\n<i>Dati: Yahoo Finance | AI: Groq Llama 70B</i>"
-        )
-        # Bottoni per ogni azione nel chunk
-        rows = []
-        for i in range(0, len(chunk), 2):
-            row = [btn(f"📈 {chunk[i]['ticker']}", f"apr:{chunk[i]['ticker']}")]
-            if i + 1 < len(chunk):
-                row.append(btn(f"📈 {chunk[i+1]['ticker']}", f"apr:{chunk[i+1]['ticker']}"))
-            rows.append(row)
-        await update.message.reply_text(full_msg, parse_mode=ParseMode.HTML, reply_markup=kb(rows))
+    # Bottoni per analisi dettagliata
+    rows = []
+    for i in range(0, len(enriched), 3):
+        rows.append([btn(f"📈 {enriched[j]['ticker']}", f"apr:{enriched[j]['ticker']}") for j in range(i, min(i+3, len(enriched)))])
+
+    await msg.edit_text(full_msg, parse_mode=ParseMode.HTML, reply_markup=kb(rows))
 
 
 # ─── /apr — analisi singola ──────────────────────────────────────────────────

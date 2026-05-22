@@ -751,6 +751,45 @@ def format_morning_card(d: dict, ai: dict, rank: int) -> str:
     return "\n".join(lines)
 
 
+def format_scan_card(d: dict, ai: dict, rank: int) -> str:
+    """Card compatta per /analisi — tutto in un solo messaggio."""
+    chg = d["day_change_pct"]
+    sign = "+" if chg >= 0 else ""
+    chg_emoji = "📈" if chg >= 0 else "📉"
+
+    verdict = (ai or {}).get("verdict", "")
+    bullet1 = (ai or {}).get("bullet1", "")
+
+    news_line = f"{d.get('news_sentiment_emoji', '⚪')} {d.get('news_sentiment_label', 'Neutre')}"
+
+    if d.get("earnings_today"):
+        earn_str = "⚠️ EARNINGS OGGI"
+    elif d.get("next_earnings_str"):
+        earn_str = f"📅 {d['next_earnings_str']}"
+    else:
+        earn_str = "📅 N/D"
+
+    daily_pct = d.get("daily_estimate_pct", 0.0)
+    daily_price = d.get("daily_estimate_price", d["current_price"])
+    daily_sign = "+" if daily_pct >= 0 else ""
+
+    upside = d.get("upside_52w", 0.0)
+    target_str = f"+{upside:.0f}% vs max 52w" if upside > 0 else "Già ai massimi 🏆"
+    score_10 = d.get("score_10", 5.0)
+
+    lines = [
+        f"<b>{rank}. {_h(d['ticker'])} — {_h(d['name'])}</b>",
+        f"💵 ${d['current_price']:.2f} {chg_emoji}{sign}{chg:.1f}% | {d.get('risk_emoji','🟡')} {d.get('risk_level','Medio')} | ⭐{score_10}/10",
+        f"📰 {news_line}  {earn_str}",
+    ]
+    if verdict:
+        lines.append(f"🎯 {_h(verdict)}")
+    if bullet1:
+        lines.append(f"• {_h(bullet1)}")
+    lines.append(f"📅 Stima: {daily_sign}{daily_pct:.1f}% → ${daily_price:.2f} | 📊 {target_str}")
+    return "\n".join(lines)
+
+
 def format_report_line(d: dict) -> str:
     p = d["current_price"]
     chg = d["day_change_pct"]
