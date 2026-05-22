@@ -214,15 +214,42 @@ async def generate_ai_verdict(d: dict) -> dict:
 # ─── /testanalisi e /testnotizie (temporanei) ───────────────────────────────
 
 async def cmd_testanalisi(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("▶️ Avvio test report analisi nel topic...", parse_mode=ParseMode.HTML)
-    await job_daily_report(context)
-    await update.message.reply_text("✅ Test analisi completato.", parse_mode=ParseMode.HTML)
+    await update.message.reply_text(
+        f"🔍 Config gruppo:\n"
+        f"• GROUP_CHAT_ID: <code>{GROUP_CHAT_ID}</code>\n"
+        f"• TOPIC_ANALISI_ID: <code>{TOPIC_ANALISI_ID}</code>\n"
+        f"• TOPIC_NOTIZIE_ID: <code>{TOPIC_NOTIZIE_ID}</code>",
+        parse_mode=ParseMode.HTML,
+    )
+    if not GROUP_CHAT_ID or not TOPIC_ANALISI_ID:
+        await update.message.reply_text("❌ Variabili GROUP_CHAT_ID o TOPIC_ANALISI_ID mancanti su Railway!")
+        return
+    try:
+        await context.bot.send_message(
+            GROUP_CHAT_ID,
+            "✅ <b>Test connessione topic Analisi</b>\n\nSe vedi questo messaggio nel topic Analisi, funziona!",
+            message_thread_id=TOPIC_ANALISI_ID,
+            parse_mode=ParseMode.HTML,
+        )
+        await update.message.reply_text("✅ Messaggio inviato al topic Analisi!")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Errore invio topic Analisi:\n<code>{e}</code>", parse_mode=ParseMode.HTML)
 
 
 async def cmd_testnotizie(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("▶️ Avvio test notizie nel topic...", parse_mode=ParseMode.HTML)
-    await job_news_portafoglio(context)
-    await update.message.reply_text("✅ Test notizie completato.", parse_mode=ParseMode.HTML)
+    if not GROUP_CHAT_ID or not TOPIC_NOTIZIE_ID:
+        await update.message.reply_text("❌ Variabili GROUP_CHAT_ID o TOPIC_NOTIZIE_ID mancanti su Railway!")
+        return
+    try:
+        await context.bot.send_message(
+            GROUP_CHAT_ID,
+            "✅ <b>Test connessione topic Notizie</b>\n\nSe vedi questo messaggio nel topic Notizie, funziona!",
+            message_thread_id=TOPIC_NOTIZIE_ID,
+            parse_mode=ParseMode.HTML,
+        )
+        await update.message.reply_text("✅ Messaggio inviato al topic Notizie!")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Errore invio topic Notizie:\n<code>{e}</code>", parse_mode=ParseMode.HTML)
 
 
 # ─── /start ──────────────────────────────────────────────────────────────────
