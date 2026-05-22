@@ -189,11 +189,11 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ─── /analisi — scanner mercato ──────────────────────────────────────────────
+# ─── /analisi — scanner mercato con card professionali ───────────────────────
 
 async def cmd_analisi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text(
-        "🔍 <b>Scansiono ~250 azioni Revolut sotto i $20...</b>\n<i>Circa 30 secondi</i>",
+        "🔍 <b>Scansiono ~250 azioni Revolut sotto i $20...</b>\n<i>Con notizie + AI — circa 60 secondi</i>",
         parse_mode=ParseMode.HTML,
     )
     risultati = await asyncio.to_thread(scan_cheap_stocks, 20.0, 10)
@@ -202,30 +202,68 @@ async def cmd_analisi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text("❌ Nessun dato disponibile. Riprova tra qualche minuto.")
         return
 
-    lines = ["📊 <b>Top 10 azioni sotto $20 — adesso</b>\n"]
-    for i, d in enumerate(risultati):
-        chg = d["day_change_pct"]
-        sign = "+" if chg >= 0 else ""
-        emoji = "📈" if chg >= 0 else "📉"
-        vol_str = f"Vol {d['vol_ratio']:.1f}x" if d["vol_ratio"] > 1.2 else ""
-        lines.append(
-            f"{i+1}. <b>{d['ticker']}</b> ${d['current_price']:.2f} "
-            f"{emoji}{sign}{chg:.1f}%  {d['risk_emoji']}  ⭐{d['score_10']}/10\n"
-            f"   RSI {d['rsi']:.0f} {vol_str}"
+    await msg.edit_text(
+        f"✅ <b>Trovate {len(risultati)} azioni — genero analisi AI...</b>\n<i>Ancora qualche secondo</i>",
+        parse_mode=ParseMode.HTML,
+    )
+
+    # Arricchimento dati per ogni azione
+    enriched = []
+    for r in risultati:
+        d = await asyncio.to_thread(get_enriched_analysis, r["ticker"])
+        if d:
+            d["score"] = r.get("score", 0)
+            d["score_10"] = r.get("score_10", 5.0)
+            d["vol_ratio"] = r.get("vol_ratio", 1.0)
+            enriched.append(d)
+
+    if not enriched:
+        await msg.edit_text("❌ Errore nel recuperare i dati. Riprova tra qualche minuto.")
+        return
+
+    # AI verdicts concorrenti
+    ai_raw = await asyncio.gather(
+        *[generate_ai_verdict(d) for d in enriched], return_exceptions=True
+    )
+    ai_verdicts = [
+        r if not isinstance(r, Exception) else {"verdict": "", "bullet1": "", "bullet2": ""}
+        for r in ai_raw
+    ]
+
+    # Card professionali (5 per messaggio)
+    total = len(enriched)
+    SEP = "\n\n" + "━" * 20 + "\n\n"
+    chunks = [enriched[i:i + 5] for i in range(0, total, 5)]
+    ai_chunks = [ai_verdicts[i:i + 5] for i in range(0, total, 5)]
+    num_parts = len(chunks)
+
+    await msg.edit_text(
+        f"📊 <b>Top {total} azioni sotto $20 — analisi completa</b>",
+        parse_mode=ParseMode.HTML,
+    )
+
+    base_rank = 1
+    for ci, (chunk, ai_chunk) in enumerate(zip(chunks, ai_chunks)):
+        part_label = f"({ci + 1}/{num_parts})"
+        cards = [
+            format_morning_card(d, ai, base_rank + i)
+            for i, (d, ai) in enumerate(zip(chunk, ai_chunk))
+        ]
+        base_rank += len(chunk)
+        body = SEP.join(cards)
+        full_msg = (
+            f"🔝 <b>Top {total} azioni {part_label}</b>\n\n"
+            + body
+            + "\n\n<i>Dati: Yahoo Finance | AI: Groq Llama 70B</i>"
         )
-    lines.append("\n<i>Clicca un bottone per analizzare</i>")
-
-    # Bottoni per i primi 5
-    top5 = risultati[:5]
-    rows = []
-    for i in range(0, len(top5), 2):
-        row = [btn(f"📈 {top5[i]['ticker']}", f"apr:{top5[i]['ticker']}")]
-        if i + 1 < len(top5):
-            row.append(btn(f"📈 {top5[i+1]['ticker']}", f"apr:{top5[i+1]['ticker']}"))
-        rows.append(row)
-    rows.append([btn("🔄 Aggiorna scanner", "refresh_scan")])
-
-    await msg.edit_text("\n\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=kb(rows))
+        # Bottoni per ogni azione nel chunk
+        rows = []
+        for i in range(0, len(chunk), 2):
+            row = [btn(f"📈 {chunk[i]['ticker']}", f"apr:{chunk[i]['ticker']}")]
+            if i + 1 < len(chunk):
+                row.append(btn(f"📈 {chunk[i+1]['ticker']}", f"apr:{chunk[i+1]['ticker']}"))
+            rows.append(row)
+        await update.message.reply_text(full_msg, parse_mode=ParseMode.HTML, reply_markup=kb(rows))
 
 
 # ─── /apr — analisi singola ──────────────────────────────────────────────────
@@ -500,31 +538,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             save_data(user_data)
             await query.message.reply_text(f"✅ <b>{ticker}</b> aggiunto al portafoglio!", parse_mode=ParseMode.HTML)
 
-    # Aggiorna scanner
+    # Aggiorna scanner (non più usato ma gestito per sicurezza)
     elif data == "refresh_scan":
-        msg = await query.message.reply_text(
-            "🔍 <b>Aggiorno scanner...</b>\n<i>Circa 30 secondi</i>", parse_mode=ParseMode.HTML
+        await query.message.reply_text(
+            "🔄 Usa /analisi per ottenere l'analisi aggiornata con AI.",
+            parse_mode=ParseMode.HTML,
         )
-        risultati = await asyncio.to_thread(scan_cheap_stocks, 20.0, 10)
-        if not risultati:
-            await msg.edit_text("❌ Nessun dato. Riprova.")
-            return
-        lines = ["📊 <b>Top 10 azioni sotto $20 — aggiornato</b>\n"]
-        for i, d in enumerate(risultati):
-            chg = d["day_change_pct"]
-            sign = "+" if chg >= 0 else ""
-            emoji = "📈" if chg >= 0 else "📉"
-            vol_str = f"Vol {d['vol_ratio']:.1f}x" if d["vol_ratio"] > 1.2 else ""
-            lines.append(f"{i+1}. <b>{d['ticker']}</b> ${d['current_price']:.2f} {emoji}{sign}{chg:.1f}%  {d['risk_emoji']}  ⭐{d['score_10']}/10\n   RSI {d['rsi']:.0f} {vol_str}")
-        top5 = risultati[:5]
-        rows = []
-        for i in range(0, len(top5), 2):
-            row = [btn(f"📈 {top5[i]['ticker']}", f"apr:{top5[i]['ticker']}")]
-            if i + 1 < len(top5):
-                row.append(btn(f"📈 {top5[i+1]['ticker']}", f"apr:{top5[i+1]['ticker']}"))
-            rows.append(row)
-        rows.append([btn("🔄 Aggiorna scanner", "refresh_scan")])
-        await msg.edit_text("\n\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=kb(rows))
 
     # Help contestuale
     elif data == "help":
