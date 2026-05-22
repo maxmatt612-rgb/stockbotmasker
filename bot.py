@@ -23,6 +23,7 @@ from analyzer import (
     format_confronto_message,
     format_morning_card,
     format_report_line,
+    format_apr_card,
 )
 from config import BOT_TOKEN, DEFAULT_WATCHLIST, REPORT_HOUR, REPORT_MINUTE
 
@@ -238,16 +239,20 @@ async def cmd_apr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     ticker = context.args[0].upper()
-    msg = await update.message.reply_text(f"⏳ Analizzo <b>{ticker}</b>...", parse_mode=ParseMode.HTML)
-    data = get_full_analysis(ticker)
+    msg = await update.message.reply_text(
+        f"⏳ <b>Analizzo {ticker}...</b>\n<i>Recupero dati + notizie + AI verdict</i>",
+        parse_mode=ParseMode.HTML,
+    )
+    data = await asyncio.to_thread(get_enriched_analysis, ticker)
     if not data:
         await msg.edit_text(f"❌ Nessun dato per <b>{ticker}</b>.", parse_mode=ParseMode.HTML)
         return
+    ai = await generate_ai_verdict(data)
     keyboard = kb([
         [btn(f"🎯 Trading {ticker}", f"trading:{ticker}"), btn(f"💼 Aggiungi", f"add_portfolio:{ticker}")],
         [btn(f"⚔️ Confronta con...", f"help_confronto")],
     ])
-    await msg.edit_text(format_analysis_message(data), parse_mode=ParseMode.HTML, reply_markup=keyboard)
+    await msg.edit_text(format_apr_card(data, ai), parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
 # ─── /trading ────────────────────────────────────────────────────────────────
@@ -458,15 +463,19 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Analisi singola azione
     if data.startswith("apr:"):
         ticker = data.split(":")[1]
-        await query.message.reply_text(f"⏳ Analizzo <b>{ticker}</b>...", parse_mode=ParseMode.HTML)
-        d = get_full_analysis(ticker)
+        loading = await query.message.reply_text(
+            f"⏳ <b>Analizzo {ticker}...</b>\n<i>Recupero dati + notizie + AI verdict</i>",
+            parse_mode=ParseMode.HTML,
+        )
+        d = await asyncio.to_thread(get_enriched_analysis, ticker)
         if not d:
-            await query.message.reply_text(f"❌ Nessun dato per <b>{ticker}</b>.", parse_mode=ParseMode.HTML)
+            await loading.edit_text(f"❌ Nessun dato per <b>{ticker}</b>.", parse_mode=ParseMode.HTML)
             return
+        ai = await generate_ai_verdict(d)
         keyboard = kb([
             [btn(f"🎯 Trading {ticker}", f"trading:{ticker}"), btn(f"💼 Aggiungi", f"add_portfolio:{ticker}")],
         ])
-        await query.message.reply_text(format_analysis_message(d), parse_mode=ParseMode.HTML, reply_markup=keyboard)
+        await loading.edit_text(format_apr_card(d, ai), parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
     # Trading
     elif data.startswith("trading:"):

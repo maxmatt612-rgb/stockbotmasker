@@ -521,17 +521,19 @@ def scan_cheap_stocks(max_price: float = 20.0, top_n: int = 10) -> list:
 # ─── Analisi arricchita (report mattutino) ───────────────────────────────────
 
 def get_enriched_analysis(ticker: str) -> dict | None:
-    """Full analysis + earnings today, news sentiment, 52w upside, daily estimate."""
+    """Full analysis + earnings (oggi e prossimi), news sentiment, 52w upside, daily estimate, score."""
     base = get_full_analysis(ticker)
     if not base:
         return None
 
-    # ── Earnings oggi ──
+    # ── Earnings oggi + prossima data earnings ──
     earnings_today = False
+    next_earnings_str = None
     try:
         stock = yf.Ticker(ticker.upper())
         cal = stock.calendar
         today = datetime.now().date()
+        future_dates = []
         if isinstance(cal, dict):
             for key in ("Earnings Date", "Earnings Dates"):
                 ed = cal.get(key)
@@ -540,10 +542,18 @@ def get_enriched_analysis(ticker: str) -> dict | None:
                 dates = ed if isinstance(ed, list) else [ed]
                 for item in dates:
                     try:
-                        if hasattr(item, "date") and item.date() == today:
+                        d = item.date() if hasattr(item, "date") else item
+                        if d == today:
                             earnings_today = True
+                        elif d > today:
+                            future_dates.append(d)
                     except Exception:
                         pass
+        if future_dates:
+            nxt = min(future_dates)
+            _MESI = ["gen", "feb", "mar", "apr", "mag", "giu",
+                     "lug", "ago", "set", "ott", "nov", "dic"]
+            next_earnings_str = f"{nxt.day} {_MESI[nxt.month - 1]} {nxt.year}"
     except Exception:
         pass
 
@@ -578,16 +588,114 @@ def get_enriched_analysis(ticker: str) -> dict | None:
     daily_estimate_pct = base["day_change_pct"]
     daily_estimate_price = base["current_price"] * (1 + daily_estimate_pct / 100)
 
+    # ── Score 0-10 basato su RSI, variazione e trend ──
+    rsi = base.get("rsi", 50.0)
+    chg = base.get("day_change_pct", 0.0)
+    sma_20 = base.get("sma_20")
+    price = base.get("current_price", 0.0)
+    score_raw = 0
+    if rsi < 35:      score_raw += 3
+    elif rsi < 45:    score_raw += 2
+    elif rsi > 70:    score_raw -= 3
+    elif rsi > 60:    score_raw -= 1
+    if chg > 3:       score_raw += 3
+    elif chg > 1:     score_raw += 2
+    elif chg > 0:     score_raw += 1
+    elif chg < -3:    score_raw -= 2
+    if sma_20 and price > sma_20:
+        score_raw += 1
+    score_10 = round(min(10.0, max(0.0, (score_raw + 5) / 15 * 10)), 1)
+
     base.update({
         "earnings_today": earnings_today,
+        "next_earnings_str": next_earnings_str,
         "news_sentiment": news_sentiment,
         "news_sentiment_emoji": news_emoji,
         "news_sentiment_label": news_label,
         "upside_52w": upside_52w,
         "daily_estimate_pct": daily_estimate_pct,
         "daily_estimate_price": daily_estimate_price,
+        "score_10": score_10,
     })
     return base
+
+
+def format_apr_card(d: dict, ai: dict) -> str:
+    """Card professionale per /apr — singola azione con AI verdict."""
+    chg = d["day_change_pct"]
+    sign = "+" if chg >= 0 else ""
+    chg_emoji = "📈" if chg >= 0 else "📉"
+
+    verdict = (ai or {}).get("verdict", "")
+    bullet1 = (ai or {}).get("bullet1", "")
+    bullet2 = (ai or {}).get("bullet2", "")
+
+    news_line = f"{d.get('news_sentiment_emoji', '⚪')} {d.get('news_sentiment_label', 'Neutre')}"
+
+    daily_pct = d.get("daily_estimate_pct", 0.0)
+    daily_price = d.get("daily_estimate_price", d["current_price"])
+    daily_sign = "+" if daily_pct >= 0 else ""
+
+    upside = d.get("upside_52w", 0.0)
+    score_10 = d.get("score_10", 5.0)
+
+    lines = [
+        f"<b>📈 {_h(d['ticker'])} — {_h(d['name'])}</b>",
+        f"💵 ${d['current_price']:.2f}  {chg_emoji} {sign}{chg:.2f}%",
+        "",
+        f"📰 <b>Notizie:</b> {news_line}",
+    ]
+
+    # Earnings
+    if d.get("earnings_today"):
+        lines.append("⚠️ <b>EARNINGS OGGI!</b> Rischio aumentato.")
+    elif d.get("next_earnings_str"):
+        lines.append(f"📅 <b>Prossimi earnings:</b> {d['next_earnings_str']}")
+
+    # AI verdict + motivazione
+    if verdict:
+        lines += ["", f"🎯 {_h(verdict)}"]
+    bullets = [b for b in [bullet1, bullet2] if b]
+    if bullets:
+        lines += ["", "📋 <b>Motivazione:</b>"]
+        for b in bullets:
+            lines.append(f"• {_h(b)}")
+
+    # Stima + target + rischio + score
+    if upside > 0:
+        target_line = f"📊 <b>Target 52w:</b> +{upside:.1f}% (max ${d.get('week_52_high', 0):.2f})"
+    else:
+        target_line = f"📊 <b>Target 52w:</b> Già ai massimi 52w 🏆"
+
+    lines += [
+        "",
+        f"📅 <b>Stima oggi:</b> {daily_sign}{daily_pct:.1f}% → ${daily_price:.2f}",
+        target_line,
+        f"{d.get('risk_emoji', '🟡')} <b>Rischio:</b> {d.get('risk_level', 'Medio')} (volatilità {d.get('volatility', 0):.0f}%)",
+        f"⭐ <b>Score:</b> {score_10}/10",
+    ]
+
+    # Indicatori tecnici
+    lines += [
+        "",
+        "📐 <b>Indicatori tecnici:</b>",
+        f"  • RSI (14): {d['rsi']:.0f}/100",
+    ]
+    for label, val in [("Settimana", d.get("week_return")), ("Mese", d.get("month_return")), ("Anno", d.get("ytd_return"))]:
+        if val is not None:
+            lines.append(f"  • {label}: {'+'if val>=0 else''}{val:.1f}%")
+    if d.get("sma_50"):
+        lines.append(
+            f"  • Trend 50gg: {'📈 rialzista' if d['current_price'] > d['sma_50'] else '📉 ribassista'}"
+        )
+    if d.get("pe_ratio"):
+        lines.append(f"  • P/E: {d['pe_ratio']:.1f}x")
+
+    if d.get("sector"):
+        lines += ["", f"🏭 <b>Settore:</b> {_h(d['sector'])}"]
+
+    lines.append(f"\n<i>Dati: Yahoo Finance | AI: Groq Llama 70B</i>")
+    return "\n".join(lines)
 
 
 def format_morning_card(d: dict, ai: dict, rank: int) -> str:
