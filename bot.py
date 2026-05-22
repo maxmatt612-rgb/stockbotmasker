@@ -338,57 +338,171 @@ async def cmd_confronto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await msg.edit_text(full_text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
+# ─── Portfolio helpers ───────────────────────────────────────────────────────
+
+def _port_get(data: dict, uid: str) -> dict:
+    """Restituisce il portafoglio come dict {TICKER: {price, qty}}.
+    Compatibile con il vecchio formato lista."""
+    raw = data["watchlists"].get(uid, {})
+    if isinstance(raw, list):
+        # migrazione dal vecchio formato lista
+        migrated = {t: {"price": 0.0, "qty": 0.0} for t in raw}
+        data["watchlists"][uid] = migrated
+        save_data(data)
+        return migrated
+    return raw
+
+
+def _port_tickers(data: dict, uid: str) -> list:
+    return list(_port_get(data, uid).keys())
+
+
 # ─── /portafoglio ────────────────────────────────────────────────────────────
 
 async def cmd_portafoglio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = str(update.effective_user.id)
     data = load_data()
-    watchlist = data["watchlists"].get(uid, DEFAULT_WATCHLIST)
-    lines = ["💼 <b>Il tuo portafoglio:</b>\n"] if watchlist else ["💼 <b>Portafoglio vuoto.</b>\n"]
-    for t in watchlist:
-        lines.append(f"  • {t}")
-    lines.append("\n<b>Comandi:</b>\n/aggiungi TICKER · /rimuovi TICKER")
+    args = context.args or []
 
-    # Bottoni per ogni azione nel portafoglio
+    # ── Subcomando: aggiungi ──────────────────────────────────────────────────
+    if args and args[0].lower() == "aggiungi":
+        if len(args) < 4:
+            await update.message.reply_text(
+                "📝 <b>Uso:</b> /portafoglio aggiungi TICKER PREZZO QUANTITÀ\n"
+                "<b>Esempio:</b> /portafoglio aggiungi AAPL 172.50 10",
+                parse_mode=ParseMode.HTML,
+            )
+            return
+        ticker = args[1].upper()
+        try:
+            price = float(args[2].replace(",", "."))
+            qty = float(args[3].replace(",", "."))
+        except ValueError:
+            await update.message.reply_text("❌ Prezzo e quantità devono essere numeri.\nEsempio: /portafoglio aggiungi AAPL 172.50 10", parse_mode=ParseMode.HTML)
+            return
+        port = _port_get(data, uid)
+        port[ticker] = {"price": price, "qty": qty}
+        data["watchlists"][uid] = port
+        save_data(data)
+        invested = price * qty
+        keyboard = kb([[btn(f"📈 Analizza {ticker}", f"apr:{ticker}"), btn(f"🎯 Trading {ticker}", f"trading:{ticker}")]])
+        await update.message.reply_text(
+            f"✅ <b>{ticker}</b> aggiunto al portafoglio!\n"
+            f"📦 {qty:g} azioni @ ${price:.2f} = <b>${invested:,.2f}</b> investiti",
+            parse_mode=ParseMode.HTML, reply_markup=keyboard,
+        )
+        return
+
+    # ── Subcomando: rimuovi ───────────────────────────────────────────────────
+    if args and args[0].lower() == "rimuovi":
+        if len(args) < 2:
+            await update.message.reply_text("Usa: /portafoglio rimuovi TICKER", parse_mode=ParseMode.HTML)
+            return
+        ticker = args[1].upper()
+        port = _port_get(data, uid)
+        if ticker not in port:
+            await update.message.reply_text(f"❌ <b>{ticker}</b> non è nel portafoglio.", parse_mode=ParseMode.HTML)
+            return
+        del port[ticker]
+        data["watchlists"][uid] = port
+        save_data(data)
+        await update.message.reply_text(f"✅ <b>{ticker}</b> rimosso dal portafoglio.", parse_mode=ParseMode.HTML)
+        return
+
+    # ── Vista portafoglio ─────────────────────────────────────────────────────
+    port = _port_get(data, uid)
+    if not port:
+        await update.message.reply_text(
+            "💼 <b>Portafoglio vuoto.</b>\n\n"
+            "Aggiungi la prima azione:\n"
+            "<b>/portafoglio aggiungi TICKER PREZZO QUANTITÀ</b>\n"
+            "Esempio: /portafoglio aggiungi AAPL 172.50 10",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    msg = await update.message.reply_text("⏳ Aggiorno prezzi portafoglio...", parse_mode=ParseMode.HTML)
+
+    tickers = list(port.keys())
+    lines = ["💼 <b>Il tuo portafoglio</b>\n"]
+    total_invested = 0.0
+    total_current = 0.0
+
+    for t in tickers:
+        entry = port[t]
+        buy_price = entry.get("price", 0.0)
+        qty = entry.get("qty", 0.0)
+        try:
+            import yfinance as yf
+            fast = yf.Ticker(t).fast_info
+            cur = float(fast.last_price or 0)
+            chg = ((cur - float(fast.previous_close or cur)) / float(fast.previous_close or cur)) * 100 if fast.previous_close else 0.0
+        except Exception:
+            cur = buy_price
+            chg = 0.0
+
+        invested = buy_price * qty
+        current_val = cur * qty
+        pl = current_val - invested
+        pl_pct = (pl / invested * 100) if invested > 0 else 0.0
+        total_invested += invested
+        total_current += current_val
+
+        chg_str = f"{'+'if chg>=0 else''}{chg:.1f}%"
+        chg_emoji = "📈" if chg >= 0 else "📉"
+        pl_emoji = "🟢" if pl >= 0 else "🔴"
+        pl_sign = "+" if pl >= 0 else ""
+
+        lines.append(
+            f"<b>{t}</b> {chg_emoji} ${cur:.2f} ({chg_str} oggi)\n"
+            f"  📦 {qty:g} az. @ ${buy_price:.2f} → <b>${current_val:,.2f}</b>\n"
+            f"  {pl_emoji} P&L: {pl_sign}${pl:,.2f} ({pl_sign}{pl_pct:.1f}%)"
+        )
+
+    # Totale
+    total_pl = total_current - total_invested
+    total_pl_pct = (total_pl / total_invested * 100) if total_invested > 0 else 0.0
+    total_emoji = "🟢" if total_pl >= 0 else "🔴"
+    total_sign = "+" if total_pl >= 0 else ""
+    lines += [
+        "",
+        "━━━━━━━━━━━━━━━",
+        f"💰 Investito: <b>${total_invested:,.2f}</b>",
+        f"📊 Valore attuale: <b>${total_current:,.2f}</b>",
+        f"{total_emoji} P&L totale: <b>{total_sign}${total_pl:,.2f} ({total_sign}{total_pl_pct:.1f}%)</b>",
+        "",
+        "<i>/portafoglio aggiungi TICKER PREZZO QTÀ\n/portafoglio rimuovi TICKER</i>",
+    ]
+
     rows = []
-    for i in range(0, len(watchlist), 3):
-        rows.append([btn(f"📈 {t}", f"apr:{t}") for t in watchlist[i:i+3]])
+    for i in range(0, len(tickers), 3):
+        rows.append([btn(f"📈 {t}", f"apr:{t}") for t in tickers[i:i+3]])
 
-    await update.message.reply_text(
-        "\n".join(lines), parse_mode=ParseMode.HTML,
-        reply_markup=kb(rows) if rows else None,
-    )
+    await msg.edit_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=kb(rows) if rows else None)
 
 
 async def cmd_aggiungi(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("Usa: /aggiungi TICKER")
-        return
-    ticker = context.args[0].upper()
-    uid = str(update.effective_user.id)
-    data = load_data()
-    watchlist = data["watchlists"].setdefault(uid, DEFAULT_WATCHLIST.copy())
-    if ticker in watchlist:
-        await update.message.reply_text(f"<b>{ticker}</b> è già nel portafoglio.", parse_mode=ParseMode.HTML)
-        return
-    watchlist.append(ticker)
-    save_data(data)
-    keyboard = kb([[btn(f"📈 Analizza {ticker}", f"apr:{ticker}"), btn(f"🎯 Trading {ticker}", f"trading:{ticker}")]])
-    await update.message.reply_text(f"✅ <b>{ticker}</b> aggiunto!", parse_mode=ParseMode.HTML, reply_markup=keyboard)
+    """Shortcut per /portafoglio aggiungi."""
+    await update.message.reply_text(
+        "📝 Usa il comando completo:\n<b>/portafoglio aggiungi TICKER PREZZO QUANTITÀ</b>\n\nEsempio: /portafoglio aggiungi AAPL 172.50 10",
+        parse_mode=ParseMode.HTML,
+    )
 
 
 async def cmd_rimuovi(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Shortcut per /portafoglio rimuovi."""
     if not context.args:
-        await update.message.reply_text("Usa: /rimuovi TICKER")
+        await update.message.reply_text("Usa: /portafoglio rimuovi TICKER", parse_mode=ParseMode.HTML)
         return
     ticker = context.args[0].upper()
     uid = str(update.effective_user.id)
     data = load_data()
-    watchlist = data["watchlists"].get(uid, [])
-    if ticker not in watchlist:
-        await update.message.reply_text(f"<b>{ticker}</b> non è nel portafoglio.", parse_mode=ParseMode.HTML)
+    port = _port_get(data, uid)
+    if ticker not in port:
+        await update.message.reply_text(f"❌ <b>{ticker}</b> non è nel portafoglio.", parse_mode=ParseMode.HTML)
         return
-    watchlist.remove(ticker)
+    del port[ticker]
+    data["watchlists"][uid] = port
     save_data(data)
     await update.message.reply_text(f"✅ <b>{ticker}</b> rimosso.", parse_mode=ParseMode.HTML)
 
@@ -576,7 +690,7 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
     date_str = f"{_GIORNI_IT[now.weekday()]} {now.day} {_MESI_IT[now.month - 1]} {now.year}"
 
     data = load_data()
-    all_uids = [uid for uid, wl in data["watchlists"].items()]
+    all_uids = [uid for uid in data["watchlists"].keys()]
     if not all_uids:
         return
 
