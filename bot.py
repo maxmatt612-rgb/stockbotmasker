@@ -217,7 +217,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = str(update.effective_user.id)
     data = load_data()
     if uid not in data["watchlists"]:
-        data["watchlists"][uid] = DEFAULT_WATCHLIST.copy()
+        data["watchlists"][uid] = {}
         save_data(data)
 
     await update.message.reply_text(
@@ -493,13 +493,22 @@ async def cmd_portafoglio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_invested = 0.0
     total_current = 0.0
 
+    import yfinance as _yf_port
+
+    def _fetch_fast_info(t):
+        try:
+            return _yf_port.Ticker(t).fast_info
+        except Exception:
+            return None
+
     for t in tickers:
         entry = port[t]
         buy_price = entry.get("price", 0.0)
         qty = entry.get("qty", 0.0)
         try:
-            import yfinance as yf
-            fast = yf.Ticker(t).fast_info
+            fast = await asyncio.to_thread(_fetch_fast_info, t)
+            if fast is None:
+                raise ValueError("no data")
             cur = float(fast.last_price or 0)
             chg = ((cur - float(fast.previous_close or cur)) / float(fast.previous_close or cur)) * 100 if fast.previous_close else 0.0
         except Exception:
@@ -827,7 +836,7 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
 async def job_evening_report(context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
     all_uids = list(data["watchlists"].keys())
-    if not all_uids:
+    if not all_uids and not GROUP_CHAT_ID:
         return
 
     # Usa lo scanner per il recap serale (stesso metodo del mattino)
@@ -870,7 +879,7 @@ async def job_evening_report(context: ContextTypes.DEFAULT_TYPE):
 async def job_weekly_report(context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
     all_uids = list(data["watchlists"].keys())
-    if not all_uids:
+    if not all_uids and not GROUP_CHAT_ID:
         return
 
     # Usa lo scanner per il recap settimanale

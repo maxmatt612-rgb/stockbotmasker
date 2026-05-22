@@ -411,7 +411,6 @@ def scan_cheap_stocks(max_price: float = 20.0, top_n: int = 10) -> list:
                 interval="1d",
                 auto_adjust=True,
                 progress=False,
-                threads=True,
             )
             if raw.empty:
                 continue
