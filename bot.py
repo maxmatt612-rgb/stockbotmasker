@@ -356,7 +356,7 @@ async def cmd_trading(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     ticker = context.args[0].upper()
     msg = await update.message.reply_text(f"⏳ Analizzo <b>{ticker}</b> per trading...", parse_mode=ParseMode.HTML)
-    data = get_trading_analysis(ticker)
+    data = await asyncio.to_thread(get_trading_analysis, ticker)
     if not data:
         await msg.edit_text(f"❌ Nessun dato per <b>{ticker}</b>.", parse_mode=ParseMode.HTML)
         return
@@ -381,8 +381,10 @@ async def cmd_confronto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"⏳ Confronto <b>{t1}</b> vs <b>{t2}</b>...\n<i>Analizzo i dati e chiedo all'AI</i>",
         parse_mode=ParseMode.HTML,
     )
-    d1 = get_full_analysis(t1)
-    d2 = get_full_analysis(t2)
+    d1, d2 = await asyncio.gather(
+        asyncio.to_thread(get_full_analysis, t1),
+        asyncio.to_thread(get_full_analysis, t2),
+    )
     if not d1:
         await msg.edit_text(f"❌ Nessun dato per <b>{t1}</b>.", parse_mode=ParseMode.HTML)
         return
@@ -649,7 +651,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("trading:"):
         ticker = data.split(":")[1]
         await query.message.reply_text(f"⏳ Trading analysis <b>{ticker}</b>...", parse_mode=ParseMode.HTML)
-        d = get_trading_analysis(ticker)
+        d = await asyncio.to_thread(get_trading_analysis, ticker)
         if not d:
             await query.message.reply_text(f"❌ Nessun dato per <b>{ticker}</b>.", parse_mode=ParseMode.HTML)
             return
@@ -659,14 +661,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Aggiungi al portafoglio
     elif data.startswith("add_portfolio:"):
         ticker = data.split(":")[1]
-        user_data = load_data()
-        watchlist = user_data["watchlists"].setdefault(uid, DEFAULT_WATCHLIST.copy())
-        if ticker in watchlist:
-            await query.message.reply_text(f"<b>{ticker}</b> è già nel portafoglio.", parse_mode=ParseMode.HTML)
-        else:
-            watchlist.append(ticker)
-            save_data(user_data)
-            await query.message.reply_text(f"✅ <b>{ticker}</b> aggiunto al portafoglio!", parse_mode=ParseMode.HTML)
+        await query.message.reply_text(
+            f"💼 Per aggiungere <b>{ticker}</b> al portafoglio digita:\n\n"
+            f"<code>/portafoglio aggiungi {ticker} PREZZO QUANTITÀ</code>\n\n"
+            f"<i>Esempio: /portafoglio aggiungi {ticker} 10.50 100</i>",
+            parse_mode=ParseMode.HTML,
+        )
 
     # Aggiorna scanner (non più usato ma gestito per sicurezza)
     elif data == "refresh_scan":
@@ -697,7 +697,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "help_confronto":
         await query.message.reply_text("⚔️ <b>/confronto TICKER1 TICKER2</b>\n\nConfronta due azioni su 5 criteri + valutazione AI finale.\n\nEsempio: /confronto PLTR NIO", parse_mode=ParseMode.HTML)
     elif data == "help_portafoglio":
-        await query.message.reply_text("💼 <b>/portafoglio</b>\n\nVedi le tue azioni. Il report mattutino e il recap serale usano questa lista.\n\n/aggiungi TICKER — aggiungi\n/rimuovi TICKER — rimuovi", parse_mode=ParseMode.HTML)
+        await query.message.reply_text(
+            "💼 <b>/portafoglio</b>\n\nVedi le tue azioni con P&amp;L aggiornato.\n\n"
+            "📌 <b>Aggiungi:</b>\n<code>/portafoglio aggiungi TICKER PREZZO QUANTITÀ</code>\n"
+            "<i>Es: /portafoglio aggiungi PLTR 17.50 50</i>\n\n"
+            "🗑 <b>Rimuovi:</b>\n<code>/portafoglio rimuovi TICKER</code>",
+            parse_mode=ParseMode.HTML,
+        )
     elif data == "help_chiediai":
         await query.message.reply_text("🤖 <b>/chiediai [domanda]</b>\n\nFai qualsiasi domanda sul mercato azionario all'AI.\n\nEsempio: /chiediai l'oro è un buon investimento adesso?", parse_mode=ParseMode.HTML)
 
@@ -730,7 +736,7 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
 
     data = load_data()
     all_uids = [uid for uid in data["watchlists"].keys()]
-    if not all_uids:
+    if not all_uids and not GROUP_CHAT_ID:
         return
 
     # 1 ── Scanner top 10
@@ -829,7 +835,11 @@ async def job_evening_report(context: ContextTypes.DEFAULT_TYPE):
     if not scanner_raw:
         return
 
-    risultati = [d for r in scanner_raw if (d := get_full_analysis(r["ticker"]))]
+    raw_results = await asyncio.gather(
+        *[asyncio.to_thread(get_full_analysis, r["ticker"]) for r in scanner_raw],
+        return_exceptions=True,
+    )
+    risultati = [d for d in raw_results if d and not isinstance(d, Exception)]
     if not risultati:
         return
 
@@ -868,7 +878,11 @@ async def job_weekly_report(context: ContextTypes.DEFAULT_TYPE):
     if not scanner_raw:
         return
 
-    risultati = [d for r in scanner_raw if (d := get_full_analysis(r["ticker"]))]
+    raw_results = await asyncio.gather(
+        *[asyncio.to_thread(get_full_analysis, r["ticker"]) for r in scanner_raw],
+        return_exceptions=True,
+    )
+    risultati = [d for d in raw_results if d and not isinstance(d, Exception)]
     if not risultati:
         return
 
@@ -927,10 +941,16 @@ async def job_news_portafoglio(context: ContextTypes.DEFAULT_TYPE):
     news_lines = [f"📰 <b>Notizie portafoglio</b>\n"]
     found = 0
 
+    def _fetch_news_sync(t):
+        try:
+            return _yf.Ticker(t).news or []
+        except Exception:
+            return []
+
     for ticker in sorted(all_tickers):
         try:
-            stock = _yf.Ticker(ticker)
-            for item in (stock.news or [])[:3]:
+            news_items = await asyncio.to_thread(_fetch_news_sync, ticker)
+            for item in news_items[:3]:
                 content = item.get("content", {})
                 title = content.get("title", "") if isinstance(content, dict) else str(content)
                 if not title:
