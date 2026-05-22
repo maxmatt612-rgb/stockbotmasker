@@ -211,6 +211,19 @@ async def generate_ai_verdict(d: dict) -> dict:
         return {"verdict": "", "bullet1": "", "bullet2": ""}
 
 
+# ─── /topicid (temporaneo) ───────────────────────────────────────────────────
+
+async def cmd_topicid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    thread_id = update.message.message_thread_id
+    await update.message.reply_text(
+        f"📋 <b>Info topic:</b>\n"
+        f"• <b>Chat ID:</b> <code>{chat_id}</code>\n"
+        f"• <b>Topic ID:</b> <code>{thread_id if thread_id else 'non sei in un topic'}</code>",
+        parse_mode=ParseMode.HTML,
+    )
+
+
 # ─── /start ──────────────────────────────────────────────────────────────────
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -897,6 +910,7 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
+    app.add_handler(CommandHandler("topicid", cmd_topicid))
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("analisi", cmd_analisi))
