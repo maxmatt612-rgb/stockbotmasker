@@ -995,12 +995,31 @@ async def job_news_portafoglio(context: ContextTypes.DEFAULT_TYPE):
     save_data(data)
 
 
+# ─── Web Server (FastAPI) ────────────────────────────────────────────────────
+
+def _run_web_server():
+    """Avvia il web server FastAPI in un thread separato."""
+    try:
+        import uvicorn
+        from web_server import app as web_app
+        port = int(os.getenv("PORT", 8080))
+        logger.info(f"🌐 Web dashboard avviata su porta {port}")
+        uvicorn.run(web_app, host="0.0.0.0", port=port, log_level="warning")
+    except Exception as e:
+        logger.error(f"Errore web server: {e}")
+
+
 # ─── Avvio ───────────────────────────────────────────────────────────────────
 
 def main():
     if not BOT_TOKEN:
         print("ERRORE: BOT_TOKEN mancante")
         return
+
+    # Avvia web server in background (thread daemon)
+    import threading
+    web_thread = threading.Thread(target=_run_web_server, daemon=True, name="web-server")
+    web_thread.start()
 
     app = Application.builder().token(BOT_TOKEN).build()
 
