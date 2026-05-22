@@ -211,6 +211,20 @@ async def generate_ai_verdict(d: dict) -> dict:
         return {"verdict": "", "bullet1": "", "bullet2": ""}
 
 
+# ─── /testanalisi e /testnotizie (temporanei) ───────────────────────────────
+
+async def cmd_testanalisi(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("▶️ Avvio test report analisi nel topic...", parse_mode=ParseMode.HTML)
+    await job_daily_report(context)
+    await update.message.reply_text("✅ Test analisi completato.", parse_mode=ParseMode.HTML)
+
+
+async def cmd_testnotizie(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("▶️ Avvio test notizie nel topic...", parse_mode=ParseMode.HTML)
+    await job_news_portafoglio(context)
+    await update.message.reply_text("✅ Test notizie completato.", parse_mode=ParseMode.HTML)
+
+
 # ─── /start ──────────────────────────────────────────────────────────────────
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -975,6 +989,8 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
+    app.add_handler(CommandHandler("testanalisi", cmd_testanalisi))
+    app.add_handler(CommandHandler("testnotizie", cmd_testnotizie))
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("analisi", cmd_analisi))
