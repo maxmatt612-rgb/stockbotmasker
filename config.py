@@ -5,6 +5,14 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
+# Gruppo con topic
+_raw_chat = os.getenv("GROUP_CHAT_ID", "")
+GROUP_CHAT_ID = int(_raw_chat) if _raw_chat else None
+_raw_analisi = os.getenv("TOPIC_ANALISI_ID", "")
+TOPIC_ANALISI_ID = int(_raw_analisi) if _raw_analisi else None
+_raw_notizie = os.getenv("TOPIC_NOTIZIE_ID", "")
+TOPIC_NOTIZIE_ID = int(_raw_notizie) if _raw_notizie else None
+
 DEFAULT_WATCHLIST = [
     "PLTR", "SOFI", "F", "NIO", "RIVN",
     "NOK", "SNAP", "LCID", "VALE", "XPEV",

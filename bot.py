@@ -26,7 +26,7 @@ from analyzer import (
     format_report_line,
     format_apr_card,
 )
-from config import BOT_TOKEN, DEFAULT_WATCHLIST, REPORT_HOUR, REPORT_MINUTE
+from config import BOT_TOKEN, DEFAULT_WATCHLIST, REPORT_HOUR, REPORT_MINUTE, GROUP_CHAT_ID, TOPIC_ANALISI_ID, TOPIC_NOTIZIE_ID
 
 load_dotenv()
 logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
@@ -209,19 +209,6 @@ async def generate_ai_verdict(d: dict) -> dict:
     except Exception as e:
         logger.error(f"AI verdict {d['ticker']}: {e}")
         return {"verdict": "", "bullet1": "", "bullet2": ""}
-
-
-# ─── /topicid (temporaneo) ───────────────────────────────────────────────────
-
-async def cmd_topicid(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    thread_id = update.message.message_thread_id
-    await update.message.reply_text(
-        f"📋 <b>Info topic:</b>\n"
-        f"• <b>Chat ID:</b> <code>{chat_id}</code>\n"
-        f"• <b>Topic ID:</b> <code>{thread_id if thread_id else 'non sei in un topic'}</code>",
-        parse_mode=ParseMode.HTML,
-    )
 
 
 # ─── /start ──────────────────────────────────────────────────────────────────
@@ -722,6 +709,20 @@ _MESI_IT = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
             "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"]
 
 
+async def _send_to_group(bot, text: str, topic_id: int, **kwargs):
+    """Invia un messaggio al topic del gruppo se configurato."""
+    if GROUP_CHAT_ID and topic_id:
+        try:
+            await bot.send_message(
+                GROUP_CHAT_ID, text,
+                message_thread_id=topic_id,
+                parse_mode=ParseMode.HTML,
+                **kwargs,
+            )
+        except Exception as e:
+            logger.warning(f"Errore invio topic {topic_id}: {e}")
+
+
 async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
     from datetime import datetime as _dt
     now = _dt.now(ROME)
@@ -773,7 +774,31 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
     num_parts = len(chunks)
     SEP = "\n\n" + "━" * 20 + "\n\n"
 
-    # 5 ── Invio a tutti gli utenti registrati
+    # 5 ── Costruzione testo completo per il gruppo
+    all_cards = []
+    base_rank = 1
+    for ci, (chunk, ai_chunk) in enumerate(zip(chunks, ai_chunks)):
+        part_label = f"({ci + 1}/{num_parts})"
+        cards = [
+            format_morning_card(d, ai, base_rank + i)
+            for i, (d, ai) in enumerate(zip(chunk, ai_chunk))
+        ]
+        base_rank += len(chunk)
+        body = SEP.join(cards)
+        full_msg = (
+            f"🔝 <b>Top {total} azioni sotto $20 {part_label}</b>\n\n"
+            + body
+            + "\n\n<i>Dati: Yahoo Finance | Analisi: AI</i>"
+        )
+        all_cards.append(full_msg)
+
+    # 6 ── Invia al topic Analisi del gruppo
+    header_group = f"📊 <b>Analisi automatica — {date_str}</b>"
+    await _send_to_group(context.bot, header_group, TOPIC_ANALISI_ID)
+    for msg_part in all_cards:
+        await _send_to_group(context.bot, msg_part, TOPIC_ANALISI_ID)
+
+    # 7 ── Invia anche ai singoli utenti in DM
     for uid in all_uids:
         try:
             await context.bot.send_message(
@@ -784,35 +809,11 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.warning(f"Errore header {uid}: {e}")
             continue
-
-        base_rank = 1
-        for ci, (chunk, ai_chunk) in enumerate(zip(chunks, ai_chunks)):
-            part_label = f"({ci + 1}/{num_parts})"
-            cards = [
-                format_morning_card(d, ai, base_rank + i)
-                for i, (d, ai) in enumerate(zip(chunk, ai_chunk))
-            ]
-            base_rank += len(chunk)
-
-            body = SEP.join(cards)
-            full_msg = (
-                f"🔝 <b>Top {total} azioni sotto $20 {part_label}</b>\n\n"
-                + body
-                + "\n\n<i>Dati: Yahoo Finance | Analisi: AI</i>"
-            )
+        for msg_part in all_cards:
             try:
-                await context.bot.send_message(int(uid), full_msg, parse_mode=ParseMode.HTML)
+                await context.bot.send_message(int(uid), msg_part, parse_mode=ParseMode.HTML)
             except Exception as e:
-                logger.warning(f"Errore chunk {ci} per {uid}: {e}")
-
-        try:
-            await context.bot.send_message(
-                int(uid),
-                "✅ <b>Report completato!</b>\n<i>Ci rivediamo alle 22:00 con il recap serale.</i>",
-                parse_mode=ParseMode.HTML,
-            )
-        except Exception as e:
-            logger.warning(f"Errore chiusura {uid}: {e}")
+                logger.warning(f"Errore msg {uid}: {e}")
 
 
 # ─── Job serale (22:00) ──────────────────────────────────────────────────────
@@ -846,6 +847,7 @@ async def job_evening_report(context: ContextTypes.DEFAULT_TYPE):
     ]
     text = "\n".join(lines)
 
+    await _send_to_group(context.bot, text, TOPIC_ANALISI_ID)
     for uid in all_uids:
         try:
             await context.bot.send_message(int(uid), text, parse_mode=ParseMode.HTML)
@@ -894,11 +896,74 @@ async def job_weekly_report(context: ContextTypes.DEFAULT_TYPE):
     ]
     text = "\n".join(lines)
 
+    await _send_to_group(context.bot, text, TOPIC_ANALISI_ID)
     for uid in all_uids:
         try:
             await context.bot.send_message(int(uid), text, parse_mode=ParseMode.HTML)
         except Exception as e:
             logger.warning(f"Errore recap settimanale {uid}: {e}")
+
+
+# ─── Job notizie portafoglio (ogni 4 ore) ────────────────────────────────────
+
+async def job_news_portafoglio(context: ContextTypes.DEFAULT_TYPE):
+    """Controlla notizie nuove per le azioni nel portafoglio → topic Notizie."""
+    if not GROUP_CHAT_ID or not TOPIC_NOTIZIE_ID:
+        return
+
+    import yfinance as _yf
+
+    data = load_data()
+    # Raccogli tutti i ticker unici da tutti i portafogli
+    all_tickers = set()
+    for uid in data["watchlists"]:
+        for t in _port_get(data, uid).keys():
+            all_tickers.add(t)
+    if not all_tickers:
+        return
+
+    sent_ids = set(data.get("sent_news_ids", []))
+    new_sent = []
+    news_lines = [f"📰 <b>Notizie portafoglio</b>\n"]
+    found = 0
+
+    for ticker in sorted(all_tickers):
+        try:
+            stock = _yf.Ticker(ticker)
+            for item in (stock.news or [])[:3]:
+                content = item.get("content", {})
+                title = content.get("title", "") if isinstance(content, dict) else str(content)
+                if not title:
+                    continue
+                uid_key = title[:80]
+                if uid_key in sent_ids:
+                    continue
+                # URL articolo
+                url = ""
+                if isinstance(content, dict):
+                    cp = content.get("canonicalUrl", {})
+                    url = cp.get("url", "") if isinstance(cp, dict) else ""
+                link = f' <a href="{url}">→</a>' if url else ""
+                news_lines.append(f"<b>{ticker}</b>: {title[:120]}{link}")
+                new_sent.append(uid_key)
+                found += 1
+                if found >= 15:
+                    break
+        except Exception:
+            continue
+        if found >= 15:
+            break
+
+    if found == 0:
+        return
+
+    news_lines.append("\n<i>Aggiornamento automatico ogni 4 ore</i>")
+    await _send_to_group(context.bot, "\n".join(news_lines), TOPIC_NOTIZIE_ID)
+
+    # Salva IDs inviati (max 1000)
+    all_ids = list(sent_ids) + new_sent
+    data["sent_news_ids"] = all_ids[-1000:]
+    save_data(data)
 
 
 # ─── Avvio ───────────────────────────────────────────────────────────────────
@@ -910,7 +975,6 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
-    app.add_handler(CommandHandler("topicid", cmd_topicid))
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("analisi", cmd_analisi))
@@ -931,6 +995,7 @@ def main():
         time=time(hour=10, minute=0, tzinfo=ROME),
         days=(5,),  # 5 = sabato
     )
+    jq.run_repeating(job_news_portafoglio, interval=14400, first=60)  # ogni 4 ore
 
     logger.info("Bot avviato!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
