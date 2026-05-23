@@ -11,7 +11,8 @@ from groq import AsyncGroq
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram import InputFile
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 from analyzer import (
     get_full_analysis,
@@ -26,7 +27,7 @@ from analyzer import (
     format_report_line,
     format_apr_card,
 )
-from config import BOT_TOKEN, DEFAULT_WATCHLIST, REPORT_HOUR, REPORT_MINUTE, GROUP_CHAT_ID, TOPIC_ANALISI_ID, TOPIC_NOTIZIE_ID
+from config import BOT_TOKEN, DEFAULT_WATCHLIST, REPORT_HOUR, REPORT_MINUTE, GROUP_CHAT_ID, TOPIC_ANALISI_ID, TOPIC_NOTIZIE_ID, TOPIC_GRAFICO_ID
 
 load_dotenv()
 logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
@@ -51,6 +52,61 @@ def load_data() -> dict:
 
 def save_data(data: dict):
     DATA_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+# ─── Livelli utente ──────────────────────────────────────────────────────────
+
+def get_user_level(data: dict, uid: str) -> str:
+    return data.get("levels", {}).get(str(uid), "intermedio")
+
+def set_user_level(data: dict, uid: str, level: str):
+    data.setdefault("levels", {})[str(uid)] = level
+
+
+# ─── Prompt analisi grafico per livello ──────────────────────────────────────
+
+_GRAFICO_PROMPT = {
+    "dilettante": (
+        "Sei un esperto di trading che aiuta un principiante. Analizza questo grafico e rispondi in italiano "
+        "in modo MOLTO semplice. Usa questo formato:\n\n"
+        "📍 SITUAZIONE: [una frase: il prezzo sta salendo/scendendo/laterale e perché]\n"
+        "🛑 STOP LOSS: [valore preciso] — [spiegazione semplicissima in 1 riga]\n"
+        "🎯 TAKE PROFIT: [valore preciso] — [spiegazione semplice in 1 riga]\n"
+        "💡 CONSIGLIO: COMPRA / VENDI / ASPETTA\n"
+        "[2 righe max, spiega come a un bambino]\n\n"
+        "Usa emoji, sii incoraggiante, zero gergo tecnico."
+    ),
+    "intermedio": (
+        "Sei un analista tecnico. Analizza questo grafico in italiano con questo formato:\n\n"
+        "📈 TREND: [direzione e forza]\n"
+        "🔑 LIVELLI CHIAVE: Supporto $X.XX | Resistenza $X.XX\n"
+        "🛑 STOP LOSS: $X.XX [-X%] | Invalidazione: [motivazione tecnica]\n"
+        "🎯 TP1: $X.XX [+X%] — R/R 1:X\n"
+        "🎯 TP2: $X.XX [+X%] — R/R 1:X\n"
+        "📊 SEGNALI: [RSI visivo, volume, pattern rilevati]\n"
+        "⚖️ BIAS: Rialzista / Ribassista / Neutro\n"
+        "🎯 ENTRY IDEALE: $X.XX\n\n"
+        "Sii preciso e conciso."
+    ),
+    "esperto": (
+        "Sei un analista quantitativo senior. Analisi tecnica professionale del grafico in italiano:\n\n"
+        "🏗️ STRUTTURA: [macro trend, micro price action, key levels]\n"
+        "📐 PATTERN: [pattern tecnici: H&S, wedge, flag, double top/bottom, triangoli, ecc.]\n"
+        "🔑 LIVELLI: [supporti/resistenze statici, dinamici, pivot points]\n"
+        "📏 FIBONACCI: [livelli di ritracciamento/estensione se visibili]\n"
+        "📦 VOLUME: [analisi volume se presente nel grafico]\n"
+        "🛑 STOP LOSS: $X.XX | Invalidazione tecnica: [dettaglio]\n"
+        "🎯 TP1: $X.XX — R/R 1:X\n"
+        "🎯 TP2: $X.XX — R/R 1:X\n"
+        "🎯 TP3 (esteso): $X.XX — R/R 1:X\n"
+        "📍 ENTRY: $X.XX [limite/mercato, motivazione]\n"
+        "🧠 TESI: [tesi di trading in 2 righe]\n"
+        "⚠️ RISCHIO: max 1-2% capitale per operazione\n\n"
+        "Dati precisi, linguaggio da trader professionista."
+    ),
+}
+
+_LEVEL_LABEL = {"dilettante": "🟢 Base", "intermedio": "🟡 Pro", "esperto": "🔴 Expert"}
 
 
 # ─── Helpers bottoni ─────────────────────────────────────────────────────────
@@ -247,7 +303,9 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🎯 /trading — day trading: compra e vendi subito\n"
         "⚔️ /confronto — confronta due azioni con AI\n"
         "💼 /portafoglio — il tuo portafoglio con P&amp;L\n"
-        "🤖 /chiediai — chiedi all'AI\n\n"
+        "🤖 /chiediai — chiedi all'AI\n"
+        "📸 <b>Foto grafico → analisi SL/TP</b> — invia una foto di un grafico nel topic Grafico\n"
+        "🎚 /livello — imposta il tuo livello (Base / Pro / Expert)\n\n"
         "<i>Clicca un bottone per sapere come si usa</i>",
         parse_mode=ParseMode.HTML,
         reply_markup=keyboard,
@@ -837,6 +895,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "help_chiediai":
         await query.message.reply_text("🤖 <b>/chiediai [domanda]</b>\n\nFai qualsiasi domanda sul mercato azionario all'AI.\n\nEsempio: /chiediai l'oro è un buon investimento adesso?", parse_mode=ParseMode.HTML)
 
+    elif data.startswith("livello:"):
+        chosen = data.split(":")[1]
+        user_data = load_data()
+        set_user_level(user_data, uid, chosen)
+        save_data(user_data)
+        await query.message.edit_text(
+            f"✅ Livello impostato: {_LEVEL_LABEL[chosen]}\n\n"
+            "Invia un grafico (foto) qui in privato o nel topic <b>Grafico</b> del gruppo "
+            "per ricevere un'analisi con stop loss e take profit.",
+            parse_mode=ParseMode.HTML
+        )
+
 
 # ─── Job mattutino (7:30) ────────────────────────────────────────────────────
 
@@ -1154,6 +1224,141 @@ def _run_web_server():
         logger.error(f"Errore web server: {e}")
 
 
+# ─── /livello — imposta livello esperienza ────────────────────────────────────
+
+async def cmd_livello(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    args = context.args
+    uid = str(update.effective_user.id)
+    data = load_data()
+    current = get_user_level(data, uid)
+
+    if not args:
+        kb_rows = [[
+            btn("🟢 Base",   f"livello:dilettante"),
+            btn("🟡 Pro",    f"livello:intermedio"),
+            btn("🔴 Expert", f"livello:esperto"),
+        ]]
+        await update.message.reply_text(
+            f"📊 <b>Livello attuale:</b> {_LEVEL_LABEL.get(current, current)}\n\n"
+            "Scegli il tuo livello di esperienza per l'analisi grafico:",
+            parse_mode=ParseMode.HTML, reply_markup=kb(kb_rows)
+        )
+        return
+
+    level_map = {"base": "dilettante", "pro": "intermedio", "expert": "esperto",
+                 "dilettante": "dilettante", "intermedio": "intermedio", "esperto": "esperto"}
+    chosen = level_map.get(args[0].lower())
+    if not chosen:
+        await update.message.reply_text("❌ Livelli disponibili: base, pro, expert")
+        return
+    set_user_level(data, uid, chosen)
+    save_data(data)
+    await update.message.reply_text(
+        f"✅ Livello impostato: {_LEVEL_LABEL[chosen]}\n"
+        "Le prossime analisi grafico useranno questo livello."
+    )
+
+
+# ─── Analisi grafico da foto ──────────────────────────────────────────────────
+
+async def handle_grafico_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Analizza una foto di grafico inviata nel topic Grafico o in privato."""
+    msg = update.message
+    if not msg or not msg.photo:
+        return
+
+    # Filtra: accetta solo in privato o nel topic Grafico del gruppo
+    is_private = msg.chat.type == "private"
+    is_grafico_topic = (
+        GROUP_CHAT_ID and TOPIC_GRAFICO_ID and
+        msg.chat.id == GROUP_CHAT_ID and
+        msg.message_thread_id == TOPIC_GRAFICO_ID
+    )
+    if not is_private and not is_grafico_topic:
+        return
+
+    if not groq_client:
+        await msg.reply_text("❌ AI non configurata (GROQ_API_KEY mancante)")
+        return
+
+    uid = str(update.effective_user.id)
+    data = load_data()
+    level = get_user_level(data, uid)
+
+    # Caption può sovrascrivere il livello
+    caption = (msg.caption or "").lower()
+    if "base" in caption or "dilettante" in caption:
+        level = "dilettante"
+    elif "pro" in caption or "intermedio" in caption:
+        level = "intermedio"
+    elif "expert" in caption or "esperto" in caption:
+        level = "esperto"
+
+    wait_msg = await msg.reply_text(
+        f"🔍 Analisi grafico in corso… {_LEVEL_LABEL[level]}\n"
+        "<i>Invio all'AI, circa 10-20 secondi…</i>",
+        parse_mode=ParseMode.HTML
+    )
+
+    try:
+        # Scarica la foto in memoria (qualità massima)
+        photo = msg.photo[-1]
+        file = await context.bot.get_file(photo.file_id)
+        import io, base64
+        buf = io.BytesIO()
+        await file.download_to_memory(buf)
+        buf.seek(0)
+        b64 = base64.b64encode(buf.read()).decode("utf-8")
+        image_url = f"data:image/jpeg;base64,{b64}"
+
+        prompt = _GRAFICO_PROMPT[level]
+
+        resp = await groq_client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text",  "text": prompt},
+                    {"type": "image_url", "image_url": {"url": image_url}},
+                ],
+            }],
+            max_tokens=700,
+            temperature=0.4,
+        )
+
+        analysis = resp.choices[0].message.content.strip()
+        level_header = {
+            "dilettante": "🟢 ANALISI BASE",
+            "intermedio": "🟡 ANALISI TECNICA PRO",
+            "esperto":    "🔴 ANALISI EXPERT",
+        }[level]
+
+        reply = (
+            f"<b>{level_header}</b>\n\n"
+            f"{analysis}\n\n"
+            f"<i>⚠️ Solo a scopo informativo. Non costituisce consulenza finanziaria.</i>"
+        )
+
+        await wait_msg.delete()
+        # Se nel gruppo, rispondi nel topic
+        if is_grafico_topic:
+            await context.bot.send_message(
+                GROUP_CHAT_ID, reply,
+                message_thread_id=TOPIC_GRAFICO_ID,
+                parse_mode=ParseMode.HTML,
+                reply_to_message_id=msg.message_id,
+            )
+        else:
+            await msg.reply_text(reply, parse_mode=ParseMode.HTML)
+
+    except Exception as e:
+        logger.error(f"Errore analisi grafico: {e}")
+        try:
+            await wait_msg.edit_text(f"❌ Errore analisi: {str(e)[:120]}")
+        except Exception:
+            pass
+
+
 # ─── Avvio ───────────────────────────────────────────────────────────────────
 
 def main():
@@ -1179,6 +1384,8 @@ def main():
     app.add_handler(CommandHandler("rimuovi", cmd_rimuovi))
     app.add_handler(CommandHandler("valuta", cmd_valuta))
     app.add_handler(CommandHandler("chiediai", cmd_chiediai))
+    app.add_handler(CommandHandler("livello", cmd_livello))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_grafico_photo))
     app.add_handler(CallbackQueryHandler(handle_callback))
 
     jq = app.job_queue

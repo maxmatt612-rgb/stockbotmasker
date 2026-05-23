@@ -12,6 +12,8 @@ _raw_analisi = os.getenv("TOPIC_ANALISI_ID", "")
 TOPIC_ANALISI_ID = int(_raw_analisi) if _raw_analisi else None
 _raw_notizie = os.getenv("TOPIC_NOTIZIE_ID", "")
 TOPIC_NOTIZIE_ID = int(_raw_notizie) if _raw_notizie else None
+_raw_grafico = os.getenv("TOPIC_GRAFICO_ID", "")
+TOPIC_GRAFICO_ID = int(_raw_grafico) if _raw_grafico else None
 
 DEFAULT_WATCHLIST = [
     "PLTR", "SOFI", "F", "NIO", "RIVN",
