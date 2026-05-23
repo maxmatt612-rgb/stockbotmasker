@@ -624,6 +624,21 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .vsmarket-legend span{display:flex;align-items:center;gap:5px}
 .vsmarket-legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
 
+/* ── Analisi grafico (upload) ── */
+.chart-upload-wrap{padding:16px 0;border-top:1px solid var(--border);margin-top:8px;display:none}
+.chart-upload-title{font-size:.72rem;font-weight:700;color:var(--text-dim);letter-spacing:.08em;margin-bottom:10px}
+.chart-drop-zone{border:2px dashed var(--border);border-radius:var(--r-lg);padding:24px;text-align:center;cursor:pointer;transition:all .2s;position:relative}
+.chart-drop-zone:hover,.chart-drop-zone.drag-over{border-color:var(--primary);background:var(--primary-dim)}
+.chart-drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.chart-drop-label{font-size:.82rem;color:var(--text-dim);line-height:1.6}
+.chart-preview-wrap{margin-top:10px;position:relative;display:none}
+.chart-preview-img{width:100%;border-radius:var(--r-md);max-height:220px;object-fit:contain;background:var(--surf-v);border:1px solid var(--border)}
+.chart-preview-clear{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.7);border:none;border-radius:50%;width:24px;height:24px;color:#fff;font-size:.75rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.chart-analyze-btn{margin-top:8px;width:100%;background:linear-gradient(135deg,rgba(196,166,255,.22),rgba(128,255,219,.1));border:1px solid rgba(196,166,255,.4);color:var(--primary);border-radius:var(--r-md);padding:10px;font-family:'Inter',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;transition:all .2s}
+.chart-analyze-btn:hover{background:rgba(196,166,255,.28)}
+.chart-analyze-btn:disabled{opacity:.5;cursor:default}
+.chart-result{margin-top:12px;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:16px;font-size:.82rem;line-height:1.8;white-space:pre-wrap;display:none}
+
 /* ── Confessionale ── */
 .confessionale-wrap{padding:16px 0;border-top:1px solid var(--border);margin-top:8px}
 .conf-title{font-size:.72rem;font-weight:700;color:var(--text-dim);letter-spacing:.08em;margin-bottom:8px}
@@ -950,6 +965,21 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
         <div class="chat-welcome-sub">Chiedi analisi, confronti o info sui tuoi titoli.<br>Conosco il tuo portafoglio e watchlist.</div>
       </div>
     </div>
+    <!-- Analisi grafico upload -->
+    <div class="chart-upload-wrap" id="chart-upload-wrap" style="display:none">
+      <div class="chart-upload-title">📸 ANALISI GRAFICO — carica uno screenshot</div>
+      <div class="chart-drop-zone" id="chart-drop-zone">
+        <input type="file" id="chart-file-input" accept="image/*" onchange="onChartFileSelected(this)">
+        <div class="chart-drop-label">📂 Clicca per caricare o trascina qui<br><span style="font-size:.7rem">PNG, JPG, WebP — screenshot da TradingView, Revolut, ecc.</span></div>
+      </div>
+      <div class="chart-preview-wrap" id="chart-preview-wrap">
+        <img class="chart-preview-img" id="chart-preview-img" src="" alt="preview">
+        <button class="chart-preview-clear" onclick="clearChartUpload()">✕</button>
+      </div>
+      <button class="chart-analyze-btn" id="chart-analyze-btn" onclick="runChartAnalysis()" disabled>🔍 Analizza grafico</button>
+      <div class="chart-result" id="chart-result"></div>
+    </div>
+
     <!-- Confessionale finanziario -->
     <div class="confessionale-wrap" id="conf-wrap" style="display:none">
       <div class="conf-title">🧠 CONFESSIONALE FINANZIARIO — scrivi cosa stai pensando di fare</div>
@@ -968,6 +998,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     </div>
     <div class="chat-input-wrap">
       <button class="conf-send-btn" style="flex-shrink:0;padding:0 12px;height:44px;border-radius:100px;font-size:.75rem" onclick="toggleConfessionale()" title="Confessionale finanziario">🧠</button>
+      <button class="conf-send-btn" style="flex-shrink:0;padding:0 12px;height:44px;border-radius:100px;font-size:.75rem" onclick="toggleChartUpload()" title="Analisi grafico con AI">📸</button>
       <input class="chat-input" id="chat-input" type="text" placeholder="Chiedi qualcosa... es. Analizza il mio portafoglio" onkeydown="if(event.key==='Enter')sendChat()"/>
       <button class="chat-send-btn" onclick="sendChat()">▶</button>
     </div>
@@ -2883,6 +2914,88 @@ function renderDiary(){
   const d=new Date();
   document.getElementById('diary-date').value=d.toISOString().slice(0,10);
   renderDiary();
+})();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Analisi Grafico — upload screenshot
+// ══════════════════════════════════════════════════════════════════════════════
+let _chartB64 = null;
+
+function toggleChartUpload(){
+  const wrap = document.getElementById('chart-upload-wrap');
+  const isVisible = wrap.style.display !== 'none';
+  wrap.style.display = isVisible ? 'none' : 'block';
+  if (!isVisible) wrap.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function onChartFileSelected(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataUrl = e.target.result;
+    _chartB64 = dataUrl.split(',')[1];
+    document.getElementById('chart-preview-img').src = dataUrl;
+    document.getElementById('chart-preview-wrap').style.display = 'flex';
+    document.getElementById('chart-drop-zone').style.display = 'none';
+    document.getElementById('chart-analyze-btn').disabled = false;
+    document.getElementById('chart-result').innerHTML = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearChartUpload(){
+  _chartB64 = null;
+  document.getElementById('chart-file-input').value = '';
+  document.getElementById('chart-preview-img').src = '';
+  document.getElementById('chart-preview-wrap').style.display = 'none';
+  document.getElementById('chart-drop-zone').style.display = 'flex';
+  document.getElementById('chart-analyze-btn').disabled = true;
+  document.getElementById('chart-result').innerHTML = '';
+}
+
+async function runChartAnalysis(){
+  if(!_chartB64) return;
+  const btn = document.getElementById('chart-analyze-btn');
+  const resultEl = document.getElementById('chart-result');
+  btn.disabled = true;
+  btn.textContent = '⏳ Analisi in corso…';
+  resultEl.innerHTML = '<div style="color:var(--text-dim);font-size:.8rem;padding:8px 0">Elaborazione con AI…</div>';
+  try{
+    const res = await fetch('/api/analyze-chart', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', ..._authHeader()},
+      body: JSON.stringify({image_b64: _chartB64, level: _level})
+    });
+    const data = await res.json();
+    if(data.error){
+      resultEl.innerHTML = `<div style="color:var(--red);font-size:.82rem">${data.error}</div>`;
+    } else {
+      resultEl.innerHTML = `<div class="ai-msg assistant" style="margin:0;border-radius:12px">${data.analysis.replace(/\n/g,'<br>')}</div>`;
+    }
+  }catch(err){
+    resultEl.innerHTML = `<div style="color:var(--red);font-size:.82rem">Errore connessione: ${err.message}</div>`;
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '🔍 Analizza grafico';
+  }
+}
+
+// Drag & drop sul drop zone
+(()=>{
+  const zone = document.getElementById('chart-drop-zone');
+  if(!zone) return;
+  zone.addEventListener('dragover', e=>{e.preventDefault(); zone.style.borderColor='var(--primary)';});
+  zone.addEventListener('dragleave', ()=>{ zone.style.borderColor=''; });
+  zone.addEventListener('drop', e=>{
+    e.preventDefault(); zone.style.borderColor='';
+    const file = e.dataTransfer.files[0];
+    if(!file || !file.type.startsWith('image/')) return;
+    const dt = new DataTransfer(); dt.items.add(file);
+    const input = document.getElementById('chart-file-input');
+    input.files = dt.files;
+    onChartFileSelected(input);
+  });
 })();
 
 // ══════════════════════════════════════════════════════════════════════════════

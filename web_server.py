@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, List, Optional
 
-from fastapi import FastAPI, Header
+from fastapi import FastAPI, Header, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
@@ -881,6 +881,82 @@ async def api_vs_market(body: VsMarketBody):
         return JSONResponse({"error": "Dati insufficienti"}, status_code=404)
     _store(key, data)
     return data
+
+
+# ─── Analisi grafico (upload immagine) ───────────────────────────────────────
+
+_GRAFICO_PROMPTS = {
+    "dilettante": (
+        "Sei un esperto di trading che aiuta un principiante. Analizza questo grafico e rispondi in italiano "
+        "in modo MOLTO semplice, senza gergo tecnico. Usa questo formato:\n\n"
+        "📍 SITUAZIONE: [una frase su cosa sta facendo il prezzo]\n"
+        "🛑 STOP LOSS: [valore preciso] — [perché in 1 riga semplice]\n"
+        "🎯 TAKE PROFIT: [valore preciso] — [perché in 1 riga semplice]\n"
+        "💡 CONSIGLIO: COMPRA / VENDI / ASPETTA\n"
+        "[2 righe max di spiegazione semplicissima]\n\n"
+        "Usa emoji, sii chiaro e incoraggiante."
+    ),
+    "intermedio": (
+        "Sei un analista tecnico. Analizza questo grafico in italiano con questo formato:\n\n"
+        "📈 TREND: [direzione e forza]\n"
+        "🔑 LIVELLI CHIAVE: Supporto $X | Resistenza $X\n"
+        "🛑 STOP LOSS: $X [-X%] | Invalidazione: [motivazione tecnica]\n"
+        "🎯 TP1: $X [+X%] — R/R 1:X\n"
+        "🎯 TP2: $X [+X%] — R/R 1:X\n"
+        "📊 SEGNALI: [RSI visivo, volume, pattern]\n"
+        "⚖️ BIAS: Rialzista / Ribassista / Neutro\n"
+        "🎯 ENTRY IDEALE: $X"
+    ),
+    "esperto": (
+        "Sei un analista quantitativo senior. Analisi tecnica professionale in italiano:\n\n"
+        "🏗️ STRUTTURA: [macro trend, micro price action, key levels]\n"
+        "📐 PATTERN: [pattern tecnici identificati: H&S, wedge, flag, double top/bottom, ecc.]\n"
+        "🔑 LIVELLI: [supporti/resistenze statici, dinamici, pivot]\n"
+        "📏 FIBONACCI: [livelli se visibili]\n"
+        "📦 VOLUME: [analisi volume]\n"
+        "🛑 STOP LOSS: $X | Invalidazione: [dettaglio]\n"
+        "🎯 TP1: $X — R/R 1:X\n"
+        "🎯 TP2: $X — R/R 1:X\n"
+        "🎯 TP3: $X — R/R 1:X\n"
+        "📍 ENTRY: $X [motivazione]\n"
+        "🧠 TESI: [tesi di trading in 2 righe]"
+    ),
+}
+
+
+class ChartAnalysisBody(BaseModel):
+    image_b64: str
+    level: Optional[str] = "intermedio"
+
+
+@app.post("/api/analyze-chart")
+async def api_analyze_chart(body: ChartAnalysisBody):
+    if not groq_client:
+        return JSONResponse({"error": "GROQ_API_KEY non configurata"}, status_code=503)
+    level = body.level if body.level in _GRAFICO_PROMPTS else "intermedio"
+    prompt = _GRAFICO_PROMPTS[level]
+
+    # Assicura il prefisso data URL
+    img = body.image_b64
+    if not img.startswith("data:"):
+        img = f"data:image/jpeg;base64,{img}"
+
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": img}},
+                ],
+            }],
+            max_tokens=700,
+            temperature=0.4,
+        )
+        return {"analysis": resp.choices[0].message.content.strip()}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 # ─── Confessionale finanziario ────────────────────────────────────────────────
