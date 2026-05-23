@@ -1,27 +1,31 @@
 """Web dashboard per Stock Bot — FastAPI server."""
 import asyncio
+import hashlib
+import hmac
 import json
 import os
+import secrets
 import time
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, List, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
-from typing import List, Optional
 
 from analyzer import get_enriched_analysis, scan_cheap_stocks
 
 STATIC = Path(__file__).parent / "static"
 HISTORY_FILE = Path(__file__).parent / "analysis_history.json"
+WEB_USERS_FILE = Path(__file__).parent / "web_users.json"
 
 app = FastAPI(title="Stock Bot Dashboard", docs_url=None, redoc_url=None)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -33,11 +37,75 @@ try:
 except Exception:
     groq_client = None
 
+# ─── Autenticazione Telegram + JWT ───────────────────────────────────────────
+# Variabili env richieste per il login:
+#   BOT_TOKEN    — token del bot (già usato da bot.py)
+#   BOT_USERNAME — username del bot SENZA @ (es. MaskerStockBot)
+#   JWT_SECRET   — chiave segreta per JWT (genera con: python -c "import secrets;print(secrets.token_hex(32))")
+_BOT_TOKEN  = os.getenv("BOT_TOKEN", "")
+_JWT_SECRET = os.getenv("JWT_SECRET") or secrets.token_hex(32)
+
+try:
+    import jwt as _pyjwt
+    _JWT_OK = True
+except ImportError:
+    _JWT_OK = False
+
+
+def _jwt_create(payload: dict) -> str:
+    if not _JWT_OK:
+        return ""
+    now = int(datetime.now(timezone.utc).timestamp())
+    p = {**payload, "iat": now, "exp": now + 86400 * 30}
+    return _pyjwt.encode(p, _JWT_SECRET, algorithm="HS256")
+
+
+def _jwt_decode(token: str):
+    if not _JWT_OK:
+        return None
+    try:
+        return _pyjwt.decode(token, _JWT_SECRET, algorithms=["HS256"])
+    except Exception:
+        return None
+
+
+def _tg_verify(raw: dict) -> bool:
+    """Verifica firma hash Telegram Login Widget."""
+    if not _BOT_TOKEN:
+        return True  # dev mode: skip (solo in locale!)
+    check_hash = raw.get("hash", "")
+    data_str = "\n".join(f"{k}={v}" for k, v in sorted(raw.items()) if k != "hash")
+    secret = hashlib.sha256(_BOT_TOKEN.encode()).digest()
+    computed = hmac.new(secret, data_str.encode(), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(computed, check_hash)
+
+
+def _get_token(authorization: Optional[str]):
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    return _jwt_decode(authorization[7:])
+
+
+def _read_users() -> dict:
+    if not WEB_USERS_FILE.exists():
+        return {}
+    try:
+        return json.loads(WEB_USERS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _write_users(d: dict):
+    WEB_USERS_FILE.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 # ─── Cache semplice in memoria ────────────────────────────────────────────────
 _cache: dict[str, dict] = {}
-_SCAN_TTL   = 300    # 5 min — scanner
-_STOCK_TTL  = 180    # 3 min — analisi singola
-_AI_TTL     = 600    # 10 min — AI (chiamata Groq costosa)
+_SCAN_TTL     = 300    # 5 min — scanner
+_STOCK_TTL    = 180    # 3 min — analisi singola
+_AI_TTL       = 600    # 10 min — AI (chiamata Groq costosa)
+_FORECAST_TTL = 14400  # 4 h — previsione 7 giorni
+_EARNINGS_TTL = 21600  # 6 h — calendario earnings
 
 
 def _cached(key: str, ttl: int):
@@ -72,6 +140,39 @@ def _clean(obj: Any) -> Any:
     return obj
 
 
+# ─── Heatmap tickers (USA large-cap + Europa ADR) ────────────────────────────
+_HEATMAP_TICKERS = [
+    # 🇺🇸 Mega Tech
+    "AAPL","MSFT","NVDA","GOOGL","AMZN","META","TSLA","AVGO","AMD","INTC",
+    "ORCL","CRM","NFLX","QCOM","TXN",
+    # 🇺🇸 Finance
+    "JPM","BAC","GS","V","MA","WFC","BLK","MS",
+    # 🇺🇸 Health & Pharma
+    "JNJ","UNH","LLY","ABBV","PFE","MRK","TMO",
+    # 🇺🇸 Consumer & Retail
+    "WMT","HD","COST","PG","NKE","DIS","MCD","SBUX",
+    # 🇺🇸 Energy & Industrial
+    "XOM","CVX","BA","CAT","GE","HON",
+    # 🌍 Europa (ADR su NYSE/NASDAQ)
+    "ASML","SAP","AZN","SHEL","BP","SNY","NVS",
+    # 🌏 Asia / International
+    "TSM","TM","BABA",
+]
+
+# ─── Earnings tickers (~50 major) ─────────────────────────────────────────────
+_EARNINGS_TICKERS = [
+    "AAPL","MSFT","GOOGL","AMZN","META","TSLA","NVDA","AVGO","AMD","ORCL",
+    "CRM","NFLX","INTC","QCOM","TXN","MU","AMAT",
+    "JPM","BAC","GS","V","MA","WFC","MS","BLK",
+    "JNJ","UNH","LLY","ABBV","PFE","MRK","TMO","ISRG",
+    "WMT","COST","HD","NKE","DIS","MCD","SBUX","TGT",
+    "XOM","CVX","BA","CAT","GE","HON",
+    "ASML","SAP","AZN","TSM",
+]
+
+_INTRADAY_INTERVALS = {"1m","2m","5m","15m","30m","60m","90m","1h"}
+
+
 # ─── Endpoint ─────────────────────────────────────────────────────────────────
 
 @app.get("/api/scan")
@@ -100,7 +201,7 @@ async def api_stock(ticker: str):
 
 
 @app.get("/api/stock/{ticker}/history")
-async def api_history(ticker: str, period: str = "1mo"):
+async def api_stock_history(ticker: str, period: str = "1mo"):
     t = ticker.upper()
     key = f"history:{t}:{period}"
     if (c := _cached(key, _STOCK_TTL)) is not None:
@@ -112,9 +213,9 @@ async def api_history(ticker: str, period: str = "1mo"):
         if h.empty:
             return []
         return [
-            {"date": str(idx.date()), "close": round(float(c), 4)}
-            for idx, c in zip(h.index, h["Close"])
-            if c == c
+            {"date": str(idx.date()), "close": round(float(cl), 4)}
+            for idx, cl in zip(h.index, h["Close"])
+            if cl == cl
         ]
 
     result = await asyncio.to_thread(_get)
@@ -168,10 +269,10 @@ async def api_ai(ticker: str):
         perche_si = rischi = conclusione = verdict = ""
         for line in text.split("\n"):
             l = line.strip()
-            if l.upper().startswith("PERCHE_SI:"):   perche_si  = l[10:].strip()
-            elif l.upper().startswith("RISCHI:"):    rischi     = l[7:].strip()
+            if l.upper().startswith("PERCHE_SI:"):     perche_si   = l[10:].strip()
+            elif l.upper().startswith("RISCHI:"):      rischi      = l[7:].strip()
             elif l.upper().startswith("CONCLUSIONE:"): conclusione = l[12:].strip()
-            elif l.upper().startswith("VERDICT:"):   verdict    = l[8:].strip().upper()
+            elif l.upper().startswith("VERDICT:"):     verdict     = l[8:].strip().upper()
 
         if not verdict:
             low = conclusione.lower()
@@ -187,6 +288,104 @@ async def api_ai(ticker: str):
             "rischi":     rischi     or "Dati insufficienti.",
             "conclusione": conclusione or text,
             "verdict":    verdict if verdict in ("SI", "NO", "NEUTRO") else "NEUTRO",
+        }
+        _store(key, result)
+        return result
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/stock/{ticker}/forecast")
+async def api_forecast(ticker: str):
+    """Previsione AI 7 giorni — trend, range prezzi, confidenza, catalizzatori."""
+    t = ticker.upper()
+    key = f"forecast:{t}"
+    if (c := _cached(key, _FORECAST_TTL)) is not None:
+        return c
+
+    if not groq_client:
+        return JSONResponse({"error": "GROQ_API_KEY non configurata"}, status_code=503)
+
+    data = await asyncio.to_thread(get_enriched_analysis, t)
+    if not data:
+        return JSONResponse({"error": "ticker non trovato"}, status_code=404)
+    data = _clean(data)
+
+    price = float(data.get("current_price") or 0)
+    segnali = ", ".join((data.get("signals") or [])[:3]) or "nessuno"
+
+    prompt = (
+        f"Previsione tecnica 7 giorni per {t} ({data.get('name', t)}):\n"
+        f"- Prezzo attuale: ${price:.4f}, oggi {data.get('day_change_pct', 0):+.1f}%\n"
+        f"- RSI: {data.get('rsi', 50):.0f}, Volatilità annualizzata: {data.get('volatility', 0):.0f}%\n"
+        f"- Performance: settimana {(data.get('week_return') or 0):+.1f}%, mese {(data.get('month_return') or 0):+.1f}%\n"
+        f"- Sentiment notizie: {data.get('news_sentiment_label', 'Neutre')}\n"
+        f"- Earnings: {data.get('next_earnings_str', 'N/D')}\n"
+        f"- Segnali tecnici: {segnali}\n\n"
+        "Basandoti su questi dati tecnici, rispondi SOLO in questo formato esatto (italiano):\n"
+        "TREND: RIALZO oppure RIBASSO oppure LATERALE\n"
+        "RANGE_PCT_LOW: [numero, variazione % minima prevista in 7 giorni rispetto al prezzo attuale, es. -5.2]\n"
+        "RANGE_PCT_HIGH: [numero, variazione % massima prevista in 7 giorni rispetto al prezzo attuale, es. +8.1]\n"
+        "CONFIDENZA: ALTA oppure MEDIA oppure BASSA\n"
+        "CATALIZZATORI: [2-3 fattori chiave da monitorare questa settimana]\n"
+        "SINTESI: [1-2 frasi sul perché questo trend atteso]"
+    )
+
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=300,
+            messages=[
+                {"role": "system", "content": "Sei un analista tecnico esperto. Fornisci previsioni orientative basate su indicatori tecnici. Sii preciso nel formato richiesto. Le previsioni sui mercati sono intrinsecamente incerte."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+
+        trend = conf = cat = sintesi = ""
+        pct_low: Optional[float] = None
+        pct_high: Optional[float] = None
+
+        for line in text.split("\n"):
+            l = line.strip()
+            lu = l.upper()
+            if lu.startswith("TREND:"):
+                v = l[6:].strip().upper()
+                if v in ("RIALZO", "RIBASSO", "LATERALE"): trend = v
+            elif lu.startswith("RANGE_PCT_LOW:"):
+                try: pct_low = float(l[14:].strip().replace(",", ".").replace("+", ""))
+                except Exception: pass
+            elif lu.startswith("RANGE_PCT_HIGH:"):
+                try: pct_high = float(l[15:].strip().replace(",", ".").replace("+", ""))
+                except Exception: pass
+            elif lu.startswith("CONFIDENZA:"):
+                v = l[11:].strip().upper()
+                if v in ("ALTA", "MEDIA", "BASSA"): conf = v
+            elif lu.startswith("CATALIZZATORI:"):
+                cat = l[14:].strip()
+            elif lu.startswith("SINTESI:"):
+                sintesi = l[8:].strip()
+
+        # Fallback range basato su volatilità se il modello non ha risposto bene
+        vol = float(data.get("volatility") or 20)
+        weekly_vol = vol / (52 ** 0.5) * 1.5   # volatilità settimanale stimata
+        if pct_low is None:
+            pct_low = round(-weekly_vol, 2)
+        if pct_high is None:
+            pct_high = round(weekly_vol, 2)
+        if not trend:
+            trend = "LATERALE"
+
+        result = {
+            "trend":        trend,
+            "pct_low":      round(pct_low, 2),
+            "pct_high":     round(pct_high, 2),
+            "price_low":    round(price * (1 + pct_low  / 100), 4) if price else 0,
+            "price_high":   round(price * (1 + pct_high / 100), 4) if price else 0,
+            "confidenza":   conf or "MEDIA",
+            "catalizzatori": cat or "Dati non disponibili.",
+            "sintesi":      sintesi or "Analisi non disponibile.",
         }
         _store(key, result)
         return result
@@ -255,19 +454,6 @@ async def api_sparklines(tickers: str):
     data = await asyncio.to_thread(_get)
     _store(key, data)
     return data
-
-
-_INTRADAY_INTERVALS = {"1m","2m","5m","15m","30m","60m","90m","1h"}
-
-_HEATMAP_TICKERS = [
-    "AAPL","MSFT","NVDA","GOOGL","AMZN","META","TSLA","AVGO","AMD","INTC",
-    "ORCL","CRM","NFLX","DIS","PYPL",
-    "JPM","BAC","GS","V","MA",
-    "JNJ","UNH","LLY","ABBV","PFE",
-    "XOM","CVX",
-    "WMT","HD","COST","PG","NKE",
-    "BA","CAT","GE",
-]
 
 
 @app.get("/api/stock/{ticker}/ohlc")
@@ -347,11 +533,10 @@ async def api_batch_quotes(tickers: str):
 
 @app.get("/api/heatmap")
 async def api_heatmap_data():
-    """Heatmap 35 azioni principali USA — cache 60s."""
+    """Heatmap USA large-cap + Europa ADR — cache 60s."""
     key = "heatmap:main"
     if (c := _cached(key, 60)) is not None:
         return c
-    tickers_csv = ",".join(_HEATMAP_TICKERS)
 
     def _get():
         import yfinance as yf
@@ -383,6 +568,77 @@ async def api_heatmap_data():
     _store(key, data)
     return _clean(data)
 
+
+@app.get("/api/earnings")
+async def api_earnings(days: int = 14):
+    """Calendario earnings prossimi N giorni — cache 6h."""
+    key = f"earnings:{days}"
+    if (c := _cached(key, _EARNINGS_TTL)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        import pandas as pd
+        from datetime import date as _date, timedelta
+        today = _date.today()
+        end_dt = today + timedelta(days=days)
+        result: dict = {}
+
+        for ticker in _EARNINGS_TICKERS:
+            try:
+                cal = yf.Ticker(ticker).calendar
+                if cal is None:
+                    continue
+
+                # Normalizza a dict o list di date
+                if isinstance(cal, pd.DataFrame):
+                    if "Earnings Date" in cal.index:
+                        row = cal.loc["Earnings Date"]
+                        dates_list = list(row.values) if hasattr(row, "values") else [row]
+                    else:
+                        continue
+                elif isinstance(cal, dict):
+                    dates_list = cal.get("Earnings Date", [])
+                    if not isinstance(dates_list, list):
+                        dates_list = [dates_list] if dates_list is not None else []
+                else:
+                    continue
+
+                eps = None
+                if isinstance(cal, dict):
+                    eps_val = cal.get("Earnings Average")
+                    if eps_val is not None:
+                        try: eps = round(float(eps_val), 2)
+                        except Exception: pass
+
+                for ed in dates_list:
+                    try:
+                        if hasattr(ed, "date"):
+                            d = ed.date()
+                        elif isinstance(ed, str):
+                            from datetime import datetime as _dt2
+                            d = _dt2.strptime(ed[:10], "%Y-%m-%d").date()
+                        else:
+                            continue
+                        if today <= d <= end_dt:
+                            dk = str(d)
+                            if dk not in result:
+                                result[dk] = []
+                            if not any(x["ticker"] == ticker for x in result[dk]):
+                                result[dk].append({"ticker": ticker, "eps_estimate": eps})
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        return dict(sorted(result.items()))
+
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return _clean(data)
+
+
+# ─── Portafoglio AI ───────────────────────────────────────────────────────────
 
 class PortfolioPosition(BaseModel):
     ticker: str
@@ -464,6 +720,8 @@ async def api_portfolio_evaluate(req: PortfolioEvalRequest):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+# ─── Storico analisi ──────────────────────────────────────────────────────────
+
 @app.get("/api/history")
 async def api_history_list():
     """Lista date disponibili nello storico analisi."""
@@ -529,9 +787,137 @@ async def api_history_date(date: str):
     })
 
 
+# ─── Auth — Telegram Login ────────────────────────────────────────────────────
+
+@app.get("/api/config")
+async def api_config():
+    """Configurazione pubblica: bot username e flag login."""
+    bot_username = os.getenv("BOT_USERNAME", "")
+    return {
+        "bot_username": bot_username,
+        "login_enabled": bool(bot_username and _JWT_OK and _BOT_TOKEN),
+    }
+
+
+class TgAuthBody(BaseModel):
+    id: int
+    first_name: str
+    username: Optional[str] = ""
+    photo_url: Optional[str] = ""
+    auth_date: int
+    hash: str
+
+
+@app.post("/api/auth/telegram")
+async def api_auth_telegram(body: TgAuthBody):
+    """Verifica login Telegram e restituisce JWT 30 giorni."""
+    raw = body.dict()
+    if not _tg_verify(dict(raw)):
+        return JSONResponse({"error": "firma non valida"}, status_code=401)
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    if abs(now_ts - body.auth_date) > 86400:
+        return JSONResponse({"error": "token scaduto — riprova il login"}, status_code=401)
+
+    uid = str(body.id)
+    users = _read_users()
+    if uid not in users:
+        users[uid] = {
+            "id": uid, "first_name": body.first_name,
+            "username": body.username or "", "photo_url": body.photo_url or "",
+            "portfolio": {}, "watchlist": {},
+        }
+    else:
+        users[uid].update({
+            "first_name": body.first_name,
+            "username": body.username or "",
+            "photo_url": body.photo_url or "",
+        })
+    _write_users(users)
+
+    token = _jwt_create({"uid": uid, "fn": body.first_name, "un": body.username or ""})
+    return {
+        "token": token,
+        "user": {
+            "id": uid, "first_name": body.first_name,
+            "username": body.username or "", "photo_url": body.photo_url or "",
+        },
+    }
+
+
+@app.get("/api/auth/me")
+async def api_auth_me(authorization: Optional[str] = Header(None)):
+    payload = _get_token(authorization)
+    if not payload:
+        return JSONResponse({"error": "non autenticato"}, status_code=401)
+    users = _read_users()
+    u = users.get(payload.get("uid", ""))
+    if not u:
+        return JSONResponse({"error": "utente non trovato"}, status_code=404)
+    return {
+        "id": u.get("id"), "first_name": u.get("first_name", ""),
+        "username": u.get("username", ""), "photo_url": u.get("photo_url", ""),
+    }
+
+
+# ─── User portfolio & watchlist (server-side) ─────────────────────────────────
+
+@app.get("/api/user/portfolio")
+async def api_user_portfolio_get(authorization: Optional[str] = Header(None)):
+    payload = _get_token(authorization)
+    if not payload:
+        return JSONResponse({"error": "non autenticato"}, status_code=401)
+    return _read_users().get(payload.get("uid", ""), {}).get("portfolio", {})
+
+
+class BodyPortfolio(BaseModel):
+    portfolio: dict
+
+
+@app.post("/api/user/portfolio")
+async def api_user_portfolio_post(body: BodyPortfolio, authorization: Optional[str] = Header(None)):
+    payload = _get_token(authorization)
+    if not payload:
+        return JSONResponse({"error": "non autenticato"}, status_code=401)
+    users = _read_users()
+    uid = payload.get("uid", "")
+    if uid not in users:
+        return JSONResponse({"error": "utente non trovato"}, status_code=404)
+    users[uid]["portfolio"] = body.portfolio
+    _write_users(users)
+    return {"ok": True}
+
+
+@app.get("/api/user/watchlist")
+async def api_user_watchlist_get(authorization: Optional[str] = Header(None)):
+    payload = _get_token(authorization)
+    if not payload:
+        return JSONResponse({"error": "non autenticato"}, status_code=401)
+    return _read_users().get(payload.get("uid", ""), {}).get("watchlist", {})
+
+
+class BodyWatchlist(BaseModel):
+    watchlist: dict
+
+
+@app.post("/api/user/watchlist")
+async def api_user_watchlist_post(body: BodyWatchlist, authorization: Optional[str] = Header(None)):
+    payload = _get_token(authorization)
+    if not payload:
+        return JSONResponse({"error": "non autenticato"}, status_code=401)
+    users = _read_users()
+    uid = payload.get("uid", "")
+    if uid not in users:
+        return JSONResponse({"error": "utente non trovato"}, status_code=404)
+    users[uid]["watchlist"] = body.watchlist
+    _write_users(users)
+    return {"ok": True}
+
+
+# ─── Health ───────────────────────────────────────────────────────────────────
+
 @app.get("/health")
 async def health():
-    return {"status": "ok", "cache_keys": len(_cache)}
+    return {"status": "ok", "cache_keys": len(_cache), "jwt_ok": _JWT_OK}
 
 
 @app.get("/")

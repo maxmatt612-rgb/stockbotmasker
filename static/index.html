@@ -422,6 +422,78 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .hcard-chip{font-size:.66rem;padding:2px 8px;border-radius:100px;border:1px solid var(--border);color:var(--text-dim)}
 .hcard-verdict{font-size:.76rem;color:var(--text-dim);line-height:1.5;margin-top:8px;border-left:2px solid rgba(196,166,255,.2);padding-left:8px}
 
+/* ── Forecast 7 giorni ── */
+.forecast-section{margin-top:14px;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden}
+.forecast-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)}
+.forecast-title{font-size:.77rem;font-weight:700;color:var(--text)}
+.forecast-badge{font-size:.67rem;padding:2px 9px;border-radius:100px;font-weight:700;letter-spacing:.04em}
+.fbadge-rialzo{background:rgba(114,239,160,.18);color:var(--green)}
+.fbadge-ribasso{background:rgba(255,107,107,.18);color:var(--red)}
+.fbadge-laterale{background:rgba(255,184,108,.15);color:var(--gold)}
+.forecast-body-inner{padding:12px 14px;display:flex;flex-direction:column;gap:9px}
+.forecast-range{display:flex;align-items:center;justify-content:space-between;background:var(--surf-v);border-radius:var(--r-sm);padding:10px 14px}
+.forecast-side{display:flex;flex-direction:column;gap:2px}
+.forecast-side-lbl{font-size:.6rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em}
+.forecast-price-val{font-size:1rem;font-weight:800;letter-spacing:-.025em}
+.forecast-pct{font-size:.64rem;color:var(--text-dim)}
+.forecast-arrow-icon{font-size:1rem;opacity:.35}
+.forecast-chips{display:flex;gap:6px;flex-wrap:wrap}
+.forecast-chip{font-size:.64rem;padding:2px 8px;border-radius:100px;border:1px solid var(--border);color:var(--text-dim)}
+.forecast-text{font-size:.76rem;color:var(--text-dim);line-height:1.55;border-left:2px solid rgba(196,166,255,.2);padding-left:9px}
+.forecast-disc{font-size:.6rem;color:var(--text-dim);opacity:.55;text-align:center;padding-top:2px}
+.forecast-loading{text-align:center;padding:16px;font-size:.78rem;color:var(--text-dim);animation:shimmer 1.8s infinite}
+
+/* ── Print / PDF Export ── */
+.print-header{display:none}
+@media print{
+  #bg-canvas,header,.indices-tape,.tab-nav,.controls-bar,.stats-bar,.refresh-pill,.disc-banner,
+  footer,.modal-overlay,.disc-overlay,#history-view,#earnings-view,#heatmap-view,#portfolio-view,
+  #watchlist-view,.auth-widget,.sparkline-wrap,#export-pdf-btn,.verdict,.live-badge{display:none!important}
+  body{background:#fff!important;color:#000!important;font-family:Inter,sans-serif}
+  .hero{display:none!important}
+  .print-header{display:block!important;text-align:center;padding:12px 0 16px;border-bottom:2px solid #222;margin-bottom:18px}
+  .print-header h1{font-size:1.35rem;font-weight:900;color:#111;margin-bottom:3px}
+  .print-header p{font-size:.75rem;color:#555}
+  .grid{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:10px!important;padding:0 14px!important}
+  .card{background:#f7f7fb!important;border:1px solid #ccc!important;box-shadow:none!important;break-inside:avoid;color:#000!important}
+  .card-ticker,.price-val{color:#111!important}
+  .card-name,.score-label,.score-num{color:#555!important}
+  .chg-pos{background:#e6f7ed!important;color:#1a7a3a!important}
+  .chg-neg{background:#fdecea!important;color:#c0392b!important}
+  .score-bar{background:linear-gradient(90deg,#7c3aed,#059669)!important}
+  .chips .chip{background:#f0f0f0!important;border-color:#ccc!important;color:#444!important}
+  .disc-banner{display:block!important;background:#fffde7!important;border-top:1px solid #f0c000!important;color:#5a4a00!important;font-size:.68rem;padding:8px 14px!important}
+  @page{margin:18mm 14mm}
+}
+
+/* ── Auth widget ── */
+.auth-widget{display:flex;align-items:center;gap:6px}
+.auth-user-chip{display:flex;align-items:center;gap:6px;background:var(--surf-v);border:1px solid var(--border);border-radius:100px;padding:4px 11px 4px 4px;cursor:pointer;font-size:.74rem;transition:border-color .15s}
+.auth-user-chip:hover{border-color:var(--border-hi)}
+.auth-avatar{width:24px;height:24px;border-radius:50%;object-fit:cover}
+.auth-avatar-ph{width:24px;height:24px;border-radius:50%;background:var(--primary-dim);border:1px solid rgba(196,166,255,.3);display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:700;color:var(--primary);flex-shrink:0}
+.auth-sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
+.tg-login-btn{background:var(--surf-v);border:1px solid var(--border);border-radius:100px;padding:5px 11px;font-size:.72rem;color:var(--text-dim);cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'Inter',sans-serif;transition:all .15s;white-space:nowrap}
+.tg-login-btn:hover{border-color:var(--border-hi);color:var(--text)}
+
+/* ── Earnings Calendar ── */
+#earnings-view{padding:0 0 96px}
+.earn-grid{display:flex;flex-direction:column;gap:12px;padding:12px 28px 48px;max-width:1180px;margin:0 auto}
+.earn-day{background:linear-gradient(145deg,rgba(196,166,255,.04),rgba(128,255,219,.02));border:1px solid var(--border);border-radius:var(--r-xl);overflow:hidden}
+.earn-day-hd{display:flex;align-items:center;gap:10px;padding:12px 18px;background:rgba(196,166,255,.05);border-bottom:1px solid var(--border)}
+.earn-day-name{font-size:.84rem;font-weight:800;color:var(--primary);letter-spacing:-.01em}
+.earn-day-date{font-size:.7rem;color:var(--text-dim)}
+.earn-day-cnt{margin-left:auto;font-size:.66rem;color:var(--text-dim);background:var(--surf-v);padding:2px 8px;border-radius:100px}
+.earn-list{padding:4px 0}
+.earn-row{display:flex;align-items:center;gap:12px;padding:9px 18px;cursor:pointer;transition:background .15s}
+.earn-row:hover{background:rgba(255,255,255,.025)}
+.earn-ticker{font-size:.86rem;font-weight:800;min-width:58px;letter-spacing:-.01em}
+.earn-name{font-size:.74rem;color:var(--text-dim);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.earn-eps{font-size:.7rem;color:var(--gold);font-weight:600;white-space:nowrap}
+.earn-empty{text-align:center;padding:56px 24px;color:var(--text-dim);font-size:.84rem;line-height:1.8}
+.earn-empty .icon{font-size:2.2rem;display:block;margin-bottom:10px}
+.earn-today-badge{background:rgba(196,166,255,.15);color:var(--primary);padding:1px 7px;border-radius:100px;font-size:.64rem;font-weight:700;letter-spacing:.04em}
+
 /* ── Responsive ── */
 @media(max-width:640px){
   header{padding:8px 12px;gap:8px}
@@ -430,7 +502,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   .logo span.logo-text{display:none}
   .indices-tape{top:60px}
   .hero{padding:32px 14px 24px}
-  .tab-nav,.controls-bar,.grid,.hgrid,.history-toolbar{padding-left:14px;padding-right:14px}
+  .tab-nav,.controls-bar,.grid,.hgrid,.history-toolbar,.earn-grid{padding-left:14px;padding-right:14px}
   .grid,.hgrid{gap:12px}
   .modal-sheet{padding:18px}
   .ctrl-div{display:none}
@@ -484,6 +556,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     <input id="search-input" type="text" placeholder="Cerca azione... TSLA · NVDA · AAPL" autocomplete="off" spellcheck="false" autocapitalize="characters" />
   </div>
   <div class="header-right">
+    <div id="auth-widget" class="auth-widget"></div>
     <div class="live-badge">
       <div class="live-dot"></div>
       <span id="last-update">—</span>
@@ -524,6 +597,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 <div class="tab-nav">
   <button class="tab-btn active" data-tab="live">📊 Live</button>
   <button class="tab-btn" data-tab="history">📅 Storico</button>
+  <button class="tab-btn" data-tab="earnings">📆 Earnings</button>
   <button class="tab-btn" data-tab="heatmap">🌡️ Heatmap</button>
   <button class="tab-btn" data-tab="portfolio">💼 Portafoglio</button>
   <button class="tab-btn" data-tab="watchlist">⭐ Watchlist</button>
@@ -544,11 +618,22 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   </div>
 </div>
 
+<!-- ── Earnings Calendar view ── -->
+<div id="earnings-view" style="display:none">
+  <div class="pview-head">
+    <h2 class="pview-title">📆 Calendario Earnings</h2>
+    <span class="pview-sub">Prossimi 14 giorni · <span id="earn-event-count">—</span> eventi · aggiornamento ogni 6 ore</span>
+  </div>
+  <div id="earn-grid" class="earn-grid">
+    <div class="earn-empty"><span class="icon">⏳</span>Caricamento calendario...</div>
+  </div>
+</div>
+
 <!-- ── Heatmap view ── -->
 <div id="heatmap-view" style="display:none">
   <div class="pview-head">
-    <h2 class="pview-title">🌡️ Heatmap Mercato USA</h2>
-    <span class="pview-sub">35 azioni principali — variazione giornaliera</span>
+    <h2 class="pview-title">🌡️ Heatmap Mercato</h2>
+    <span class="pview-sub">~54 titoli — USA large-cap + Europa ADR — variazione giornaliera</span>
   </div>
   <div id="heatmap-grid" class="heatmap-grid"></div>
 </div>
@@ -633,6 +718,12 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 <!-- ── Live view ── -->
 <div id="live-view">
 
+<!-- Intestazione visibile solo in stampa/PDF -->
+<div class="print-header">
+  <h1>Masker Stock Intelligence</h1>
+  <p id="print-date">—</p>
+</div>
+
 <!-- ── Hero ── -->
 <section class="hero">
   <h1>Masker<br>Intelligence</h1>
@@ -657,6 +748,8 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     <button class="ctrl-btn" data-risk="Medio">🟡 Medio</button>
     <button class="ctrl-btn" data-risk="Alto">🔴 Alto</button>
   </div>
+  <div class="ctrl-div"></div>
+  <button class="ctrl-btn" id="export-pdf-btn" title="Esporta analisi corrente in PDF" onclick="exportPDF()">📄 PDF</button>
 </div>
 
 <!-- ── Stats ── -->
@@ -727,6 +820,17 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
           <div class="ai-card-text" id="m-ai-conc-text"></div>
           <div id="m-ai-badge"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- Forecast 7 giorni -->
+    <div class="forecast-section" id="m-forecast-wrap">
+      <div class="forecast-hd">
+        <span class="forecast-title">📈 Previsione 7 giorni <span style="font-size:.62rem;color:var(--text-dim);font-weight:400">&nbsp;AI · orientativa</span></span>
+        <span class="forecast-badge" id="m-forecast-badge"></span>
+      </div>
+      <div id="m-forecast-body">
+        <div class="forecast-loading">🔮 &nbsp;Calcolo in corso…</div>
       </div>
     </div>
   </div>
@@ -1093,6 +1197,9 @@ async function openModal(stock){
   _modalTicker=stock.ticker;
   document.getElementById('m-ai-loading').style.display='block';
   document.getElementById('m-ai-content').style.display='none';
+  document.getElementById('m-forecast-body').innerHTML='<div class="forecast-loading">🔮 &nbsp;Calcolo previsione…</div>';
+  document.getElementById('m-forecast-badge').textContent='';
+  document.getElementById('m-forecast-badge').className='forecast-badge';
   document.getElementById('modal-overlay').classList.add('open');
   document.getElementById('m-ticker').textContent=stock.ticker;
   document.getElementById('m-company').textContent=stock.name??stock.ticker;
@@ -1143,6 +1250,54 @@ async function openModal(stock){
       document.getElementById('m-ai-content').style.display='flex';
     }else{document.getElementById('m-ai-loading').textContent='⚠️ AI non disponibile.';}
   }catch(e){document.getElementById('m-ai-loading').textContent='⚠️ Errore analisi AI.';}
+
+  // Forecast 7 giorni (fire & forget — non blocca il modal)
+  _loadForecast(stock.ticker);
+}
+
+async function _loadForecast(ticker){
+  const bodyEl=document.getElementById('m-forecast-body');
+  const badgeEl=document.getElementById('m-forecast-badge');
+  bodyEl.innerHTML='<div class="forecast-loading">🔮 &nbsp;Calcolo previsione…</div>';
+  badgeEl.textContent=''; badgeEl.className='forecast-badge';
+  try{
+    const f=await fetch('/api/stock/'+ticker+'/forecast').then(r=>r.ok?r.json():null);
+    if(!f||f.error){bodyEl.innerHTML='<div class="forecast-loading" style="animation:none;color:var(--text-dim)">⚠️ Previsione non disponibile</div>';return;}
+
+    const trendEmoji=f.trend==='RIALZO'?'🟢':f.trend==='RIBASSO'?'🔴':'🟡';
+    const bCls=f.trend==='RIALZO'?'fbadge-rialzo':f.trend==='RIBASSO'?'fbadge-ribasso':'fbadge-laterale';
+    badgeEl.className='forecast-badge '+bCls;
+    badgeEl.textContent=trendEmoji+' '+f.trend;
+
+    const lowCol=f.pct_low<0?'var(--red)':'var(--green)';
+    const hiCol=f.pct_high>=0?'var(--green)':'var(--red)';
+    const lowSign=f.pct_low>=0?'+':'';
+    const hiSign=f.pct_high>=0?'+':'';
+    const confStars=f.confidenza==='ALTA'?'★★★':f.confidenza==='MEDIA'?'★★☆':'★☆☆';
+
+    bodyEl.innerHTML=`<div class="forecast-body-inner">
+      <div class="forecast-range">
+        <div class="forecast-side">
+          <div class="forecast-side-lbl">Minimo stimato</div>
+          <div class="forecast-price-val" style="color:${lowCol}">${fmtP(f.price_low)}</div>
+          <div class="forecast-pct">${lowSign}${f.pct_low}%</div>
+        </div>
+        <div class="forecast-arrow-icon">↔</div>
+        <div class="forecast-side" style="text-align:right">
+          <div class="forecast-side-lbl">Massimo stimato</div>
+          <div class="forecast-price-val" style="color:${hiCol}">${fmtP(f.price_high)}</div>
+          <div class="forecast-pct">${hiSign}${f.pct_high}%</div>
+        </div>
+      </div>
+      <div class="forecast-chips">
+        <span class="forecast-chip">Confidenza ${confStars} ${f.confidenza}</span>
+        <span class="forecast-chip">Orizzonte 7 giorni</span>
+      </div>
+      <div class="forecast-text">${f.sintesi}</div>
+      <div class="forecast-text"><span style="color:var(--gold)">⚡</span> ${f.catalizzatori}</div>
+      <div class="forecast-disc">⚠️ Previsione AI orientativa — i mercati sono imprevedibili. Non è consulenza finanziaria.</div>
+    </div>`;
+  }catch(e){bodyEl.innerHTML='<div class="forecast-loading" style="animation:none;color:var(--red)">Errore caricamento previsione</div>';}
 }
 
 document.getElementById('modal-close').addEventListener('click',closeModal);
@@ -1213,6 +1368,23 @@ function startCountdown(){
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Export PDF (stampa)
+// ══════════════════════════════════════════════════════════════════════════════
+function exportPDF(){
+  // Assicuriamoci di essere nel tab Live
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('[data-tab="live"]').classList.add('active');
+  _VIEWS.forEach(v=>{const el=document.getElementById(v+'-view');if(el)el.style.display=v==='live'?'':'none';});
+  // Intestazione stampa
+  const now=new Date();
+  const dateStr=now.toLocaleDateString('it-IT',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const timeStr=now.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('print-date').textContent=`Generato il ${dateStr} alle ${timeStr} · Masker Stock Intelligence · Solo uso informativo`;
+  // Breve attesa per il reflow, poi stampa
+  setTimeout(()=>window.print(), 80);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Heatmap
 // ══════════════════════════════════════════════════════════════════════════════
 async function loadHeatmap(){
@@ -1235,14 +1407,32 @@ async function loadHeatmap(){
   }catch(e){grid.innerHTML='<div class="hm-load" style="color:var(--red)">Errore caricamento heatmap</div>';}
 }
 
+// ── Auth state (dichiarato qui, usato da portfolio/watchlist e da initAuth) ──
+let _authToken = localStorage.getItem('masker_jwt') || '';
+let _authUser  = null;
+try { const _u=localStorage.getItem('masker_user'); if(_u) _authUser=JSON.parse(_u); } catch(_) {}
+
 // ══════════════════════════════════════════════════════════════════════════════
-// Portfolio (localStorage)
+// Portfolio (localStorage + server sync quando loggato)
 // ══════════════════════════════════════════════════════════════════════════════
 const PORT_KEY='masker_portfolio';
 function loadPortfolioData(){try{return JSON.parse(localStorage.getItem(PORT_KEY)||'{}')}catch{return {}}}
-function savePortfolioData(d){localStorage.setItem(PORT_KEY,JSON.stringify(d))}
+function _writePortLocal(d){localStorage.setItem(PORT_KEY,JSON.stringify(d));}
+function savePortfolioData(d){
+  _writePortLocal(d);
+  if(_authToken){
+    fetch('/api/user/portfolio',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_authToken},body:JSON.stringify({portfolio:d})}).catch(_=>_);
+  }
+}
 
 async function renderPortfolio(){
+  // Se loggato, carica dal server prima
+  if(_authToken){
+    try{
+      const r=await fetch('/api/user/portfolio',{headers:{Authorization:'Bearer '+_authToken}});
+      if(r.ok){const srv=await r.json();if(srv&&typeof srv==='object'&&!srv.error)_writePortLocal(srv);}
+    }catch(_){}
+  }
   const port=loadPortfolioData();
   const tickers=Object.keys(port);
   const wrap=document.getElementById('port-table-wrap');
@@ -1399,13 +1589,25 @@ document.getElementById('port-add-btn').addEventListener('click',async()=>{
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Watchlist (localStorage)
+// Watchlist (localStorage + server sync quando loggato)
 // ══════════════════════════════════════════════════════════════════════════════
 const WL_KEY='masker_watchlist';
 function loadWlData(){try{return JSON.parse(localStorage.getItem(WL_KEY)||'{}')}catch{return {}}}
-function saveWlData(d){localStorage.setItem(WL_KEY,JSON.stringify(d))}
+function _writeWlLocal(d){localStorage.setItem(WL_KEY,JSON.stringify(d));}
+function saveWlData(d){
+  _writeWlLocal(d);
+  if(_authToken){
+    fetch('/api/user/watchlist',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_authToken},body:JSON.stringify({watchlist:d})}).catch(_=>_);
+  }
+}
 
 async function renderWatchlist(){
+  if(_authToken){
+    try{
+      const r=await fetch('/api/user/watchlist',{headers:{Authorization:'Bearer '+_authToken}});
+      if(r.ok){const srv=await r.json();if(srv&&typeof srv==='object'&&!srv.error)_writeWlLocal(srv);}
+    }catch(_){}
+  }
   const wl=loadWlData(); const tickers=Object.keys(wl);
   const grid=document.getElementById('wl-grid');
   if(!tickers.length){grid.innerHTML='<div class="history-empty"><span class="icon">⭐</span>Aggiungi azioni da monitorare.</div>';return;}
@@ -1480,11 +1682,12 @@ updateMarketStatus();
 loadIndices();
 setInterval(()=>{updateMarketStatus();loadIndices();},60000);
 loadData().then(startCountdown);
+initAuth();
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab switching (5 tab)
 // ══════════════════════════════════════════════════════════════════════════════
-const _VIEWS = ['live','history','heatmap','portfolio','watchlist'];
+const _VIEWS = ['live','history','earnings','heatmap','portfolio','watchlist'];
 let _tabLoaded = {};
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1499,6 +1702,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if(!_tabLoaded[tab]){
       _tabLoaded[tab]=true;
       if(tab==='history')  loadHistoryDates();
+      if(tab==='earnings') loadEarnings();
       if(tab==='heatmap')  loadHeatmap();
       if(tab==='portfolio') renderPortfolio();
       if(tab==='watchlist') renderWatchlist();
@@ -1569,6 +1773,190 @@ async function loadHistoryDay(date) {
     hgrid.appendChild(frag);
   } catch(e) {
     hgrid.innerHTML = '<div class="history-empty"><span class="icon">❌</span>Errore nel caricamento.</div>';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Auth — Telegram Login + JWT
+// ══════════════════════════════════════════════════════════════════════════════
+async function initAuth() {
+  try {
+    const cfg = await fetch('/api/config').then(r=>r.json());
+    if (cfg.login_enabled && cfg.bot_username) {
+      _renderAuthWidget(cfg.bot_username);
+    }
+  } catch(_) {}
+  if (_authToken) {
+    try {
+      const me = await fetch('/api/auth/me',{headers:{Authorization:'Bearer '+_authToken}}).then(r=>r.ok?r.json():null);
+      if (me && !me.error) {
+        _authUser = me;
+        localStorage.setItem('masker_user', JSON.stringify(me));
+        _updateAuthChip();
+      } else {
+        _authToken=''; _authUser=null;
+        localStorage.removeItem('masker_jwt'); localStorage.removeItem('masker_user');
+      }
+    } catch(_) {}
+  }
+}
+
+function _renderAuthWidget(botUsername) {
+  const w = document.getElementById('auth-widget');
+  if (_authUser) { _updateAuthChip(); return; }
+  w.innerHTML = `<button class="tg-login-btn" onclick="_showTgLogin('${botUsername}')"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.869 4.326-2.96-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.83.94z"/></svg>Login</button>`;
+}
+
+function _showTgLogin(botUsername) {
+  const ov = document.createElement('div');
+  ov.id = 'tg-login-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(10px);z-index:1500;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML = `<div style="background:var(--surf);border:1px solid var(--border-hi);border-radius:var(--r-xl);padding:32px;text-align:center;max-width:320px;width:100%;box-shadow:0 40px 80px rgba(0,0,0,.6)">
+    <div style="font-size:2rem;margin-bottom:10px">📨</div>
+    <div style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:6px">Accedi con Telegram</div>
+    <div style="font-size:.77rem;color:var(--text-dim);margin-bottom:18px;line-height:1.55">Portafoglio e watchlist sincronizzati su tutti i dispositivi.</div>
+    <div id="tg-wgt"></div>
+    <button onclick="document.getElementById('tg-login-ov').remove()" style="margin-top:14px;background:transparent;border:1px solid var(--border);border-radius:var(--r-sm);padding:6px 18px;color:var(--text-dim);cursor:pointer;font-family:Inter,sans-serif;font-size:.76rem">Annulla</button>
+  </div>`;
+  ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+  const sc = document.createElement('script');
+  sc.src = 'https://telegram.org/js/telegram-widget.js?22';
+  sc.setAttribute('data-telegram-login', botUsername);
+  sc.setAttribute('data-size', 'large');
+  sc.setAttribute('data-onauth', 'onTelegramAuth(user)');
+  sc.setAttribute('data-request-access', 'write');
+  document.getElementById('tg-wgt').appendChild(sc);
+}
+
+async function onTelegramAuth(user) {
+  document.getElementById('tg-login-ov')?.remove();
+  try {
+    const res = await fetch('/api/auth/telegram',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(user)}).then(r=>r.json());
+    if (res.error) { alert('Errore login: '+res.error); return; }
+    _authToken = res.token; _authUser = res.user;
+    localStorage.setItem('masker_jwt', _authToken);
+    localStorage.setItem('masker_user', JSON.stringify(_authUser));
+    _updateAuthChip();
+    // Sincronizza dati locali al server
+    const port=loadPortfolioData(), wl=loadWlData();
+    if(Object.keys(port).length) fetch('/api/user/portfolio',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_authToken},body:JSON.stringify({portfolio:port})}).catch(_=>_);
+    if(Object.keys(wl).length)   fetch('/api/user/watchlist',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_authToken},body:JSON.stringify({watchlist:wl})}).catch(_=>_);
+    // Ricarica tab attivo
+    const tab = document.querySelector('.tab-btn.active')?.dataset.tab;
+    if(tab==='portfolio') { _tabLoaded.portfolio=false; renderPortfolio(); }
+    if(tab==='watchlist') { _tabLoaded.watchlist=false; renderWatchlist(); }
+  } catch(e) { alert('Errore login: '+e.message); }
+}
+
+function _updateAuthChip() {
+  const w = document.getElementById('auth-widget');
+  if (!_authUser) return;
+  const init = (_authUser.first_name||'?')[0].toUpperCase();
+  const imgHtml = _authUser.photo_url
+    ? `<img class="auth-avatar" src="${_authUser.photo_url}" alt="${init}" onerror="this.style.display='none'">`
+    : `<div class="auth-avatar-ph">${init}</div>`;
+  w.innerHTML = `<div class="auth-user-chip" title="${_authUser.first_name} — clicca per opzioni">${imgHtml}<span style="color:var(--text);font-weight:600">${_authUser.first_name}</span><div class="auth-sync-dot" title="Sincronizzato"></div></div>`;
+  w.querySelector('.auth-user-chip').addEventListener('click', _showUserMenu);
+}
+
+function _showUserMenu() {
+  const ov = document.createElement('div');
+  ov.id = 'user-menu-ov';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:1500;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML = `<div style="background:var(--surf);border:1px solid var(--border-hi);border-radius:var(--r-xl);padding:24px;text-align:center;max-width:270px;width:100%;box-shadow:0 40px 80px rgba(0,0,0,.6)">
+    <div style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:4px">${_authUser.first_name}</div>
+    <div style="font-size:.74rem;color:var(--text-dim);margin-bottom:18px">@${_authUser.username||_authUser.id}</div>
+    <div style="font-size:.72rem;color:var(--green);margin-bottom:16px">☁️ Portafoglio e watchlist sincronizzati</div>
+    <button onclick="_logoutUser()" style="width:100%;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.25);border-radius:var(--r-md);padding:9px;color:var(--red);cursor:pointer;font-family:Inter,sans-serif;font-size:.82rem;font-weight:600">Disconnetti</button>
+    <button onclick="document.getElementById('user-menu-ov').remove()" style="width:100%;margin-top:8px;background:transparent;border:1px solid var(--border);border-radius:var(--r-md);padding:8px;color:var(--text-dim);cursor:pointer;font-family:Inter,sans-serif;font-size:.76rem">Chiudi</button>
+  </div>`;
+  ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+
+function _logoutUser() {
+  _authToken=''; _authUser=null;
+  localStorage.removeItem('masker_jwt'); localStorage.removeItem('masker_user');
+  document.getElementById('user-menu-ov')?.remove();
+  document.getElementById('auth-widget').innerHTML='';
+  initAuth();
+  _tabLoaded.portfolio=false; _tabLoaded.watchlist=false;
+  const tab=document.querySelector('.tab-btn.active')?.dataset.tab;
+  if(tab==='portfolio') renderPortfolio();
+  if(tab==='watchlist') renderWatchlist();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Earnings Calendar
+// ══════════════════════════════════════════════════════════════════════════════
+const _GIORNI_EARN = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+const _MESI_EARN   = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+
+async function loadEarnings() {
+  const grid = document.getElementById('earn-grid');
+  grid.innerHTML = '<div class="earn-empty"><span class="icon">⏳</span>Ricerca earnings in corso…<br><small style="font-size:.72rem">Può richiedere fino a 30 secondi</small></div>';
+  try {
+    const data = await fetch('/api/earnings?days=14').then(r=>r.json());
+    const dates = Object.keys(data||{}).sort();
+    if(!dates.length){
+      grid.innerHTML='<div class="earn-empty"><span class="icon">📭</span>Nessun earnings previsto nei prossimi 14 giorni.<br><small>I dati si aggiornano ogni 6 ore.</small></div>';
+      document.getElementById('earn-event-count').textContent='0';
+      return;
+    }
+    let totalEvents=0;
+    dates.forEach(dk=>totalEvents+=data[dk].length);
+    document.getElementById('earn-event-count').textContent=totalEvents;
+    grid.innerHTML='';
+    const today=new Date().toISOString().slice(0,10);
+    const frag=document.createDocumentFragment();
+    dates.forEach(dk=>{
+      const [y,m,d]=dk.split('-').map(Number);
+      const dt=new Date(y,m-1,d);
+      const dayName=_GIORNI_EARN[dt.getDay()];
+      const dateLabel=`${d} ${_MESI_EARN[m-1]} ${y}`;
+      const isToday=dk===today;
+      const events=data[dk];
+      const dayDiv=document.createElement('div');
+      dayDiv.className='earn-day';
+      const rowsHtml=events.map(e=>`
+        <div class="earn-row" onclick="openModal({ticker:'${e.ticker}',day_change_pct:0,current_price:0,name:'${e.ticker}',score_10:5})">
+          <div class="earn-ticker">${e.ticker}</div>
+          <div class="earn-name">${e.ticker}</div>
+          ${e.eps_estimate!=null?`<div class="earn-eps">EPS est. $${e.eps_estimate.toFixed(2)}</div>`:'<div class="earn-eps" style="color:var(--text-dim)">EPS n/d</div>'}
+        </div>`).join('');
+      dayDiv.innerHTML=`
+        <div class="earn-day-hd">
+          <span class="earn-day-name">${dayName}</span>
+          <span class="earn-day-date">${dateLabel}</span>
+          ${isToday?'<span class="earn-today-badge">OGGI</span>':''}
+          <span class="earn-day-cnt">${events.length} aziend${events.length===1?'a':'e'}</span>
+        </div>
+        <div class="earn-list">${rowsHtml}</div>`;
+      frag.appendChild(dayDiv);
+    });
+    grid.appendChild(frag);
+    // Arricchisci i nomi in background
+    _enrichEarningsNames(dates, data);
+  } catch(e){
+    grid.innerHTML='<div class="earn-empty"><span class="icon">❌</span>Errore caricamento earnings.</div>';
+  }
+}
+
+async function _enrichEarningsNames(dates, data){
+  // Fetch nomi batch per tutte le azioni trovate
+  const allTickers=[...new Set(dates.flatMap(dk=>data[dk].map(e=>e.ticker)))];
+  const rows=document.querySelectorAll('.earn-row');
+  for(const row of rows){
+    const tickerEl=row.querySelector('.earn-ticker');
+    const nameEl=row.querySelector('.earn-name');
+    if(!tickerEl||!nameEl) continue;
+    const t=tickerEl.textContent;
+    try{
+      const d=await fetch('/api/stock/'+t).then(r=>r.ok?r.json():null);
+      if(d?.name) nameEl.textContent=d.name;
+    }catch(_){}
+    await new Promise(r=>setTimeout(r,120));
   }
 }
 
