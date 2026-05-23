@@ -578,6 +578,65 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .chat-send-btn:hover{background:rgba(196,166,255,.25)}
 
 
+/* ── Livello esperienza ── */
+.level-badge{display:flex;align-items:center;gap:0;border-radius:100px;border:1px solid var(--border);overflow:hidden;flex-shrink:0}
+.level-btn{background:transparent;border:none;padding:5px 11px;font-family:'Inter',sans-serif;font-size:.7rem;font-weight:700;cursor:pointer;color:var(--text-dim);letter-spacing:.04em;transition:all .15s;white-space:nowrap}
+.level-btn.active-dil{background:rgba(114,239,160,.18);color:var(--green)}
+.level-btn.active-int{background:rgba(255,184,108,.18);color:var(--gold)}
+.level-btn.active-esp{background:rgba(196,166,255,.2);color:var(--primary)}
+.level-indicator{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--surf);border:1px solid var(--border-hi);border-radius:100px;padding:7px 18px;font-size:.75rem;font-weight:700;z-index:400;opacity:0;pointer-events:none;transition:opacity .3s;white-space:nowrap}
+
+/* ── Orario migliore ── */
+.bh-wrap{margin:14px 0 0;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:14px}
+.bh-title{font-size:.64rem;font-weight:700;color:var(--text-dim);letter-spacing:.08em;margin-bottom:10px}
+.bh-bars{display:flex;align-items:flex-end;gap:3px;height:50px}
+.bh-bar-wrap{display:flex;flex-direction:column;align-items:center;flex:1}
+.bh-bar{width:100%;border-radius:3px 3px 0 0;min-height:2px;transition:height .4s}
+.bh-bar.best-bar{background:var(--green)}
+.bh-bar.worst-bar{background:var(--red)}
+.bh-bar.neutral-bar{background:var(--border-hi)}
+.bh-label{font-size:.52rem;color:var(--text-dim);margin-top:3px}
+.bh-summary{margin-top:8px;display:flex;gap:12px;flex-wrap:wrap}
+.bh-badge{font-size:.72rem;font-weight:600;padding:4px 10px;border-radius:100px}
+.bh-badge.green{background:rgba(114,239,160,.15);color:var(--green)}
+.bh-badge.red{background:rgba(255,107,107,.15);color:var(--red)}
+
+/* ── Correlazione ── */
+.corr-section{padding:0 28px 18px;max-width:1180px;margin:0 auto}
+.corr-hd-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.corr-hd{font-size:.72rem;font-weight:700;color:var(--text-dim);letter-spacing:.08em}
+.corr-btn{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-sm);padding:6px 14px;color:var(--text-dim);font-family:'Inter',sans-serif;font-size:.75rem;cursor:pointer;transition:all .15s}
+.corr-btn:hover{border-color:var(--border-hi);color:var(--text)}
+.corr-grid{display:grid;gap:2px;margin-top:8px}
+.corr-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:4px;font-size:.62rem;font-weight:700;cursor:default}
+.corr-label{font-size:.62rem;font-weight:700;color:var(--text-dim);display:flex;align-items:center;justify-content:center}
+
+/* ── Sfida vs S&P500 ── */
+.vsmarket-section{padding:0 28px 18px;max-width:1180px;margin:0 auto}
+.vsmarket-hd-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.vsmarket-hd{font-size:.72rem;font-weight:700;color:var(--text-dim);letter-spacing:.08em}
+.vsmarket-stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.vsmarket-stat{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 16px;flex:1;min-width:120px;text-align:center}
+.vsmarket-stat-label{font-size:.67rem;color:var(--text-dim);margin-bottom:4px}
+.vsmarket-stat-val{font-size:1.1rem;font-weight:900}
+.vsmarket-chart{height:160px;border-radius:var(--r-md);overflow:hidden}
+.vsmarket-legend{display:flex;gap:14px;margin-top:6px;font-size:.67rem;color:var(--text-dim)}
+.vsmarket-legend span{display:flex;align-items:center;gap:5px}
+.vsmarket-legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
+
+/* ── Confessionale ── */
+.confessionale-wrap{padding:16px 0;border-top:1px solid var(--border);margin-top:8px}
+.conf-title{font-size:.72rem;font-weight:700;color:var(--text-dim);letter-spacing:.08em;margin-bottom:8px}
+.conf-textarea{width:100%;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;color:var(--text);font-family:'Inter',sans-serif;font-size:.83rem;resize:vertical;min-height:80px;outline:none;transition:border-color .2s;line-height:1.5}
+.conf-textarea:focus{border-color:var(--border-hi)}
+.conf-actions{display:flex;gap:8px;margin-top:8px}
+.conf-send-btn{background:linear-gradient(135deg,rgba(196,166,255,.22),rgba(128,255,219,.1));border:1px solid rgba(196,166,255,.4);color:var(--primary);border-radius:var(--r-sm);padding:8px 18px;font-family:'Inter',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer}
+.conf-result{margin-top:12px;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;display:none}
+.conf-bias-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.conf-bias-chip{background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.2);color:var(--red);border-radius:100px;padding:3px 10px;font-size:.67rem;font-weight:700}
+.conf-section-label{font-size:.65rem;font-weight:700;color:var(--text-dim);letter-spacing:.06em;margin:8px 0 3px}
+.conf-text{font-size:.8rem;line-height:1.6;color:var(--text)}
+
 /* ── Screener ── */
 .screener-panel{background:var(--surf);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px 22px;margin:0 28px 18px;max-width:1180px;margin-left:auto;margin-right:auto;display:none}
 .screener-panel.open{display:block}
@@ -646,6 +705,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 
 <canvas id="bg-canvas"></canvas>
+<div class="level-indicator" id="level-indicator"></div>
 
 <div class="app">
 
@@ -667,6 +727,11 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     <input id="search-input" type="text" placeholder="Cerca azione... TSLA · NVDA · AAPL" autocomplete="off" spellcheck="false" autocapitalize="characters" />
   </div>
   <div class="header-right">
+    <div class="level-badge" id="level-badge">
+      <button class="level-btn" id="lvl-dil" onclick="setLevel('dilettante')">🟢 Base</button>
+      <button class="level-btn" id="lvl-int" onclick="setLevel('intermedio')">🟡 Pro</button>
+      <button class="level-btn" id="lvl-esp" onclick="setLevel('esperto')">🔴 Expert</button>
+    </div>
     <button class="fx-toggle" id="fx-toggle" onclick="toggleFX()">$ USD</button>
     <div id="auth-widget" class="auth-widget"></div>
     <div class="live-badge">
@@ -803,6 +868,41 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   <!-- Leaderboard -->
   <div id="port-leaderboard" style="display:none"></div>
 
+  <!-- Sfida vs S&P500 -->
+  <div class="vsmarket-section" id="vsmarket-section" style="display:none">
+    <div class="vsmarket-hd-row">
+      <span class="vsmarket-hd">⚔️ SFIDA VS S&amp;P 500 (1 anno)</span>
+    </div>
+    <div class="vsmarket-stats">
+      <div class="vsmarket-stat">
+        <div class="vsmarket-stat-label">Il tuo portafoglio</div>
+        <div class="vsmarket-stat-val" id="vsm-port-val">—</div>
+      </div>
+      <div class="vsmarket-stat">
+        <div class="vsmarket-stat-label">S&amp;P 500 (SPY)</div>
+        <div class="vsmarket-stat-val" id="vsm-spy-val">—</div>
+      </div>
+      <div class="vsmarket-stat" id="vsm-result-card">
+        <div class="vsmarket-stat-label">Risultato</div>
+        <div class="vsmarket-stat-val" id="vsm-result-val">—</div>
+      </div>
+    </div>
+    <div class="vsmarket-chart" id="vsmarket-chart"></div>
+    <div class="vsmarket-legend">
+      <span><i style="background:var(--primary)"></i>Il tuo portafoglio</span>
+      <span><i style="background:var(--gold)"></i>S&amp;P 500</span>
+    </div>
+  </div>
+
+  <!-- Correlazione portafoglio -->
+  <div class="corr-section" id="corr-section" style="display:none">
+    <div class="corr-hd-row">
+      <span class="corr-hd">🔗 AFFINITÀ TRA TITOLI</span>
+      <button class="corr-btn" onclick="loadCorrelation()">↻ Aggiorna</button>
+    </div>
+    <div id="corr-grid-wrap"></div>
+  </div>
+
   <!-- Diario operazioni -->
   <div class="diary-section">
     <div class="diary-hd">📓 DIARIO OPERAZIONI</div>
@@ -850,7 +950,24 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
         <div class="chat-welcome-sub">Chiedi analisi, confronti o info sui tuoi titoli.<br>Conosco il tuo portafoglio e watchlist.</div>
       </div>
     </div>
+    <!-- Confessionale finanziario -->
+    <div class="confessionale-wrap" id="conf-wrap" style="display:none">
+      <div class="conf-title">🧠 CONFESSIONALE FINANZIARIO — scrivi cosa stai pensando di fare</div>
+      <textarea class="conf-textarea" id="conf-input" placeholder="Es: Sto pensando di vendere tutto perché ho paura che il mercato crolli ancora..."></textarea>
+      <div class="conf-actions">
+        <button class="conf-send-btn" onclick="runConfessionale()">Analizza i miei bias</button>
+        <button class="conf-send-btn" style="background:transparent;border-color:var(--border);color:var(--text-dim)" onclick="toggleConfessionale()">Chiudi</button>
+      </div>
+      <div class="conf-result" id="conf-result">
+        <div class="conf-bias-chips" id="conf-bias-chips"></div>
+        <div class="conf-section-label">COSA STA SUCCEDENDO</div>
+        <div class="conf-text" id="conf-analisi"></div>
+        <div class="conf-section-label" style="margin-top:10px">CONSIGLIO</div>
+        <div class="conf-text" id="conf-consiglio"></div>
+      </div>
+    </div>
     <div class="chat-input-wrap">
+      <button class="conf-send-btn" style="flex-shrink:0;padding:0 12px;height:44px;border-radius:100px;font-size:.75rem" onclick="toggleConfessionale()" title="Confessionale finanziario">🧠</button>
       <input class="chat-input" id="chat-input" type="text" placeholder="Chiedi qualcosa... es. Analizza il mio portafoglio" onkeydown="if(event.key==='Enter')sendChat()"/>
       <button class="chat-send-btn" onclick="sendChat()">▶</button>
     </div>
@@ -1011,6 +1128,13 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     <div class="note-section">
       <div class="note-hd">📝 NOTE PERSONALI</div>
       <textarea class="note-area" id="m-note" placeholder="Aggiungi appunti su questo titolo..."></textarea>
+    </div>
+
+    <!-- Orario migliore -->
+    <div class="bh-wrap" id="m-bh-wrap" style="display:none">
+      <div class="bh-title">⏰ ORARIO MIGLIORE PER COMPRARE</div>
+      <div class="bh-bars" id="m-bh-bars"></div>
+      <div class="bh-summary" id="m-bh-summary"></div>
     </div>
 
     <!-- Forecast 7 giorni -->
@@ -1455,6 +1579,9 @@ async function openModal(stock){
 
   // Chart
   _renderChart(stock.ticker,_chartPeriod,_chartInterval,_chartType);
+  // Orario migliore
+  document.getElementById('m-bh-wrap').style.display='none';
+  loadBestHour(stock.ticker);
 
   // Full data
   try{
@@ -1802,6 +1929,10 @@ async function renderPortfolio(){
 
   // Leaderboard migliori/peggiori
   _renderLeaderboard(_lbPositions);
+
+  // Sfida vs S&P500 + Correlazione (asincroni, non bloccano il render)
+  if (tickers.length >= 1) loadVsMarket();
+  if (tickers.length >= 2) loadCorrelation();
 }
 
 async function _renderPortfolioChart(port, tickers, chartWrap){
@@ -1853,7 +1984,7 @@ document.getElementById('port-valuta-btn').addEventListener('click',async()=>{
     const ai=await fetch('/api/portfolio/evaluate',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({positions}),
+      body:JSON.stringify({positions,level:_level}),
     }).then(r=>r.json());
 
     if(ai.error){throw new Error(ai.error);}
@@ -2122,7 +2253,7 @@ async function sendChat(){
   const wl=Object.keys(JSON.parse(localStorage.getItem('masker_watchlist')||'{}'));
   try{
     const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:msg,portfolio,watchlist:wl,history:_chatHistory})}).then(r=>r.json());
+      body:JSON.stringify({message:msg,portfolio,watchlist:wl,history:_chatHistory,level:_level})}).then(r=>r.json());
     loadDiv.classList.remove('loading');
     loadDiv.textContent=res.reply||'Errore nella risposta.';
     _chatHistory.push({role:'user',content:msg},{role:'assistant',content:res.reply});
@@ -2315,25 +2446,9 @@ function _renderAuthWidget(botUsername) {
 }
 
 function _showTgLogin(botUsername) {
-  const ov = document.createElement('div');
-  ov.id = 'tg-login-ov';
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(10px);z-index:1500;display:flex;align-items:center;justify-content:center;padding:16px';
-  ov.innerHTML = `<div style="background:var(--surf);border:1px solid var(--border-hi);border-radius:var(--r-xl);padding:32px;text-align:center;max-width:320px;width:100%;box-shadow:0 40px 80px rgba(0,0,0,.6)">
-    <div style="font-size:2rem;margin-bottom:10px">📨</div>
-    <div style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:6px">Accedi con Telegram</div>
-    <div style="font-size:.77rem;color:var(--text-dim);margin-bottom:18px;line-height:1.55">Portafoglio e watchlist sincronizzati su tutti i dispositivi.</div>
-    <div id="tg-wgt"></div>
-    <button onclick="document.getElementById('tg-login-ov').remove()" style="margin-top:14px;background:transparent;border:1px solid var(--border);border-radius:var(--r-sm);padding:6px 18px;color:var(--text-dim);cursor:pointer;font-family:Inter,sans-serif;font-size:.76rem">Annulla</button>
-  </div>`;
-  ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
-  document.body.appendChild(ov);
-  const sc = document.createElement('script');
-  sc.src = 'https://telegram.org/js/telegram-widget.js?22';
-  sc.setAttribute('data-telegram-login', botUsername);
-  sc.setAttribute('data-size', 'large');
-  sc.setAttribute('data-onauth', 'onTelegramAuth(user)');
-  sc.setAttribute('data-request-access', 'write');
-  document.getElementById('tg-wgt').appendChild(sc);
+  const popup = window.open('/tg-login', 'tg_login',
+    'width=420,height=320,top='+(screen.height/2-160)+',left='+(screen.width/2-210)+',popup=yes');
+  if (!popup) alert('Abilita i popup del browser per accedere con Telegram.');
 }
 
 async function onTelegramAuth(user) {
@@ -2451,6 +2566,199 @@ function buildHistoryCard(s, idx, date) {
     current_price: s.current_price ?? s.price_at_analysis, name: s.name, score_10: s.score_10
   }));
   return div;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Livello esperienza
+// ══════════════════════════════════════════════════════════════════════════════
+let _level = localStorage.getItem('masker_level') || 'intermedio';
+
+function setLevel(l) {
+  _level = l;
+  localStorage.setItem('masker_level', l);
+  _applyLevel();
+  // Toast
+  const ind = document.getElementById('level-indicator');
+  const labels = {dilettante:'🟢 Base', intermedio:'🟡 Pro', esperto:'🔴 Expert'};
+  ind.textContent = labels[l] || l;
+  ind.style.opacity = '1';
+  setTimeout(() => ind.style.opacity = '0', 1800);
+}
+
+function _applyLevel() {
+  const btns = {dilettante:'lvl-dil', intermedio:'lvl-int', esperto:'lvl-esp'};
+  const activeClass = {dilettante:'active-dil', intermedio:'active-int', esperto:'active-esp'};
+  Object.entries(btns).forEach(([k,id]) => {
+    const el = document.getElementById(id);
+    el.className = 'level-btn' + (_level === k ? ' ' + activeClass[k] : '');
+  });
+}
+
+_applyLevel();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Orario migliore
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadBestHour(ticker) {
+  try {
+    const data = await fetch(`/api/stock/${ticker}/best-hour`).then(r => r.ok ? r.json() : null);
+    if (!data || data.error) return;
+    const wrap = document.getElementById('m-bh-wrap');
+    const barsEl = document.getElementById('m-bh-bars');
+    const sumEl = document.getElementById('m-bh-summary');
+    wrap.style.display = 'block';
+
+    const hours = Object.keys(data.hourly_pct).map(Number).sort((a,b)=>a-b);
+    const vals = hours.map(h => data.hourly_pct[h]);
+    const minV = Math.min(...vals), maxV = Math.max(...vals);
+    const range = maxV - minV || 1;
+
+    barsEl.innerHTML = hours.map(h => {
+      const v = data.hourly_pct[h];
+      const heightPct = Math.round(((v - minV) / range) * 80 + 10);
+      const cls = h === data.best_hour ? 'best-bar' : h === data.worst_hour ? 'worst-bar' : 'neutral-bar';
+      return `<div class="bh-bar-wrap">
+        <div class="bh-bar ${cls}" style="height:${heightPct}%"></div>
+        <div class="bh-label">${h}h</div>
+      </div>`;
+    }).join('');
+
+    const fmtH = h => `${h}:00–${h+1}:00`;
+    sumEl.innerHTML = `
+      <span class="bh-badge green">✓ Meglio: ${fmtH(data.best_hour)} (${data.hourly_pct[data.best_hour]>0?'+':''}${data.hourly_pct[data.best_hour]}%)</span>
+      <span class="bh-badge red">✗ Peggio: ${fmtH(data.worst_hour)} (${data.hourly_pct[data.worst_hour]>0?'+':''}${data.hourly_pct[data.worst_hour]}%)</span>`;
+  } catch(_) {}
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Sfida vs S&P500
+// ══════════════════════════════════════════════════════════════════════════════
+let _vsmChart = null;
+
+async function loadVsMarket() {
+  const port = loadPortfolioData();
+  const tickers = Object.keys(port);
+  if (tickers.length < 1) return;
+  const section = document.getElementById('vsmarket-section');
+  section.style.display = 'block';
+
+  const positions = tickers.map(t => ({
+    ticker: t, buyPrice: port[t].buyPrice||0, qty: port[t].qty||0,
+    currentPrice: 0, name: port[t].name||t
+  }));
+
+  try {
+    const data = await fetch('/api/portfolio/vs-market', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({positions})
+    }).then(r => r.ok ? r.json() : null);
+    if (!data || data.error) return;
+
+    const sign = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+    const portEl = document.getElementById('vsm-port-val');
+    const spyEl  = document.getElementById('vsm-spy-val');
+    const resEl  = document.getElementById('vsm-result-val');
+    portEl.textContent = sign(data.portfolio_final);
+    portEl.style.color = data.portfolio_final >= 0 ? 'var(--green)' : 'var(--red)';
+    spyEl.textContent  = sign(data.spy_final);
+    spyEl.style.color  = data.spy_final >= 0 ? 'var(--green)' : 'var(--red)';
+    const diff = data.portfolio_final - data.spy_final;
+    resEl.textContent = data.winning ? `▲ +${diff.toFixed(2)}% vs mercato` : `▼ ${diff.toFixed(2)}% vs mercato`;
+    resEl.style.color = data.winning ? 'var(--green)' : 'var(--red)';
+
+    const chartEl = document.getElementById('vsmarket-chart');
+    if (_vsmChart) { try { _vsmChart.remove(); } catch(_){} _vsmChart = null; }
+    chartEl.innerHTML = '';
+    await new Promise(r => requestAnimationFrame(r));
+    _vsmChart = LightweightCharts.createChart(chartEl, {
+      ..._lwOpts, width: chartEl.offsetWidth || 700, height: 160
+    });
+    const portSeries = _vsmChart.addLineSeries({ color:'#C4A6FF', lineWidth:2 });
+    const spySeries  = _vsmChart.addLineSeries({ color:'#FFB86C', lineWidth:2 });
+    const toTs = s => Math.floor(new Date(s).getTime()/1000);
+    portSeries.setData(data.dates.map((d,i) => ({time: toTs(d), value: data.portfolio_pct[i]})));
+    spySeries.setData(data.dates.map((d,i)  => ({time: toTs(d), value: data.spy_pct[i]})));
+    _vsmChart.timeScale().fitContent();
+  } catch(_) {}
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Correlazione portafoglio
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadCorrelation() {
+  const tickers = Object.keys(loadPortfolioData());
+  if (tickers.length < 2) return;
+  const section = document.getElementById('corr-section');
+  section.style.display = 'block';
+  const wrap = document.getElementById('corr-grid-wrap');
+  wrap.innerHTML = '<div style="color:var(--text-dim);font-size:.78rem;padding:8px 0">⏳ Calcolo correlazioni…</div>';
+
+  try {
+    const data = await fetch('/api/portfolio/correlation', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({tickers})
+    }).then(r => r.ok ? r.json() : null);
+    if (!data || data.error) { wrap.innerHTML = '<div style="color:var(--text-dim);font-size:.78rem">Dati insufficienti.</div>'; return; }
+
+    const n = data.tickers.length;
+    const size = Math.min(48, Math.floor(280 / n));
+    const corrColor = v => {
+      if (v >= 0.7)  return 'rgba(255,107,107,.7)';
+      if (v >= 0.4)  return 'rgba(255,184,108,.5)';
+      if (v >= 0.1)  return 'rgba(114,239,160,.25)';
+      if (v >= -0.1) return 'rgba(142,138,158,.2)';
+      return 'rgba(128,255,219,.35)';
+    };
+
+    let html = `<div style="display:grid;grid-template-columns:${size}px repeat(${n},${size}px);gap:2px;overflow-x:auto">`;
+    // header row
+    html += `<div></div>` + data.tickers.map(t => `<div class="corr-label" style="height:${size}px;font-size:.55rem">${t}</div>`).join('');
+    // rows
+    data.tickers.forEach(t1 => {
+      html += `<div class="corr-label" style="height:${size}px;font-size:.55rem">${t1}</div>`;
+      data.tickers.forEach(t2 => {
+        const v = data.matrix[t1][t2];
+        const bg = t1===t2 ? 'rgba(196,166,255,.3)' : corrColor(v);
+        const txt = t1===t2 ? '—' : v.toFixed(2);
+        html += `<div class="corr-cell" style="background:${bg};height:${size}px;font-size:${size<32?'.5':'}.62'}rem" title="${t1}/${t2}: ${v}">${txt}</div>`;
+      });
+    });
+    html += '</div><div style="display:flex;gap:12px;margin-top:8px;font-size:.62rem;color:var(--text-dim);flex-wrap:wrap">'
+      + '<span><span style="color:rgba(255,107,107,.9)">■</span> Alta correlazione (≥0.7) — si muovono insieme</span>'
+      + '<span><span style="color:rgba(128,255,219,.8)">■</span> Correlazione negativa — si bilanciano</span>'
+      + '<span><span style="color:rgba(114,239,160,.7)">■</span> Bassa correlazione — buona diversificazione</span></div>';
+    wrap.innerHTML = html;
+  } catch(_) { wrap.innerHTML = '<div style="color:var(--text-dim);font-size:.78rem">Errore nel calcolo.</div>'; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Confessionale finanziario
+// ══════════════════════════════════════════════════════════════════════════════
+function toggleConfessionale() {
+  const w = document.getElementById('conf-wrap');
+  w.style.display = w.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('conf-result').style.display = 'none';
+}
+
+async function runConfessionale() {
+  const text = document.getElementById('conf-input').value.trim();
+  if (!text) return;
+  const res = document.getElementById('conf-result');
+  res.style.display = 'block';
+  document.getElementById('conf-bias-chips').innerHTML = '<span style="color:var(--text-dim);font-size:.75rem">⏳ Analisi in corso…</span>';
+  document.getElementById('conf-analisi').textContent = '';
+  document.getElementById('conf-consiglio').textContent = '';
+  try {
+    const data = await fetch('/api/confessionale', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text, level: _level})
+    }).then(r => r.json());
+    if (data.error) { document.getElementById('conf-bias-chips').textContent = '❌ ' + data.error; return; }
+    const chips = (data.bias||'').split(',').map(b=>b.trim()).filter(Boolean);
+    document.getElementById('conf-bias-chips').innerHTML = chips.map(b=>`<span class="conf-bias-chip">${b}</span>`).join('');
+    document.getElementById('conf-analisi').textContent = data.analisi || '—';
+    document.getElementById('conf-consiglio').textContent = data.consiglio || '—';
+  } catch(_) { document.getElementById('conf-bias-chips').textContent = '❌ Errore di connessione.'; }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

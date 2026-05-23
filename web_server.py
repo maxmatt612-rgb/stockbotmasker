@@ -12,7 +12,7 @@ from typing import Any, List, Optional
 
 from fastapi import FastAPI, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from analyzer import get_enriched_analysis, scan_cheap_stocks
@@ -630,6 +630,26 @@ class PortfolioPosition(BaseModel):
 
 class PortfolioEvalRequest(BaseModel):
     positions: List[PortfolioPosition]
+    level: Optional[str] = "intermedio"  # dilettante | intermedio | esperto
+
+
+_LEVEL_SYSTEM = {
+    "dilettante": (
+        "Sei un consulente finanziario amichevole che parla con un principiante. "
+        "Usa un linguaggio semplice, zero gergo tecnico, spiega ogni concetto come se fosse la prima volta. "
+        "Dai consigli chiari e diretti: compra, vendi, aspetta. Usa analogie semplici. Rispondi SEMPRE in italiano."
+    ),
+    "intermedio": (
+        "Sei un analista finanziario che parla con un investitore con esperienza media. "
+        "Puoi usare termini tecnici come RSI, MACD, supporti/resistenze, P/E ratio, ma spiegali brevemente. "
+        "Bilancia semplicità e profondità. Rispondi SEMPRE in italiano."
+    ),
+    "esperto": (
+        "Sei un analista quantitativo senior. Parli con un trader/investitore esperto. "
+        "Usa terminologia avanzata: Greeks, correlazioni, beta, Sharpe ratio, drawdown, mean reversion, momentum. "
+        "Sii denso di informazioni, niente spiegazioni base. Rispondi SEMPRE in italiano."
+    ),
+}
 
 
 @app.post("/api/portfolio/evaluate")
@@ -640,6 +660,7 @@ async def api_portfolio_evaluate(req: PortfolioEvalRequest):
     if not req.positions:
         return JSONResponse({"error": "portafoglio vuoto"}, status_code=400)
 
+    level = req.level if req.level in _LEVEL_SYSTEM else "intermedio"
     total_inv = 0.0; total_val = 0.0
     lines = []
     for p in req.positions:
@@ -669,9 +690,9 @@ async def api_portfolio_evaluate(req: PortfolioEvalRequest):
     try:
         resp = await groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
-            max_tokens=420,
+            max_tokens=500,
             messages=[
-                {"role": "system", "content": "Sei un analista finanziario senior. Rispondi in italiano, diretto e concreto. Non dare mai consigli finanziari definitivi."},
+                {"role": "system", "content": _LEVEL_SYSTEM[level]},
                 {"role": "user", "content": prompt},
             ],
         )
@@ -697,6 +718,219 @@ async def api_portfolio_evaluate(req: PortfolioEvalRequest):
             "total_pl_pct": round(total_pl_pct, 2),
         }
 
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# ─── Orario migliore ──────────────────────────────────────────────────────────
+
+@app.get("/api/stock/{ticker}/best-hour")
+async def api_best_hour(ticker: str):
+    t = ticker.upper()
+    key = f"besthour:{t}"
+    if (c := _cached(key, 3600)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf, math
+        try:
+            df = yf.download(t, period="60d", interval="30m", progress=False, auto_adjust=True)
+            if df is None or df.empty:
+                return None
+            close = df["Close"]
+            if hasattr(close, "squeeze"):
+                close = close.squeeze()
+            hourly: dict[int, list] = {}
+            for ts, price in close.items():
+                try:
+                    h = ts.hour
+                    p = float(price)
+                    if math.isnan(p) or p <= 0:
+                        continue
+                    hourly.setdefault(h, []).append(p)
+                except Exception:
+                    continue
+            if not hourly:
+                return None
+            avg = {h: sum(v)/len(v) for h, v in hourly.items() if len(v) >= 3}
+            if not avg:
+                return None
+            overall_avg = sum(avg.values()) / len(avg)
+            pct = {h: round((v - overall_avg) / overall_avg * 100, 2) for h, v in avg.items()}
+            best  = min(pct, key=pct.get)
+            worst = max(pct, key=pct.get)
+            return {"best_hour": best, "worst_hour": worst, "hourly_pct": pct}
+        except Exception:
+            return None
+
+    data = await asyncio.to_thread(_get)
+    if not data:
+        return JSONResponse({"error": "dati non disponibili"}, status_code=404)
+    _store(key, data)
+    return data
+
+
+# ─── Correlazione portafoglio ─────────────────────────────────────────────────
+
+class CorrelationBody(BaseModel):
+    tickers: List[str]
+
+
+@app.post("/api/portfolio/correlation")
+async def api_portfolio_correlation(body: CorrelationBody):
+    tickers = [t.upper() for t in body.tickers if t.strip()][:12]
+    if len(tickers) < 2:
+        return JSONResponse({"error": "Servono almeno 2 ticker"}, status_code=400)
+    key = f"corr:{'_'.join(sorted(tickers))}"
+    if (c := _cached(key, 3600)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf, math
+        try:
+            raw = yf.download(tickers, period="60d", interval="1d", progress=False, auto_adjust=True)
+            close = raw["Close"] if "Close" in raw.columns else raw
+            close = close.dropna(how="all")
+            rets = close.pct_change().dropna()
+            result = {}
+            for t1 in tickers:
+                result[t1] = {}
+                for t2 in tickers:
+                    try:
+                        c = float(rets[t1].corr(rets[t2]))
+                        result[t1][t2] = round(c, 2) if not math.isnan(c) else 0.0
+                    except Exception:
+                        result[t1][t2] = 0.0
+            return {"tickers": tickers, "matrix": result}
+        except Exception as e:
+            return None
+
+    data = await asyncio.to_thread(_get)
+    if not data:
+        return JSONResponse({"error": "Dati insufficienti"}, status_code=404)
+    _store(key, data)
+    return data
+
+
+# ─── Sfida vs mercato ─────────────────────────────────────────────────────────
+
+class VsMarketBody(BaseModel):
+    positions: List[PortfolioPosition]
+
+
+@app.post("/api/portfolio/vs-market")
+async def api_vs_market(body: VsMarketBody):
+    if not body.positions:
+        return JSONResponse({"error": "portafoglio vuoto"}, status_code=400)
+    tickers = [p.ticker.upper() for p in body.positions]
+    key = f"vsmarket:{'_'.join(sorted(tickers))}"
+    if (c := _cached(key, 300)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf, math
+        try:
+            to_dl = tickers + ["SPY"]
+            raw = yf.download(to_dl, period="1y", interval="1wk", progress=False, auto_adjust=True)
+            close = raw["Close"] if "Close" in raw.columns else raw
+            close = close.dropna(how="all")
+            spy = close["SPY"].dropna()
+            if spy.empty:
+                return None
+
+            dates = [str(d.date()) for d in spy.index.tolist()]
+            spy_start = float(spy.iloc[0])
+            spy_pct = [(float(v) / spy_start - 1) * 100 for v in spy]
+
+            # Weighted portfolio return
+            total_inv = sum(p.buyPrice * p.qty for p in body.positions)
+            port_pct = []
+            for i, date in enumerate(spy.index):
+                weighted = 0.0
+                for p in body.positions:
+                    t = p.ticker.upper()
+                    if t not in close.columns:
+                        continue
+                    series = close[t].dropna()
+                    if series.empty:
+                        continue
+                    try:
+                        start_price = float(series.iloc[0])
+                        curr_price = float(series.iloc[min(i, len(series)-1)])
+                        weight = (p.buyPrice * p.qty) / total_inv if total_inv > 0 else 0
+                        weighted += weight * (curr_price / start_price - 1) * 100
+                    except Exception:
+                        continue
+                port_pct.append(round(weighted, 2))
+
+            spy_final = round(spy_pct[-1], 2)
+            port_final = round(port_pct[-1], 2)
+            return {
+                "dates": dates,
+                "portfolio_pct": port_pct,
+                "spy_pct": [round(v, 2) for v in spy_pct],
+                "portfolio_final": port_final,
+                "spy_final": spy_final,
+                "winning": port_final > spy_final,
+            }
+        except Exception:
+            return None
+
+    data = await asyncio.to_thread(_get)
+    if not data:
+        return JSONResponse({"error": "Dati insufficienti"}, status_code=404)
+    _store(key, data)
+    return data
+
+
+# ─── Confessionale finanziario ────────────────────────────────────────────────
+
+class ConfessionaleBody(BaseModel):
+    text: str
+    level: Optional[str] = "intermedio"
+
+
+@app.post("/api/confessionale")
+async def api_confessionale(body: ConfessionaleBody):
+    if not groq_client:
+        return JSONResponse({"error": "GROQ_API_KEY non configurata"}, status_code=503)
+    if not body.text or len(body.text.strip()) < 10:
+        return JSONResponse({"error": "Testo troppo breve"}, status_code=400)
+
+    level = body.level if body.level in _LEVEL_SYSTEM else "intermedio"
+    sys_prompt = (
+        "Sei uno psicologo comportamentale specializzato in finanza behaviorale. "
+        "Analizza il testo dell'investitore e identifica i bias cognitivi presenti (FOMO, anchoring, loss aversion, "
+        "overconfidence, herding, recency bias, panic selling, ecc.). "
+        "Rispondi SEMPRE in italiano. Sii empatico ma diretto. "
+        + ("Usa un linguaggio semplice senza gergo." if level == "dilettante" else
+           "Usa terminologia behaviorale appropriata." if level == "esperto" else "")
+    )
+    user_prompt = (
+        f"L'investitore scrive:\n\"{body.text.strip()}\"\n\n"
+        "Rispondi in questo formato:\n"
+        "BIAS: [elenco bias rilevati, separati da virgola]\n"
+        "ANALISI: [2-3 frasi che spiegano cosa sta succedendo psicologicamente]\n"
+        "CONSIGLIO: [1-2 frasi concrete su come gestire questo momento emotivo]"
+    )
+
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=350,
+            messages=[
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        bias = analisi = consiglio = ""
+        for line in text.split("\n"):
+            l = line.strip()
+            if l.upper().startswith("BIAS:"):     bias     = l[5:].strip()
+            elif l.upper().startswith("ANALISI:"): analisi  = l[8:].strip()
+            elif l.upper().startswith("CONSIGLIO:"): consiglio = l[10:].strip()
+        return {"bias": bias, "analisi": analisi, "consiglio": consiglio}
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -789,6 +1023,53 @@ async def api_fx():
 
 
 # ─── Auth — Telegram Login ────────────────────────────────────────────────────
+
+@app.get("/tg-login")
+async def tg_login_page():
+    """Pagina standalone per il widget Telegram Login (evita problemi con iniezione dinamica)."""
+    bot_username = os.getenv("BOT_USERNAME", "")
+    if not bot_username:
+        return HTMLResponse("<p>Login non configurato (BOT_USERNAME mancante)</p>", status_code=503)
+    html = f"""<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Accedi con Telegram</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:Inter,sans-serif;background:#06061A;color:#E6E1EF;
+  display:flex;align-items:center;justify-content:center;min-height:100vh}}
+.wrap{{text-align:center;padding:32px 24px}}
+.icon{{font-size:2.2rem;margin-bottom:10px}}
+h2{{font-size:1rem;font-weight:800;margin-bottom:6px}}
+p{{font-size:.8rem;color:#8E8A9E;margin-bottom:20px;line-height:1.5}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="icon">📨</div>
+  <h2>Accedi con Telegram</h2>
+  <p>Clicca il pulsante per autorizzare l'accesso.</p>
+  <script async src="https://telegram.org/js/telegram-widget.js?22"
+    data-telegram-login="{bot_username}"
+    data-size="large"
+    data-onauth="onAuth(user)"
+    data-request-access="write">
+  </script>
+</div>
+<script>
+function onAuth(user) {{
+  if (window.opener && !window.opener.closed) {{
+    window.opener.onTelegramAuth(user);
+  }}
+  window.close();
+}}
+</script>
+</body>
+</html>"""
+    return HTMLResponse(html)
+
 
 @app.get("/api/config")
 async def api_config():
@@ -956,6 +1237,7 @@ class ChatBody(BaseModel):
     portfolio: Optional[dict] = {}
     watchlist: Optional[list] = []
     history: Optional[list] = []
+    level: Optional[str] = "intermedio"
 
 
 @app.post("/api/chat")
@@ -963,6 +1245,7 @@ async def api_chat(body: ChatBody):
     if not groq_client:
         return JSONResponse({"error": "GROQ_API_KEY non configurata"}, status_code=503)
 
+    level = body.level if body.level in _LEVEL_SYSTEM else "intermedio"
     port_ctx = ""
     if body.portfolio:
         port_ctx = "\nPortafoglio utente:\n"
@@ -975,10 +1258,8 @@ async def api_chat(body: ChatBody):
 
     messages = [{"role": "system", "content": (
         "Sei Masker AI, assistente finanziario di una piattaforma italiana di analisi azioni. "
-        "Rispondi SEMPRE in italiano. Sii conciso, utile e preciso. "
-        "Puoi analizzare dati, spiegare concetti e fare confronti, "
-        "ma ricorda sempre che le informazioni sono solo indicative e non costituiscono consulenza finanziaria."
-        + port_ctx + wl_ctx
+        "Le informazioni sono solo indicative e non costituiscono consulenza finanziaria. "
+        + _LEVEL_SYSTEM[level] + port_ctx + wl_ctx
     )}]
 
     for msg in (body.history or [])[-10:]:
