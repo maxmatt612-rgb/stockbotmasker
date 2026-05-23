@@ -1508,7 +1508,7 @@ function exportPDF(){
   document.getElementById('print-date').textContent=`Generato il ${dateStr} alle ${timeStr} · Masker Stock Intelligence · Solo uso informativo`;
   // Mostra solo le prime 12 card per stare in una pagina
   const cards=[...document.querySelectorAll('#grid .card')];
-  const hidden=cards.slice(12);
+  const hidden=cards.slice(5);
   hidden.forEach(c=>c.style.display='none');
   window.addEventListener('afterprint',()=>hidden.forEach(c=>c.style.display=''),{once:true});
   setTimeout(()=>window.print(),80);
