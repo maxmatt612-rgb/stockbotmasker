@@ -191,6 +191,68 @@ async def api_ai(ticker: str):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@app.get("/api/market/indices")
+async def api_indices():
+    """S&P500, NASDAQ, DOW, VIX — cache 60s."""
+    key = "market:indices"
+    if (c := _cached(key, 60)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        syms = {"SP500": "^GSPC", "NASDAQ": "^IXIC", "DOW": "^DJI", "VIX": "^VIX"}
+        result = {}
+        for name, sym in syms.items():
+            try:
+                fi = yf.Ticker(sym).fast_info
+                price = float(fi.last_price or 0)
+                prev  = float(fi.previous_close or price)
+                chg   = round(((price - prev) / prev * 100) if prev else 0, 2)
+                result[name] = {"price": round(price, 2), "chg": chg}
+            except Exception:
+                result[name] = {"price": 0, "chg": 0}
+        return result
+
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return data
+
+
+@app.get("/api/sparklines")
+async def api_sparklines(tickers: str):
+    """Storico 5gg batch per le sparkline delle card."""
+    key = f"spark:{tickers}"
+    if (c := _cached(key, _STOCK_TTL)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        import pandas as pd
+        tlist = [t.strip().upper() for t in tickers.split(",") if t.strip()][:15]
+        if not tlist:
+            return {}
+        try:
+            raw = yf.download(tlist, period="5d", interval="1d", auto_adjust=True, progress=False)
+            if raw.empty:
+                return {}
+            close = raw["Close"] if isinstance(raw.columns, pd.MultiIndex) else None
+            if close is None:
+                return {}
+            result = {}
+            for t in tlist:
+                if t in close.columns:
+                    vals = close[t].dropna().tolist()
+                    result[t] = [round(float(v), 4) for v in vals if v == v]
+            return result
+        except Exception as e:
+            print(f"[sparklines] {e}")
+            return {}
+
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return data
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "cache_keys": len(_cache)}

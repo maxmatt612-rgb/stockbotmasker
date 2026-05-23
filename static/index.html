@@ -5,495 +5,337 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stock Bot — Live Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,900;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-
 :root{
-  --bg:#06061A;
-  --surf:#0D0D26;
-  --surf-v:#131336;
-  --surf-hi:#1C1C4A;
-  --primary:#C4A6FF;
-  --primary-dim:rgba(196,166,255,.12);
-  --secondary:#80FFDB;
-  --gold:#FFB86C;
-  --green:#72EFA0;
-  --red:#FF6B6B;
-  --text:#E6E1EF;
-  --text-dim:#8E8A9E;
-  --border:rgba(196,166,255,.1);
-  --border-hi:rgba(196,166,255,.35);
+  --bg:#06061A;--surf:#0D0D26;--surf-v:#131336;--surf-hi:#1C1C4A;
+  --primary:#C4A6FF;--primary-dim:rgba(196,166,255,.12);
+  --secondary:#80FFDB;--gold:#FFB86C;--green:#72EFA0;--red:#FF6B6B;
+  --text:#E6E1EF;--text-dim:#8E8A9E;
+  --border:rgba(196,166,255,.1);--border-hi:rgba(196,166,255,.35);
   --r-xl:28px;--r-lg:18px;--r-md:12px;--r-sm:8px;
 }
-
 html{scroll-behavior:smooth}
-
-body{
-  font-family:'Inter',sans-serif;
-  background:var(--bg);
-  color:var(--text);
-  min-height:100vh;
-  overflow-x:hidden;
-}
-
-/* ── Three.js canvas ── */
-#bg-canvas{
-  position:fixed;inset:0;z-index:0;
-  pointer-events:none;
-}
-
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
 .app{position:relative;z-index:1}
 
 /* ── Header ── */
 header{
   display:flex;align-items:center;justify-content:space-between;
-  padding:14px 32px;
-  background:rgba(6,6,26,.75);
-  backdrop-filter:blur(28px);
-  -webkit-backdrop-filter:blur(28px);
+  padding:12px 28px;
+  background:rgba(6,6,26,.8);backdrop-filter:blur(28px);
   border-bottom:1px solid var(--border);
-  position:sticky;top:0;z-index:200;
+  position:sticky;top:0;z-index:300;height:60px;
 }
+.logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:1.1rem;letter-spacing:-.025em}
+.logo-icon{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-size:16px}
+.header-right{display:flex;align-items:center;gap:14px}
+.live-badge{display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--text-dim)}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(114,239,160,.5)}50%{opacity:.6;box-shadow:0 0 0 4px rgba(114,239,160,0)}}
 
-.logo{
-  display:flex;align-items:center;gap:10px;
-  font-weight:800;font-size:1.15rem;letter-spacing:-.025em;
+/* ── Indices tape ── */
+.indices-tape{
+  display:flex;align-items:center;
+  padding:0 24px;
+  background:rgba(13,13,38,.92);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:60px;z-index:290;
+  overflow-x:auto;scrollbar-width:none;white-space:nowrap;
 }
-
-.logo-icon{
-  width:36px;height:36px;border-radius:10px;
-  background:linear-gradient(135deg,var(--primary),var(--secondary));
-  display:flex;align-items:center;justify-content:center;
-  font-size:17px;
+.indices-tape::-webkit-scrollbar{display:none}
+.mkt-status{
+  display:flex;align-items:center;gap:6px;
+  padding:9px 16px 9px 0;border-right:1px solid var(--border);
+  margin-right:4px;flex-shrink:0;
 }
-
-.header-right{
-  display:flex;align-items:center;gap:16px;
+.status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.status-label{font-size:.72rem;font-weight:700;letter-spacing:.06em}
+.status-time{font-size:.68rem;color:var(--text-dim);margin-left:4px}
+.idx-item{
+  display:flex;align-items:center;gap:9px;
+  padding:9px 16px;border-right:1px solid var(--border);
+  flex-shrink:0;font-size:.78rem;
 }
-
-.live-badge{
-  display:flex;align-items:center;gap:7px;
-  font-size:.78rem;color:var(--text-dim);
-}
-
-.live-dot{
-  width:8px;height:8px;border-radius:50%;
-  background:var(--green);
-  animation:pulse 2s infinite;
-}
-
-@keyframes pulse{
-  0%,100%{box-shadow:0 0 0 0 rgba(114,239,160,.5);opacity:1}
-  50%{box-shadow:0 0 0 5px rgba(114,239,160,0);opacity:.7}
-}
+.idx-name{color:var(--text-dim);font-size:.7rem;min-width:52px}
+.idx-price{font-weight:700}
+.idx-chg{font-size:.72rem;font-weight:600}
+.pos{color:var(--green)}.neg{color:var(--red)}
 
 /* ── Hero ── */
-.hero{
-  text-align:center;
-  padding:64px 24px 44px;
-}
-
+.hero{text-align:center;padding:56px 24px 36px}
 .hero h1{
-  font-size:clamp(2.2rem,6vw,4.5rem);
-  font-weight:900;
-  letter-spacing:-.045em;
-  line-height:1.05;
-  background:linear-gradient(135deg,var(--primary) 0%,var(--secondary) 50%,var(--gold) 100%);
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
-  background-clip:text;
-  margin-bottom:14px;
+  font-size:clamp(2rem,6vw,4.2rem);font-weight:900;
+  letter-spacing:-.045em;line-height:1.05;
+  background:linear-gradient(135deg,var(--primary) 0%,var(--secondary) 55%,var(--gold) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  margin-bottom:12px;
 }
+.hero p{color:var(--text-dim);font-size:.9rem}
 
-.hero p{
-  color:var(--text-dim);
-  font-size:.95rem;
-  letter-spacing:.01em;
+/* ── Search ── */
+.search-wrap{padding:0 24px 28px;max-width:560px;margin:0 auto}
+.search-box{
+  display:flex;align-items:center;gap:10px;
+  background:var(--surf);border:1px solid var(--border);
+  border-radius:100px;padding:11px 22px;
+  transition:border-color .2s,box-shadow .2s;
 }
-
-/* ── Stats chips ── */
-.stats-bar{
-  display:flex;flex-wrap:wrap;gap:10px;
-  justify-content:center;
-  padding:0 24px 40px;
+.search-box:focus-within{border-color:var(--border-hi);box-shadow:0 0 0 3px rgba(196,166,255,.09)}
+#search-input{
+  flex:1;background:transparent;border:none;outline:none;
+  color:var(--text);font-family:'Inter',sans-serif;font-size:.88rem;
 }
+#search-input::placeholder{color:var(--text-dim)}
 
-.stat-chip{
-  background:var(--surf);
-  border:1px solid var(--border);
-  border-radius:100px;
-  padding:8px 18px;
-  font-size:.8rem;
-  color:var(--text-dim);
+/* ── Controls ── */
+.controls-bar{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:0 28px 18px;max-width:1180px;margin:0 auto;
 }
+.ctrl-label{font-size:.72rem;color:var(--text-dim);margin-right:2px}
+.ctrl-group{display:flex;gap:5px;flex-wrap:wrap}
+.ctrl-div{width:1px;height:22px;background:var(--border);margin:0 4px}
+.ctrl-btn{
+  background:var(--surf);border:1px solid var(--border);
+  border-radius:100px;padding:5px 13px;
+  font-size:.74rem;color:var(--text-dim);cursor:pointer;
+  font-family:'Inter',sans-serif;transition:all .15s;
+}
+.ctrl-btn:hover{border-color:var(--border-hi);color:var(--text)}
+.ctrl-btn.active{background:var(--primary-dim);border-color:rgba(196,166,255,.3);color:var(--primary);font-weight:600}
 
+/* ── Stats ── */
+.stats-bar{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:0 24px 28px}
+.stat-chip{background:var(--surf);border:1px solid var(--border);border-radius:100px;padding:7px 16px;font-size:.78rem;color:var(--text-dim)}
 .stat-chip b{color:var(--primary);font-weight:700}
 
 /* ── Grid ── */
 .grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
-  gap:18px;
-  padding:0 28px 96px;
-  max-width:1180px;
-  margin:0 auto;
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(295px,1fr));
+  gap:16px;padding:0 28px 96px;max-width:1180px;margin:0 auto;
 }
 
 /* ── Card ── */
 .card{
-  background:linear-gradient(145deg,rgba(196,166,255,.06),rgba(128,255,219,.03));
-  border:1px solid var(--border);
-  border-radius:var(--r-xl);
-  padding:24px;
-  cursor:pointer;
-  transition:border-color .25s,box-shadow .25s;
-  transform-style:preserve-3d;
-  will-change:transform;
-  animation:fadeUp .55s ease both;
+  background:linear-gradient(145deg,rgba(196,166,255,.055),rgba(128,255,219,.025));
+  border:1px solid var(--border);border-radius:var(--r-xl);
+  padding:22px 22px 18px;cursor:pointer;
+  transition:border-color .2s,box-shadow .2s;
+  transform-style:preserve-3d;will-change:transform;
+  animation:fadeUp .5s ease both;
 }
-
-.card:nth-child(1){animation-delay:.04s}
-.card:nth-child(2){animation-delay:.1s}
-.card:nth-child(3){animation-delay:.16s}
-.card:nth-child(4){animation-delay:.22s}
-.card:nth-child(5){animation-delay:.28s}
-.card:nth-child(6){animation-delay:.34s}
-.card:nth-child(7){animation-delay:.4s}
-.card:nth-child(8){animation-delay:.46s}
-.card:nth-child(9){animation-delay:.52s}
-.card:nth-child(10){animation-delay:.58s}
-
-@keyframes fadeUp{
-  from{opacity:0;transform:translateY(28px)}
-  to{opacity:1;transform:translateY(0)}
-}
-
-.card:hover{
-  border-color:var(--border-hi);
-  box-shadow:0 0 0 1px rgba(196,166,255,.12),0 24px 60px rgba(0,0,0,.5),0 0 40px rgba(196,166,255,.12);
-}
-
-/* Card internals */
-.card-rank{
-  font-size:.7rem;font-weight:700;letter-spacing:.1em;
-  color:var(--primary);text-transform:uppercase;
-  margin-bottom:6px;opacity:.8;
-}
-
-.card-row{
-  display:flex;justify-content:space-between;align-items:flex-start;
-  margin-bottom:18px;
-}
-
-.card-ticker{
-  font-size:1.7rem;font-weight:900;letter-spacing:-.035em;line-height:1;
-}
-
-.card-name{
-  font-size:.76rem;color:var(--text-dim);margin-top:4px;
-  max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-
+.card:nth-child(1){animation-delay:.04s}.card:nth-child(2){animation-delay:.09s}
+.card:nth-child(3){animation-delay:.14s}.card:nth-child(4){animation-delay:.19s}
+.card:nth-child(5){animation-delay:.24s}.card:nth-child(6){animation-delay:.29s}
+.card:nth-child(7){animation-delay:.34s}.card:nth-child(8){animation-delay:.39s}
+.card:nth-child(9){animation-delay:.44s}.card:nth-child(10){animation-delay:.49s}
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.card:hover{border-color:var(--border-hi);box-shadow:0 0 0 1px rgba(196,166,255,.1),0 20px 50px rgba(0,0,0,.45),0 0 35px rgba(196,166,255,.1)}
+.card-rank{font-size:.68rem;font-weight:700;letter-spacing:.1em;color:var(--primary);text-transform:uppercase;margin-bottom:5px;opacity:.8}
+.card-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.card-ticker{font-size:1.6rem;font-weight:900;letter-spacing:-.035em;line-height:1}
+.card-name{font-size:.73rem;color:var(--text-dim);margin-top:3px;max-width:155px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .price-block{text-align:right}
-
-.price-val{
-  font-size:1.35rem;font-weight:800;letter-spacing:-.025em;
-}
-
-.price-chg{
-  display:inline-block;
-  font-size:.76rem;font-weight:700;
-  padding:3px 10px;border-radius:100px;margin-top:5px;
-}
-
-.pos{background:rgba(114,239,160,.14);color:var(--green)}
-.neg{background:rgba(255,107,107,.14);color:var(--red)}
+.price-val{font-size:1.25rem;font-weight:800;letter-spacing:-.025em}
+.price-chg{display:inline-block;font-size:.73rem;font-weight:700;padding:2px 9px;border-radius:100px;margin-top:4px}
+.chg-pos{background:rgba(114,239,160,.13);color:var(--green)}
+.chg-neg{background:rgba(255,107,107,.13);color:var(--red)}
 
 /* Score */
-.score-wrap{
-  display:flex;align-items:center;gap:10px;
-  margin-bottom:14px;
-}
-
-.score-label{font-size:.72rem;color:var(--text-dim);min-width:40px}
-
-.score-track{
-  flex:1;height:5px;
-  background:rgba(255,255,255,.07);
-  border-radius:100px;overflow:hidden;
-}
-
-.score-bar{
-  height:100%;border-radius:100px;
-  background:linear-gradient(90deg,var(--primary),var(--secondary));
-  width:0;
-  transition:width .9s cubic-bezier(.4,0,.2,1);
-}
-
-.score-num{
-  font-size:.76rem;font-weight:700;color:var(--primary);
-  min-width:36px;text-align:right;
-}
+.score-wrap{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+.score-label{font-size:.7rem;color:var(--text-dim);min-width:38px}
+.score-track{flex:1;height:5px;background:rgba(255,255,255,.07);border-radius:100px;overflow:hidden}
+.score-bar{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--primary),var(--secondary));width:0;transition:width .85s cubic-bezier(.4,0,.2,1)}
+.score-num{font-size:.74rem;font-weight:700;color:var(--primary);min-width:34px;text-align:right}
 
 /* Chips */
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.chip{font-size:.68rem;padding:2px 8px;border-radius:100px;border:1px solid var(--border);color:var(--text-dim);background:rgba(255,255,255,.025)}
 
-.chip{
-  font-size:.7rem;padding:3px 9px;border-radius:100px;
-  border:1px solid var(--border);color:var(--text-dim);
-  background:rgba(255,255,255,.03);
-  white-space:nowrap;
-}
+/* Sparkline */
+.sparkline-wrap{height:42px;margin:4px -2px 0}
+.sparkline{width:100%;height:100%;display:block}
 
 /* Verdict */
-.verdict{
-  font-size:.79rem;color:var(--text-dim);line-height:1.55;
-  border-left:2px solid rgba(196,166,255,.3);
-  padding-left:10px;
-  opacity:0;
-  transition:opacity .5s ease;
-}
+.verdict{font-size:.76rem;color:var(--text-dim);line-height:1.5;border-left:2px solid rgba(196,166,255,.25);padding-left:9px;margin-top:10px;opacity:0;transition:opacity .5s}
 .verdict.show{opacity:1}
 
 /* ── Skeleton ── */
-.skel-card{
-  background:var(--surf);
-  border:1px solid var(--border);
-  border-radius:var(--r-xl);
-  padding:24px;
-  animation:shimmer 1.8s infinite;
-}
+.skel-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r-xl);padding:22px;animation:shimmer 1.8s infinite}
+@keyframes shimmer{0%,100%{opacity:.3}50%{opacity:.65}}
+.skel-line{background:var(--surf-v);border-radius:6px;margin-bottom:10px}
 
-@keyframes shimmer{
-  0%,100%{opacity:.35}50%{opacity:.7}
-}
-
-.skel-line{
-  background:var(--surf-v);border-radius:6px;
-  margin-bottom:12px;
-}
+/* ── Empty state ── */
+.empty-state{grid-column:1/-1;text-align:center;padding:56px 24px;color:var(--text-dim)}
+.empty-state .icon{font-size:2.6rem;display:block;margin-bottom:10px}
 
 /* ── Modal ── */
 .modal-overlay{
-  position:fixed;inset:0;
-  background:rgba(0,0,0,.65);
-  backdrop-filter:blur(14px);
-  -webkit-backdrop-filter:blur(14px);
-  z-index:500;
-  display:flex;align-items:center;justify-content:center;
-  padding:16px;
-  opacity:0;pointer-events:none;
-  transition:opacity .2s;
+  position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(14px);
+  z-index:500;display:flex;align-items:center;justify-content:center;padding:16px;
+  opacity:0;pointer-events:none;transition:opacity .2s;
 }
-
 .modal-overlay.open{opacity:1;pointer-events:all}
-
 .modal-sheet{
-  background:var(--surf);
-  border:1px solid var(--border-hi);
-  border-radius:var(--r-xl);
-  width:100%;max-width:580px;
-  max-height:92vh;overflow-y:auto;
-  padding:28px;
-  transform:scale(.93) translateY(24px);
-  transition:transform .25s cubic-bezier(.4,0,.2,1);
-  box-shadow:0 40px 80px rgba(0,0,0,.6),0 0 60px rgba(196,166,255,.08);
+  background:var(--surf);border:1px solid var(--border-hi);border-radius:var(--r-xl);
+  width:100%;max-width:580px;max-height:92vh;overflow-y:auto;padding:26px;
+  transform:scale(.93) translateY(22px);transition:transform .25s cubic-bezier(.4,0,.2,1);
+  box-shadow:0 40px 80px rgba(0,0,0,.6),0 0 50px rgba(196,166,255,.07);
 }
-
-.modal-overlay.open .modal-sheet{
-  transform:scale(1) translateY(0);
-}
-
-.modal-head{
-  display:flex;justify-content:space-between;align-items:flex-start;
-  margin-bottom:16px;
-}
-
-.modal-close{
-  width:36px;height:36px;border-radius:50%;
-  border:1px solid var(--border);
-  background:var(--surf-v);
-  color:var(--text);cursor:pointer;
-  font-size:16px;display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;
-  transition:background .15s;
-}
+.modal-overlay.open .modal-sheet{transform:scale(1) translateY(0)}
+.modal-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.modal-close{width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surf-v);color:var(--text);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s}
 .modal-close:hover{background:var(--surf-hi)}
+.modal-ticker{font-size:1.9rem;font-weight:900;letter-spacing:-.04em;line-height:1}
+.modal-company{color:var(--text-dim);font-size:.85rem;margin-top:3px}
+.modal-price-row{display:flex;align-items:center;gap:11px;margin-bottom:4px}
+.modal-price{font-size:2.1rem;font-weight:900;letter-spacing:-.04em}
+.chart-wrap{position:relative;height:195px;margin:18px 0}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+.detail-cell{background:var(--surf-v);border-radius:var(--r-md);padding:13px}
+.detail-cell-label{font-size:.66rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+.detail-cell-val{font-size:.92rem;font-weight:700}
+.modal-verdict{margin-top:14px;font-size:.8rem;line-height:1.6;color:var(--text-dim);border-left:3px solid rgba(196,166,255,.3);padding-left:11px}
 
-.modal-ticker{
-  font-size:2rem;font-weight:900;letter-spacing:-.04em;line-height:1;
-}
-
-.modal-company{color:var(--text-dim);font-size:.88rem;margin-top:4px}
-
-.modal-price-row{
-  display:flex;align-items:center;gap:12px;
-  margin-bottom:4px;
-}
-
-.modal-price{
-  font-size:2.2rem;font-weight:900;letter-spacing:-.04em;
-}
-
-.chart-wrap{
-  position:relative;height:200px;
-  margin:20px 0;
-}
-
-.detail-grid{
-  display:grid;grid-template-columns:1fr 1fr;gap:10px;
-  margin-top:16px;
-}
-
-.detail-cell{
-  background:var(--surf-v);
-  border-radius:var(--r-md);
-  padding:14px;
-}
-
-.detail-cell-label{
-  font-size:.68rem;color:var(--text-dim);
-  text-transform:uppercase;letter-spacing:.07em;
-  margin-bottom:5px;
-}
-
-.detail-cell-val{
-  font-size:.95rem;font-weight:700;
-}
-
-.modal-verdict{
-  margin-top:16px;
-  font-size:.82rem;line-height:1.6;
-  color:var(--text-dim);
-  border-left:3px solid rgba(196,166,255,.35);
-  padding-left:12px;
-}
-
-/* ── AI section ── */
-.ai-section{margin-top:20px;display:flex;flex-direction:column;gap:10px}
-
-.ai-card{
-  border-radius:var(--r-md);
-  padding:14px 16px;
-  border-left:3px solid;
-}
-
+/* AI section */
+.ai-section{margin-top:18px;display:flex;flex-direction:column;gap:9px}
+.ai-card{border-radius:var(--r-md);padding:13px 15px;border-left:3px solid}
 .ai-card.ai-green{background:rgba(114,239,160,.07);border-color:var(--green)}
 .ai-card.ai-red{background:rgba(255,107,107,.07);border-color:var(--red)}
-.ai-card.ai-si{background:rgba(114,239,160,.12);border-color:var(--green)}
-.ai-card.ai-no{background:rgba(255,107,107,.12);border-color:var(--red)}
+.ai-card.ai-si{background:rgba(114,239,160,.11);border-color:var(--green)}
+.ai-card.ai-no{background:rgba(255,107,107,.11);border-color:var(--red)}
 .ai-card.ai-neutro{background:rgba(255,184,108,.07);border-color:var(--gold)}
-
-.ai-card-title{
-  font-size:.68rem;font-weight:700;
-  text-transform:uppercase;letter-spacing:.08em;
-  margin-bottom:7px;
-}
-
-.ai-card-text{font-size:.83rem;line-height:1.62;color:var(--text-dim)}
-
-.verdict-badge{
-  display:inline-flex;align-items:center;gap:6px;
-  margin-top:10px;
-  padding:5px 14px;border-radius:100px;
-  font-size:.8rem;font-weight:800;letter-spacing:.04em;
-}
-
+.ai-card-title{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.ai-card-text{font-size:.81rem;line-height:1.6;color:var(--text-dim)}
+.verdict-badge{display:inline-flex;align-items:center;gap:5px;margin-top:9px;padding:4px 13px;border-radius:100px;font-size:.77rem;font-weight:800;letter-spacing:.04em}
 .badge-si{background:rgba(114,239,160,.2);color:var(--green)}
 .badge-no{background:rgba(255,107,107,.2);color:var(--red)}
 .badge-neutro{background:rgba(255,184,108,.15);color:var(--gold)}
-
-.ai-loading{
-  text-align:center;padding:20px;
-  font-size:.82rem;color:var(--text-dim);
-  animation:shimmer 1.8s infinite;
-}
+.ai-loading{text-align:center;padding:18px;font-size:.8rem;color:var(--text-dim);animation:shimmer 1.8s infinite}
 
 /* ── Refresh pill ── */
-.refresh-pill{
-  position:fixed;bottom:20px;right:20px;
-  background:rgba(13,13,38,.9);
-  border:1px solid var(--border);
-  border-radius:100px;
-  padding:9px 16px;
-  font-size:.76rem;color:var(--text-dim);
-  display:flex;align-items:center;gap:7px;
-  z-index:100;
-  backdrop-filter:blur(16px);
-}
+.refresh-pill{position:fixed;bottom:18px;right:18px;background:rgba(13,13,38,.92);border:1px solid var(--border);border-radius:100px;padding:8px 15px;font-size:.74rem;color:var(--text-dim);display:flex;align-items:center;gap:6px;z-index:100;backdrop-filter:blur(16px)}
 
 /* ── Footer ── */
-footer{
-  text-align:center;padding:20px 24px;
-  color:var(--text-dim);font-size:.75rem;
-  border-top:1px solid var(--border);
-}
-
-/* ── Error / empty ── */
-.empty-state{
-  grid-column:1/-1;
-  text-align:center;
-  padding:60px 24px;
-  color:var(--text-dim);
-}
-
-.empty-state .icon{font-size:3rem;display:block;margin-bottom:12px}
+footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72rem;border-top:1px solid var(--border)}
 
 /* ── Responsive ── */
 @media(max-width:640px){
-  header{padding:12px 16px}
-  .hero{padding:44px 16px 32px}
-  .grid{padding:0 16px 80px;gap:14px}
-  .modal-sheet{padding:20px}
-  .detail-grid{grid-template-columns:1fr 1fr}
+  header{padding:10px 14px}
+  .indices-tape{top:54px}
+  .hero{padding:38px 14px 28px}
+  .search-wrap{padding:0 14px 22px}
+  .controls-bar,.grid{padding-left:14px;padding-right:14px}
+  .grid{gap:12px}
+  .modal-sheet{padding:18px}
+  .ctrl-div{display:none}
 }
 </style>
 </head>
 <body>
-
 <canvas id="bg-canvas"></canvas>
 
 <div class="app">
-  <header>
-    <div class="logo">
-      <div class="logo-icon">📈</div>
-      Stock Bot
-    </div>
-    <div class="header-right">
-      <div class="live-badge">
-        <div class="live-dot"></div>
-        <span id="last-update">—</span>
-      </div>
-    </div>
-  </header>
 
-  <section class="hero">
-    <h1>Mercato<br>in Tempo Reale</h1>
-    <p>Top azioni sotto $20 &nbsp;·&nbsp; AI Scanner &nbsp;·&nbsp; Aggiornamento ogni 60 s</p>
-  </section>
-
-  <div class="stats-bar" id="stats-bar">
-    <div class="stat-chip">Azioni trovate <b id="s-total">—</b></div>
-    <div class="stat-chip">Score medio <b id="s-avg">—</b></div>
-    <div class="stat-chip">Top mover <b id="s-top">—</b></div>
+<!-- ── Header ── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">📈</div>
+    Stock Bot
   </div>
-
-  <div class="grid" id="grid">
-    <!-- skeleton -->
-    <div id="loading-msg" style="grid-column:1/-1;text-align:center;padding:32px 0 16px;color:var(--text-dim);font-size:.85rem;animation:shimmer 1.8s infinite">
-      ⏳ &nbsp;Scansione mercato in corso — prima richiesta ~30 sec…
+  <div class="header-right">
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      <span id="last-update">—</span>
     </div>
-    <div class="skel-card"><div class="skel-line" style="height:14px;width:40%"></div><div class="skel-line" style="height:36px;width:55%"></div><div class="skel-line" style="height:12px;width:100%"></div><div class="skel-line" style="height:12px;width:75%"></div></div>
-    <div class="skel-card"><div class="skel-line" style="height:14px;width:40%"></div><div class="skel-line" style="height:36px;width:55%"></div><div class="skel-line" style="height:12px;width:100%"></div><div class="skel-line" style="height:12px;width:75%"></div></div>
-    <div class="skel-card"><div class="skel-line" style="height:14px;width:40%"></div><div class="skel-line" style="height:36px;width:55%"></div><div class="skel-line" style="height:12px;width:100%"></div><div class="skel-line" style="height:12px;width:75%"></div></div>
-    <div class="skel-card"><div class="skel-line" style="height:14px;width:40%"></div><div class="skel-line" style="height:36px;width:55%"></div><div class="skel-line" style="height:12px;width:100%"></div><div class="skel-line" style="height:12px;width:75%"></div></div>
-    <div class="skel-card"><div class="skel-line" style="height:14px;width:40%"></div><div class="skel-line" style="height:36px;width:55%"></div><div class="skel-line" style="height:12px;width:100%"></div><div class="skel-line" style="height:12px;width:75%"></div></div>
-    <div class="skel-card"><div class="skel-line" style="height:14px;width:40%"></div><div class="skel-line" style="height:36px;width:55%"></div><div class="skel-line" style="height:12px;width:100%"></div><div class="skel-line" style="height:12px;width:75%"></div></div>
+  </div>
+</header>
+
+<!-- ── Indices tape ── -->
+<div class="indices-tape">
+  <div class="mkt-status">
+    <div class="status-dot" id="status-dot"></div>
+    <span class="status-label" id="status-label">—</span>
+    <span class="status-time" id="status-time"></span>
+  </div>
+  <div class="idx-item" id="idx-SP500">
+    <span class="idx-name">S&amp;P 500</span>
+    <span class="idx-price">—</span>
+    <span class="idx-chg">—</span>
+  </div>
+  <div class="idx-item" id="idx-NASDAQ">
+    <span class="idx-name">NASDAQ</span>
+    <span class="idx-price">—</span>
+    <span class="idx-chg">—</span>
+  </div>
+  <div class="idx-item" id="idx-DOW">
+    <span class="idx-name">DOW</span>
+    <span class="idx-price">—</span>
+    <span class="idx-chg">—</span>
+  </div>
+  <div class="idx-item" id="idx-VIX">
+    <span class="idx-name">VIX</span>
+    <span class="idx-price">—</span>
+    <span class="idx-chg">—</span>
   </div>
 </div>
 
-<!-- Modal dettaglio -->
+<!-- ── Hero ── -->
+<section class="hero">
+  <h1>Mercato in<br>Tempo Reale</h1>
+  <p>Top azioni sotto $20 &nbsp;·&nbsp; AI Scanner &nbsp;·&nbsp; Aggiornamento ogni 60 s</p>
+</section>
+
+<!-- ── Search ── -->
+<div class="search-wrap">
+  <div class="search-box">
+    <span style="font-size:1rem">🔍</span>
+    <input id="search-input" type="text" placeholder="Cerca azione... TSLA · NVDA · AAPL" autocomplete="off" spellcheck="false" autocapitalize="characters" />
+  </div>
+</div>
+
+<!-- ── Controls ── -->
+<div class="controls-bar">
+  <span class="ctrl-label">Ordina:</span>
+  <div class="ctrl-group">
+    <button class="ctrl-btn active" data-sort="score">Score ↓</button>
+    <button class="ctrl-btn" data-sort="chg">Variazione</button>
+    <button class="ctrl-btn" data-sort="risk">Rischio ↑</button>
+  </div>
+  <div class="ctrl-div"></div>
+  <span class="ctrl-label">Rischio:</span>
+  <div class="ctrl-group">
+    <button class="ctrl-btn active" data-risk="all">Tutti</button>
+    <button class="ctrl-btn" data-risk="Basso">🟢 Basso</button>
+    <button class="ctrl-btn" data-risk="Medio">🟡 Medio</button>
+    <button class="ctrl-btn" data-risk="Alto">🔴 Alto</button>
+  </div>
+</div>
+
+<!-- ── Stats ── -->
+<div class="stats-bar">
+  <div class="stat-chip">Azioni <b id="s-total">—</b></div>
+  <div class="stat-chip">Score medio <b id="s-avg">—</b></div>
+  <div class="stat-chip">Top mover <b id="s-top">—</b></div>
+</div>
+
+<!-- ── Grid ── -->
+<div class="grid" id="grid">
+  <div id="loading-msg" style="grid-column:1/-1;text-align:center;padding:28px 0 14px;color:var(--text-dim);font-size:.83rem;animation:shimmer 1.8s infinite">⏳ &nbsp;Scansione mercato in corso — prima richiesta ~30 sec…</div>
+  <div class="skel-card"><div class="skel-line" style="height:13px;width:38%"></div><div class="skel-line" style="height:34px;width:52%"></div><div class="skel-line" style="height:11px;width:100%"></div><div class="skel-line" style="height:11px;width:70%"></div></div>
+  <div class="skel-card"><div class="skel-line" style="height:13px;width:38%"></div><div class="skel-line" style="height:34px;width:52%"></div><div class="skel-line" style="height:11px;width:100%"></div><div class="skel-line" style="height:11px;width:70%"></div></div>
+  <div class="skel-card"><div class="skel-line" style="height:13px;width:38%"></div><div class="skel-line" style="height:34px;width:52%"></div><div class="skel-line" style="height:11px;width:100%"></div><div class="skel-line" style="height:11px;width:70%"></div></div>
+  <div class="skel-card"><div class="skel-line" style="height:13px;width:38%"></div><div class="skel-line" style="height:34px;width:52%"></div><div class="skel-line" style="height:11px;width:100%"></div><div class="skel-line" style="height:11px;width:70%"></div></div>
+  <div class="skel-card"><div class="skel-line" style="height:13px;width:38%"></div><div class="skel-line" style="height:34px;width:52%"></div><div class="skel-line" style="height:11px;width:100%"></div><div class="skel-line" style="height:11px;width:70%"></div></div>
+  <div class="skel-card"><div class="skel-line" style="height:13px;width:38%"></div><div class="skel-line" style="height:34px;width:52%"></div><div class="skel-line" style="height:11px;width:100%"></div><div class="skel-line" style="height:11px;width:70%"></div></div>
+</div>
+
+</div><!-- .app -->
+
+<!-- ── Modal ── -->
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal-sheet">
     <div class="modal-head">
@@ -507,21 +349,17 @@ footer{
       <div class="modal-price" id="m-price">—</div>
       <div class="price-chg" id="m-chg"></div>
     </div>
-    <div class="chart-wrap">
-      <canvas id="detail-chart"></canvas>
-    </div>
+    <div class="chart-wrap"><canvas id="detail-chart"></canvas></div>
     <div class="detail-grid" id="m-details"></div>
     <div class="modal-verdict" id="m-verdict"></div>
-
-    <!-- AI Analysis -->
     <div class="ai-section" id="m-ai-section">
       <div class="ai-loading" id="m-ai-loading">🤖 &nbsp;Analisi AI in corso...</div>
-      <div id="m-ai-content" style="display:none;flex-direction:column;gap:10px">
-        <div class="ai-card ai-green" id="m-ai-perche">
+      <div id="m-ai-content" style="display:none;flex-direction:column;gap:9px">
+        <div class="ai-card ai-green">
           <div class="ai-card-title" style="color:var(--green)">✅ Perché investirci</div>
           <div class="ai-card-text" id="m-ai-perche-text"></div>
         </div>
-        <div class="ai-card ai-red" id="m-ai-rischi">
+        <div class="ai-card ai-red">
           <div class="ai-card-title" style="color:var(--red)">⚠️ Rischi</div>
           <div class="ai-card-text" id="m-ai-rischi-text"></div>
         </div>
@@ -540,11 +378,9 @@ footer{
   Refresh in <b id="countdown">60</b>s
 </div>
 
-<footer>
-  Stock Bot Dashboard &nbsp;·&nbsp; Dati: Yahoo Finance &nbsp;·&nbsp; AI: Groq Llama 70B
-</footer>
+<footer>Stock Bot Dashboard &nbsp;·&nbsp; Yahoo Finance &nbsp;·&nbsp; AI: Groq Llama 70B</footer>
 
-<!-- CDN: Three.js + Chart.js -->
+<!-- CDN -->
 <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
@@ -552,147 +388,198 @@ footer{
 'use strict';
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  Three.js — Particle Network Background
+// Three.js — Particle Network
 // ══════════════════════════════════════════════════════════════════════════════
-(function initParticles() {
-  const canvas   = document.getElementById('bg-canvas');
-  const isMobile = window.innerWidth < 640;
-  const N        = isMobile ? 65 : 130;
-  const DIST     = isMobile ? 14 : 18;
+(function(){
+  const canvas = document.getElementById('bg-canvas');
+  const mob = innerWidth < 640;
+  const N = mob ? 60 : 120;
+  const DIST = mob ? 13 : 17;
+  const scene = new THREE.Scene();
+  const cam = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, .1, 500);
+  const rdr = new THREE.WebGLRenderer({canvas, alpha:true, antialias:true});
+  rdr.setPixelRatio(Math.min(devicePixelRatio,2));
+  rdr.setSize(innerWidth, innerHeight);
+  cam.position.z = 55;
 
-  const scene    = new THREE.Scene();
-  const camera   = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, .1, 500);
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.setSize(innerWidth, innerHeight);
-  camera.position.z = 55;
-
-  // Particles
-  const pos = new Float32Array(N * 3);
+  const pos = new Float32Array(N*3);
   const vel = [];
-  for (let i = 0; i < N; i++) {
-    pos[i*3]   = (Math.random() - .5) * 110;
-    pos[i*3+1] = (Math.random() - .5) * 110;
-    pos[i*3+2] = (Math.random() - .5) * 25;
-    vel.push({ x: (Math.random() - .5) * .022, y: (Math.random() - .5) * .022 });
+  for(let i=0;i<N;i++){
+    pos[i*3]=(Math.random()-.5)*105; pos[i*3+1]=(Math.random()-.5)*105; pos[i*3+2]=(Math.random()-.5)*22;
+    vel.push({x:(Math.random()-.5)*.02, y:(Math.random()-.5)*.02});
   }
-
-  const pGeo  = new THREE.BufferGeometry();
-  const pAttr = new THREE.BufferAttribute(pos, 3);
+  const pGeo=new THREE.BufferGeometry();
+  const pAttr=new THREE.BufferAttribute(pos,3);
   pAttr.setUsage(THREE.DynamicDrawUsage);
-  pGeo.setAttribute('position', pAttr);
-  const pMat = new THREE.PointsMaterial({ color: 0xC4A6FF, size: .45, transparent: true, opacity: .75, sizeAttenuation: true });
-  const pointsMesh = new THREE.Points(pGeo, pMat);
-  scene.add(pointsMesh);
+  pGeo.setAttribute('position',pAttr);
+  const pts=new THREE.Points(pGeo, new THREE.PointsMaterial({color:0xC4A6FF,size:.42,transparent:true,opacity:.72,sizeAttenuation:true}));
+  scene.add(pts);
 
-  // Lines
-  const MAX_L  = 450;
-  const lPos   = new Float32Array(MAX_L * 6);
-  const lAttr  = new THREE.BufferAttribute(lPos, 3);
+  const ML=400, lPos=new Float32Array(ML*6);
+  const lAttr=new THREE.BufferAttribute(lPos,3);
   lAttr.setUsage(THREE.DynamicDrawUsage);
-  const lGeo   = new THREE.BufferGeometry();
-  lGeo.setAttribute('position', lAttr);
-  const lMat   = new THREE.LineBasicMaterial({ color: 0x80FFDB, transparent: true, opacity: .11 });
-  const linesMesh = new THREE.LineSegments(lGeo, lMat);
-  scene.add(linesMesh);
+  const lGeo=new THREE.BufferGeometry();
+  lGeo.setAttribute('position',lAttr);
+  const lns=new THREE.LineSegments(lGeo, new THREE.LineBasicMaterial({color:0x80FFDB,transparent:true,opacity:.1}));
+  scene.add(lns);
 
-  // Mouse parallax
-  let mx = 0, my = 0;
-  window.addEventListener('mousemove', e => {
-    mx = (e.clientX / innerWidth  - .5) * .8;
-    my = (e.clientY / innerHeight - .5) * .8;
-  });
+  let mx=0,my=0;
+  window.addEventListener('mousemove',e=>{mx=(e.clientX/innerWidth-.5)*.7;my=(e.clientY/innerHeight-.5)*.7;});
 
-  function animate() {
+  function animate(){
     requestAnimationFrame(animate);
-    for (let i = 0; i < N; i++) {
-      pos[i*3]   += vel[i].x;
-      pos[i*3+1] += vel[i].y;
-      if (Math.abs(pos[i*3])   > 55) vel[i].x *= -1;
-      if (Math.abs(pos[i*3+1]) > 55) vel[i].y *= -1;
+    for(let i=0;i<N;i++){
+      pos[i*3]+=vel[i].x; pos[i*3+1]+=vel[i].y;
+      if(Math.abs(pos[i*3])>52)vel[i].x*=-1;
+      if(Math.abs(pos[i*3+1])>52)vel[i].y*=-1;
     }
-    pAttr.needsUpdate = true;
-
-    let lc = 0;
-    for (let i = 0; i < N && lc < MAX_L; i++) {
-      for (let j = i + 1; j < N && lc < MAX_L; j++) {
-        const dx = pos[i*3] - pos[j*3], dy = pos[i*3+1] - pos[j*3+1];
-        if (dx*dx + dy*dy < DIST*DIST) {
-          lPos[lc*6]=pos[i*3]; lPos[lc*6+1]=pos[i*3+1]; lPos[lc*6+2]=pos[i*3+2];
-          lPos[lc*6+3]=pos[j*3]; lPos[lc*6+4]=pos[j*3+1]; lPos[lc*6+5]=pos[j*3+2];
-          lc++;
-        }
+    pAttr.needsUpdate=true;
+    let lc=0;
+    for(let i=0;i<N&&lc<ML;i++) for(let j=i+1;j<N&&lc<ML;j++){
+      const dx=pos[i*3]-pos[j*3],dy=pos[i*3+1]-pos[j*3+1];
+      if(dx*dx+dy*dy<DIST*DIST){
+        lPos[lc*6]=pos[i*3];lPos[lc*6+1]=pos[i*3+1];lPos[lc*6+2]=pos[i*3+2];
+        lPos[lc*6+3]=pos[j*3];lPos[lc*6+4]=pos[j*3+1];lPos[lc*6+5]=pos[j*3+2];
+        lc++;
       }
     }
-    lGeo.setDrawRange(0, lc * 2);
-    lAttr.needsUpdate = true;
-
-    // Slow camera drift + parallax
-    camera.position.x += (mx - camera.position.x) * .03;
-    camera.position.y += (-my - camera.position.y) * .03;
-    pointsMesh.rotation.z += .00025;
-
-    renderer.render(scene, camera);
+    lGeo.setDrawRange(0,lc*2); lAttr.needsUpdate=true;
+    cam.position.x+=(mx-cam.position.x)*.03;
+    cam.position.y+=(-my-cam.position.y)*.03;
+    pts.rotation.z+=.00022;
+    rdr.render(scene,cam);
   }
   animate();
-
-  window.addEventListener('resize', () => {
-    camera.aspect = innerWidth / innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(innerWidth, innerHeight);
-  });
+  window.addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();rdr.setSize(innerWidth,innerHeight);});
 })();
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Helpers
+// ══════════════════════════════════════════════════════════════════════════════
+const fmtP = v => (v != null && v !== 0) ? '$'+(v<1?v.toFixed(4):v.toFixed(2)) : '—';
+const fmtC = v => (v>=0?'+':'')+v.toFixed(2)+'%';
+const now  = () => { const d=new Date(); return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0'); };
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  3D Card Tilt
+// Market status
 // ══════════════════════════════════════════════════════════════════════════════
-function addTilt(el) {
-  el.addEventListener('mousemove', e => {
-    const r  = el.getBoundingClientRect();
-    const rx = -((e.clientY - r.top  - r.height / 2) / r.height) * 13;
-    const ry =  ((e.clientX - r.left - r.width  / 2) / r.width)  * 13;
-    el.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-7px)`;
-  });
-  el.addEventListener('mouseleave', () => {
-    el.style.transform = 'perspective(900px) rotateX(0deg) rotateY(0deg) translateY(0px)';
-  });
+function updateMarketStatus(){
+  const et = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const day=et.getDay(), h=et.getHours(), m=et.getMinutes(), t=h*60+m;
+  const timeStr = h.toString().padStart(2,'0')+':'+m.toString().padStart(2,'0');
+
+  let label,color;
+  if(day===0||day===6){label='CHIUSO';color='var(--red)';}
+  else if(t>=9*60+30&&t<16*60){label='APERTO';color='var(--green)';}
+  else if(t>=4*60&&t<9*60+30){label='PRE-MARKET';color='var(--gold)';}
+  else if(t>=16*60&&t<20*60){label='AFTER-HOURS';color='var(--gold)';}
+  else{label='CHIUSO';color='var(--red)';}
+
+  document.getElementById('status-dot').style.background=color;
+  document.getElementById('status-label').style.color=color;
+  document.getElementById('status-label').textContent=label;
+  document.getElementById('status-time').textContent='NYSE '+timeStr;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Indices
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadIndices(){
+  try{
+    const d=await fetch('/api/market/indices').then(r=>r.json());
+    const map={SP500:'S&P 500',NASDAQ:'NASDAQ',DOW:'DOW',VIX:'VIX'};
+    Object.keys(map).forEach(k=>{
+      const el=document.getElementById('idx-'+k);
+      if(!el||!d[k])return;
+      const {price,chg}=d[k];
+      el.querySelector('.idx-price').textContent=price.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});
+      const ce=el.querySelector('.idx-chg');
+      ce.textContent=(chg>=0?'+':'')+chg.toFixed(2)+'%';
+      ce.className='idx-chg '+(chg>=0?'pos':'neg');
+    });
+  }catch(_){}
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  Helpers
+// 3D Card Tilt
 // ══════════════════════════════════════════════════════════════════════════════
-const fmtP = v  => v !== undefined && v !== null ? '$' + (v < 1 ? v.toFixed(4) : v.toFixed(2)) : '—';
-const fmtC = v  => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
-const now  = () => { const d = new Date(); return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0'); };
-
+function addTilt(el){
+  el.addEventListener('mousemove',e=>{
+    const r=el.getBoundingClientRect();
+    const rx=-((e.clientY-r.top-r.height/2)/r.height)*12;
+    const ry= ((e.clientX-r.left-r.width/2)/r.width)*12;
+    el.style.transform=`perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-6px)`;
+  });
+  el.addEventListener('mouseleave',()=>{el.style.transform='perspective(900px) rotateX(0deg) rotateY(0deg) translateY(0px)';});
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  Render card
+// Sparkline (Canvas 2D, leggero)
 // ══════════════════════════════════════════════════════════════════════════════
-function buildCard(d, rank) {
-  const pos    = d.day_change_pct >= 0;
-  const score  = d.score_10 ?? 5;
-  const div    = document.createElement('div');
-  div.className = 'card';
+function drawSparkline(canvas, vals, isPos){
+  const W=canvas.offsetWidth||260, H=42;
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  if(vals.length<2)return;
+  const mn=Math.min(...vals), mx=Math.max(...vals), rng=mx-mn||.001;
+  const pts=vals.map((v,i)=>({x:(i/(vals.length-1))*W, y:H-((v-mn)/rng)*(H-5)-2}));
+  const col=isPos?'#72EFA0':'#FF6B6B';
 
-  const chipsHTML = [
-    d.risk_emoji   ? `<span class="chip">${d.risk_emoji} ${d.risk_level ?? ''}</span>` : '',
-    d.news_sentiment_emoji ? `<span class="chip">${d.news_sentiment_emoji} ${d.news_sentiment_label ?? 'Neutre'}</span>` : '',
-    d.next_earnings_str    ? `<span class="chip">📅 ${d.next_earnings_str}</span>` : '',
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x,pts[0].y);
+  for(let i=1;i<pts.length;i++){
+    const mx2=(pts[i-1].x+pts[i].x)/2, my2=(pts[i-1].y+pts[i].y)/2;
+    ctx.quadraticCurveTo(pts[i-1].x,pts[i-1].y,mx2,my2);
+  }
+  ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);
+  ctx.strokeStyle=col; ctx.lineWidth=1.8; ctx.lineJoin='round'; ctx.lineCap='round';
+  ctx.stroke();
+
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,isPos?'rgba(114,239,160,.22)':'rgba(255,107,107,.22)');
+  g.addColorStop(1,'transparent');
+  ctx.fillStyle=g; ctx.fill();
+}
+
+async function loadSparklines(tickersCsv, data){
+  try{
+    const res=await fetch('/api/sparklines?tickers='+tickersCsv).then(r=>r.json());
+    const grid=document.getElementById('grid');
+    data.forEach((d,i)=>{
+      const vals=res[d.ticker];
+      if(!vals||vals.length<2)return;
+      const card=grid.children[i];
+      if(!card)return;
+      const canvas=card.querySelector('.sparkline');
+      if(canvas)drawSparkline(canvas,vals,d.day_change_pct>=0);
+    });
+  }catch(_){}
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Build Card
+// ══════════════════════════════════════════════════════════════════════════════
+function buildCard(d, rank){
+  const isPos=d.day_change_pct>=0;
+  const score=d.score_10??5;
+  const div=document.createElement('div');
+  div.className='card';
+  const chipsHTML=[
+    d.risk_emoji?`<span class="chip">${d.risk_emoji} ${d.risk_level??''}</span>`:'',
+    d.news_sentiment_emoji?`<span class="chip">${d.news_sentiment_emoji} ${d.news_sentiment_label??'Neutre'}</span>`:'',
+    d.next_earnings_str?`<span class="chip">📅 ${d.next_earnings_str}</span>`:'',
   ].join('');
-
-  div.innerHTML = `
+  div.innerHTML=`
     <div class="card-rank"># ${rank}</div>
     <div class="card-row">
       <div>
         <div class="card-ticker">${d.ticker}</div>
-        <div class="card-name">${d.name ?? d.ticker}</div>
+        <div class="card-name">${d.name??d.ticker}</div>
       </div>
       <div class="price-block">
         <div class="price-val">${fmtP(d.current_price)}</div>
-        <div class="price-chg ${pos ? 'pos' : 'neg'}">${fmtC(d.day_change_pct)}</div>
+        <div class="price-chg ${isPos?'chg-pos':'chg-neg'}">${fmtC(d.day_change_pct)}</div>
       </div>
     </div>
     <div class="score-wrap">
@@ -700,277 +587,244 @@ function buildCard(d, rank) {
       <div class="score-track"><div class="score-bar" data-s="${score}"></div></div>
       <span class="score-num">${score}<span style="font-weight:400;color:var(--text-dim)">/10</span></span>
     </div>
-    ${chipsHTML ? `<div class="chips">${chipsHTML}</div>` : ''}
-    <div class="verdict">${d.verdict ? '🎯 ' + d.verdict : ''}</div>
+    ${chipsHTML?`<div class="chips">${chipsHTML}</div>`:''}
+    <div class="sparkline-wrap"><canvas class="sparkline"></canvas></div>
+    <div class="verdict"></div>
   `;
-
-  div.addEventListener('click', () => openModal(d));
+  div.addEventListener('click',()=>openModal(d));
   addTilt(div);
   return div;
 }
 
-function animateBars(grid) {
-  requestAnimationFrame(() => {
-    grid.querySelectorAll('.score-bar').forEach(el => {
-      el.style.width = (parseFloat(el.dataset.s) * 10) + '%';
-    });
-    setTimeout(() => {
-      grid.querySelectorAll('.verdict').forEach(el => el.classList.add('show'));
-    }, 350);
+function animateBars(grid){
+  requestAnimationFrame(()=>{
+    grid.querySelectorAll('.score-bar').forEach(el=>{el.style.width=(parseFloat(el.dataset.s)*10)+'%';});
+    setTimeout(()=>grid.querySelectorAll('.verdict').forEach(el=>el.classList.add('show')),320);
   });
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Filter & Sort
+// ══════════════════════════════════════════════════════════════════════════════
+let cardsData=[], currentSort='score', currentRisk='all';
+
+const sortFns={
+  score:  (a,b)=>(b.score_10??0)-(a.score_10??0),
+  chg:    (a,b)=>Math.abs(b.day_change_pct)-Math.abs(a.day_change_pct),
+  risk:   (a,b)=>({Basso:0,Medio:1,Alto:2}[a.risk_level??'Medio']??1)-({Basso:0,Medio:1,Alto:2}[b.risk_level??'Medio']??1),
+};
+
+function applyAndRender(){
+  let data=[...cardsData];
+  if(currentRisk!=='all') data=data.filter(d=>d.risk_level===currentRisk);
+  data.sort(sortFns[currentSort]||sortFns.score);
+  renderCards(data);
+}
+
+function renderCards(data){
+  const grid=document.getElementById('grid');
+  grid.innerHTML='';
+  if(!data.length){
+    grid.innerHTML='<div class="empty-state"><span class="icon">🔍</span>Nessuna azione corrisponde ai filtri</div>';
+    return;
+  }
+  const frag=document.createDocumentFragment();
+  data.forEach((d,i)=>frag.appendChild(buildCard(d,i+1)));
+  grid.appendChild(frag);
+  animateBars(grid);
+  loadSparklines(data.map(d=>d.ticker).join(','),data);
+}
+
+// Controls
+document.querySelectorAll('.ctrl-btn[data-sort]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.ctrl-btn[data-sort]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentSort=btn.dataset.sort;
+    applyAndRender();
+  });
+});
+document.querySelectorAll('.ctrl-btn[data-risk]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.ctrl-btn[data-risk]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentRisk=btn.dataset.risk;
+    applyAndRender();
+  });
+});
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  Modal + Chart.js
+// Search
 // ══════════════════════════════════════════════════════════════════════════════
-let activeChart = null;
+let searchTimer=null;
+document.getElementById('search-input').addEventListener('input',e=>{
+  const val=e.target.value.trim().toUpperCase().replace(/[^A-Z0-9.\-^]/g,'');
+  clearTimeout(searchTimer);
+  if(!val)return;
+  searchTimer=setTimeout(()=>{
+    if(val.length>=1) openModal({ticker:val,day_change_pct:0,current_price:0,name:val,score_10:0});
+  },650);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeModal();document.getElementById('search-input').value='';}
+});
 
-async function openModal(stock) {
-  const overlay = document.getElementById('modal-overlay');
+// ══════════════════════════════════════════════════════════════════════════════
+// Modal + Chart.js
+// ══════════════════════════════════════════════════════════════════════════════
+let activeChart=null;
 
-  // Reset AI section
-  document.getElementById('m-ai-loading').style.display = 'block';
-  document.getElementById('m-ai-content').style.display = 'none';
+async function openModal(stock){
+  document.getElementById('m-ai-loading').style.display='block';
+  document.getElementById('m-ai-content').style.display='none';
+  document.getElementById('modal-overlay').classList.add('open');
 
-  overlay.classList.add('open');
+  document.getElementById('m-ticker').textContent=stock.ticker;
+  document.getElementById('m-company').textContent=stock.name??stock.ticker;
+  document.getElementById('m-price').textContent=fmtP(stock.current_price);
+  const chgEl=document.getElementById('m-chg');
+  chgEl.textContent=stock.current_price?fmtC(stock.day_change_pct):'';
+  chgEl.className='price-chg '+(stock.day_change_pct>=0?'chg-pos':'chg-neg');
+  document.getElementById('m-details').innerHTML='';
+  document.getElementById('m-verdict').textContent='';
 
-  // Prima mostra dati di base dal card
-  document.getElementById('m-ticker').textContent  = stock.ticker;
-  document.getElementById('m-company').textContent = stock.name ?? stock.ticker;
-  document.getElementById('m-price').textContent   = fmtP(stock.current_price);
-  const chgEl = document.getElementById('m-chg');
-  chgEl.textContent  = fmtC(stock.day_change_pct);
-  chgEl.className    = 'price-chg ' + (stock.day_change_pct >= 0 ? 'pos' : 'neg');
-
-  document.getElementById('m-details').innerHTML  = '';
-  document.getElementById('m-verdict').textContent = '';
-
-  // Poi carica dati completi + history in parallelo
-  try {
-    const [full, hist] = await Promise.all([
-      fetch(`/api/stock/${stock.ticker}`).then(r => r.ok ? r.json() : stock),
-      fetch(`/api/stock/${stock.ticker}/history`).then(r => r.ok ? r.json() : []),
+  try{
+    const [full,hist]=await Promise.all([
+      fetch('/api/stock/'+stock.ticker).then(r=>r.ok?r.json():stock),
+      fetch('/api/stock/'+stock.ticker+'/history').then(r=>r.ok?r.json():[]),
     ]);
 
-    // Aggiorna modal con dati completi
-    document.getElementById('m-company').textContent = full.name ?? stock.ticker;
-    document.getElementById('m-price').textContent   = fmtP(full.current_price);
-    chgEl.textContent = fmtC(full.day_change_pct);
-    chgEl.className   = 'price-chg ' + (full.day_change_pct >= 0 ? 'pos' : 'neg');
+    document.getElementById('m-company').textContent=full.name??stock.ticker;
+    document.getElementById('m-price').textContent=fmtP(full.current_price);
+    chgEl.textContent=fmtC(full.day_change_pct??0);
+    chgEl.className='price-chg '+((full.day_change_pct??0)>=0?'chg-pos':'chg-neg');
 
-    const cells = [
-      ['RSI (14)',    full.rsi        ? full.rsi.toFixed(0) + '/100' : '—'],
-      ['Rischio',     (full.risk_emoji ?? '') + ' ' + (full.risk_level ?? '—')],
-      ['Volatilità',  full.volatility ? full.volatility.toFixed(0) + '%' : '—'],
-      ['Score',       (full.score_10 ?? stock.score_10 ?? '—') + '/10'],
-      ['Notizie',     (full.news_sentiment_emoji ?? '⚪') + ' ' + (full.news_sentiment_label ?? 'Neutre')],
-      ['Earnings',    full.next_earnings_str ?? '—'],
-      ['Settimana',   full.week_return  != null ? (full.week_return  >= 0 ? '+' : '') + full.week_return.toFixed(1)  + '%' : '—'],
-      ['Mese',        full.month_return != null ? (full.month_return >= 0 ? '+' : '') + full.month_return.toFixed(1) + '%' : '—'],
+    const cells=[
+      ['RSI (14)',    full.rsi?full.rsi.toFixed(0)+'/100':'—'],
+      ['Rischio',    (full.risk_emoji??'')+(full.risk_level?' '+full.risk_level:'—')],
+      ['Volatilità', full.volatility?full.volatility.toFixed(0)+'%':'—'],
+      ['Score',      (full.score_10??stock.score_10??'—')+'/10'],
+      ['Notizie',    (full.news_sentiment_emoji??'⚪')+' '+(full.news_sentiment_label??'Neutre')],
+      ['Earnings',   full.next_earnings_str??'—'],
+      ['Settimana',  full.week_return!=null?(full.week_return>=0?'+':'')+full.week_return.toFixed(1)+'%':'—'],
+      ['Mese',       full.month_return!=null?(full.month_return>=0?'+':'')+full.month_return.toFixed(1)+'%':'—'],
     ];
-    document.getElementById('m-details').innerHTML = cells.map(([l, v]) =>
-      `<div class="detail-cell"><div class="detail-cell-label">${l}</div><div class="detail-cell-val">${v}</div></div>`
-    ).join('');
-
-    const sigText = full.signals?.join(' · ');
-    document.getElementById('m-verdict').textContent = sigText ?? '';
+    document.getElementById('m-details').innerHTML=cells.map(([l,v])=>`<div class="detail-cell"><div class="detail-cell-label">${l}</div><div class="detail-cell-val">${v}</div></div>`).join('');
+    document.getElementById('m-verdict').textContent=full.signals?.join(' · ')??'';
 
     // Chart
-    if (activeChart) { activeChart.destroy(); activeChart = null; }
-    if (hist.length > 2) {
-      const isUp  = hist[hist.length - 1].close >= hist[0].close;
-      const cUp   = 'rgba(114,239,160,';
-      const cDown = 'rgba(255,107,107,';
-      const base  = isUp ? cUp : cDown;
-
-      const ctx = document.getElementById('detail-chart').getContext('2d');
-      const grad = ctx.createLinearGradient(0, 0, 0, 200);
-      grad.addColorStop(0, base + '.35)');
-      grad.addColorStop(1, base + '0)');
-
-      activeChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: hist.map(h => h.date.slice(5)),
-          datasets: [{
-            data: hist.map(h => h.close),
-            borderColor:     isUp ? '#72EFA0' : '#FF6B6B',
-            backgroundColor: grad,
-            fill: true,
-            tension: .38,
-            pointRadius: 0,
-            borderWidth: 2.2,
-          }],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: 'rgba(13,13,38,.9)',
-              borderColor: 'rgba(196,166,255,.2)',
-              borderWidth: 1,
-              titleColor: '#C4A6FF',
-              bodyColor: '#E6E1EF',
-              callbacks: { label: ctx => '  $' + ctx.raw.toFixed(4) },
-            },
+    if(activeChart){activeChart.destroy();activeChart=null;}
+    if(hist.length>2){
+      const isUp=hist[hist.length-1].close>=hist[0].close;
+      const col=isUp?'#72EFA0':'#FF6B6B';
+      const ctx=document.getElementById('detail-chart').getContext('2d');
+      const grad=ctx.createLinearGradient(0,0,0,195);
+      grad.addColorStop(0,isUp?'rgba(114,239,160,.32)':'rgba(255,107,107,.32)');
+      grad.addColorStop(1,'transparent');
+      activeChart=new Chart(ctx,{
+        type:'line',
+        data:{labels:hist.map(h=>h.date.slice(5)),datasets:[{data:hist.map(h=>h.close),borderColor:col,backgroundColor:grad,fill:true,tension:.38,pointRadius:0,borderWidth:2.2}]},
+        options:{
+          responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(13,13,38,.9)',borderColor:'rgba(196,166,255,.2)',borderWidth:1,titleColor:'#C4A6FF',bodyColor:'#E6E1EF',callbacks:{label:c=>'  $'+c.raw.toFixed(4)}}},
+          scales:{
+            x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#8E8A9E',maxTicksLimit:7,font:{size:11,family:'Inter'}}},
+            y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#8E8A9E',font:{size:11,family:'Inter'},callback:v=>'$'+v.toFixed(2)}},
           },
-          scales: {
-            x: {
-              grid: { color: 'rgba(255,255,255,.04)' },
-              ticks: { color: '#8E8A9E', maxTicksLimit: 7, font: { size: 11, family: 'Inter' } },
-            },
-            y: {
-              grid: { color: 'rgba(255,255,255,.04)' },
-              ticks: { color: '#8E8A9E', font: { size: 11, family: 'Inter' }, callback: v => '$' + v.toFixed(2) },
-            },
-          },
-          animation: { duration: 600, easing: 'easeOutQuart' },
+          animation:{duration:550,easing:'easeOutQuart'},
         },
       });
     }
+  }catch(e){console.error('Modal:',e);}
 
-  } catch (e) {
-    console.error('Errore modal:', e);
-  }
-
-  // ── Analisi AI (separata, non blocca il modal) ──────────────────────────
-  try {
-    const ai = await fetch(`/api/stock/${stock.ticker}/ai`).then(r => r.ok ? r.json() : null);
-    if (ai && !ai.error) {
-      document.getElementById('m-ai-perche-text').textContent = ai.perche_si  ?? '';
-      document.getElementById('m-ai-rischi-text').textContent = ai.rischi     ?? '';
-      document.getElementById('m-ai-conc-text').textContent   = ai.conclusione ?? '';
-
-      const concCard = document.getElementById('m-ai-conclusione');
-      const badge    = document.getElementById('m-ai-badge');
-      const v = (ai.verdict ?? 'NEUTRO').toUpperCase();
-      if (v === 'SI') {
-        concCard.className = 'ai-card ai-si';
-        badge.innerHTML = '<span class="verdict-badge badge-si">✅ SÌ — Vale la pena</span>';
-      } else if (v === 'NO') {
-        concCard.className = 'ai-card ai-no';
-        badge.innerHTML = '<span class="verdict-badge badge-no">❌ NO — Da evitare ora</span>';
-      } else {
-        concCard.className = 'ai-card ai-neutro';
-        badge.innerHTML = '<span class="verdict-badge badge-neutro">⚖️ NEUTRO — Valuta con cautela</span>';
-      }
-
-      document.getElementById('m-ai-loading').style.display  = 'none';
-      document.getElementById('m-ai-content').style.display  = 'flex';
-    } else {
-      document.getElementById('m-ai-loading').textContent = '⚠️ AI non disponibile.';
-    }
-  } catch (e) {
-    document.getElementById('m-ai-loading').textContent = '⚠️ Errore analisi AI.';
-    console.error('Errore AI:', e);
-  }
+  // AI
+  try{
+    const ai=await fetch('/api/stock/'+stock.ticker+'/ai').then(r=>r.ok?r.json():null);
+    if(ai&&!ai.error){
+      document.getElementById('m-ai-perche-text').textContent=ai.perche_si??'';
+      document.getElementById('m-ai-rischi-text').textContent=ai.rischi??'';
+      document.getElementById('m-ai-conc-text').textContent=ai.conclusione??'';
+      const cc=document.getElementById('m-ai-conclusione'), badge=document.getElementById('m-ai-badge');
+      const v=(ai.verdict??'NEUTRO').toUpperCase();
+      if(v==='SI'){cc.className='ai-card ai-si';badge.innerHTML='<span class="verdict-badge badge-si">✅ SÌ — Vale la pena</span>';}
+      else if(v==='NO'){cc.className='ai-card ai-no';badge.innerHTML='<span class="verdict-badge badge-no">❌ NO — Da evitare ora</span>';}
+      else{cc.className='ai-card ai-neutro';badge.innerHTML='<span class="verdict-badge badge-neutro">⚖️ NEUTRO — Valuta con cautela</span>';}
+      document.getElementById('m-ai-loading').style.display='none';
+      document.getElementById('m-ai-content').style.display='flex';
+    }else{document.getElementById('m-ai-loading').textContent='⚠️ AI non disponibile.';}
+  }catch(e){document.getElementById('m-ai-loading').textContent='⚠️ Errore analisi AI.';}
 }
 
-document.getElementById('modal-close').addEventListener('click', closeModal);
-document.getElementById('modal-overlay').addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeModal();
-});
-
-function closeModal() {
-  document.getElementById('modal-overlay').classList.remove('open');
-}
-
+document.getElementById('modal-close').addEventListener('click',closeModal);
+document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal();});
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  Load data
+// Load Data
 // ══════════════════════════════════════════════════════════════════════════════
-async function loadData() {
-  const grid = document.getElementById('grid');
-
-  try {
-    const data = await fetch('/api/scan?top=10').then(r => r.json());
-
-    if (!Array.isArray(data) || data.length === 0) {
-      grid.innerHTML = `
-        <div class="empty-state">
-          <span class="icon">⚠️</span>
-          Nessun dato disponibile. Il server sta caricando…<br>
-          <small style="margin-top:8px;display:block">Riprova tra qualche minuto</small>
-        </div>`;
+async function loadData(){
+  try{
+    const data=await fetch('/api/scan?top=10').then(r=>r.json());
+    if(!Array.isArray(data)||!data.length){
+      document.getElementById('grid').innerHTML='<div class="empty-state"><span class="icon">⚠️</span>Dati non disponibili. Riprova tra qualche minuto.</div>';
       return;
     }
+    cardsData=data;
 
-    // Stats
-    const avg = (data.reduce((s, d) => s + (d.score_10 ?? 5), 0) / data.length).toFixed(1);
-    const top = data.reduce((a, b) => Math.abs(a.day_change_pct) > Math.abs(b.day_change_pct) ? a : b);
-    document.getElementById('s-total').textContent = data.length;
-    document.getElementById('s-avg').textContent   = avg + ' / 10';
-    document.getElementById('s-top').textContent   = top.ticker + ' ' + fmtC(top.day_change_pct);
+    const avg=(data.reduce((s,d)=>s+(d.score_10??5),0)/data.length).toFixed(1);
+    const top=data.reduce((a,b)=>Math.abs(a.day_change_pct)>Math.abs(b.day_change_pct)?a:b);
+    document.getElementById('s-total').textContent=data.length;
+    document.getElementById('s-avg').textContent=avg+' / 10';
+    document.getElementById('s-top').textContent=top.ticker+' '+fmtC(top.day_change_pct);
+    document.getElementById('last-update').textContent=now();
 
-    // Cards
-    grid.innerHTML = '';
-    const frag = document.createDocumentFragment();
-    data.forEach((d, i) => frag.appendChild(buildCard(d, i + 1)));
-    grid.appendChild(frag);
-    animateBars(grid);
+    applyAndRender();
 
-    document.getElementById('last-update').textContent = now();
-
-    // Enrich cards progressivamente in background
-    data.forEach((stock, i) => {
-      setTimeout(async () => {
-        try {
-          const full = await fetch(`/api/stock/${stock.ticker}`).then(r => r.ok ? r.json() : null);
-          if (!full) return;
-          const card = grid.children[i];
-          if (!card) return;
-          card.querySelector('.card-name').textContent = full.name ?? stock.ticker;
-          const vEl = card.querySelector('.verdict');
-          const sig = full.signals?.slice(0, 2).join(' · ');
-          if (vEl && sig) {
-            vEl.textContent = '🔍 ' + sig;
-            vEl.classList.add('show');
+    // Enrich progressivo (nome + segnali)
+    data.forEach((stock,i)=>{
+      setTimeout(async()=>{
+        try{
+          const full=await fetch('/api/stock/'+stock.ticker).then(r=>r.ok?r.json():null);
+          if(!full)return;
+          const grid=document.getElementById('grid');
+          // Trova la card corrispondente (può essere riordinata)
+          const allCards=[...grid.querySelectorAll('.card')];
+          const card=allCards.find(c=>c.querySelector('.card-ticker')?.textContent===stock.ticker);
+          if(!card)return;
+          card.querySelector('.card-name').textContent=full.name??stock.ticker;
+          const sig=full.signals?.slice(0,2).join(' · ');
+          const vEl=card.querySelector('.verdict');
+          if(vEl&&sig){vEl.textContent='🔍 '+sig;vEl.classList.add('show');}
+          if(!card.querySelector('.chips')?.innerHTML.includes('📅')&&full.next_earnings_str){
+            const chips=card.querySelector('.chips');
+            if(chips)chips.innerHTML+=`<span class="chip">📅 ${full.next_earnings_str}</span>`;
           }
-          // Aggiorna chips con notizie/earnings se non presenti
-          const chips = card.querySelector('.chips');
-          if (chips && !chips.innerHTML.includes('📅') && full.next_earnings_str) {
-            chips.innerHTML += `<span class="chip">📅 ${full.next_earnings_str}</span>`;
-          }
-        } catch (_) {}
-      }, i * 400); // stagger per non sovraccaricare il server
+        }catch(_){}
+      }, i*380);
     });
 
-  } catch (e) {
-    console.error('Errore caricamento:', e);
-    grid.innerHTML = `
-      <div class="empty-state">
-        <span class="icon">❌</span>
-        Errore connessione al server.<br>
-        <small style="margin-top:8px;display:block">Assicurati che il bot sia in esecuzione</small>
-      </div>`;
+  }catch(e){
+    console.error('Load:',e);
+    document.getElementById('grid').innerHTML='<div class="empty-state"><span class="icon">❌</span>Errore connessione al server.</div>';
   }
 }
 
-
 // ══════════════════════════════════════════════════════════════════════════════
-//  Countdown & auto-refresh
+// Countdown & Boot
 // ══════════════════════════════════════════════════════════════════════════════
-let cdVal = 60;
-let cdTimer = null;
-
-function startCountdown() {
-  cdVal = 60;
-  document.getElementById('countdown').textContent = cdVal;
-  if (cdTimer) clearInterval(cdTimer);
-  cdTimer = setInterval(() => {
-    cdVal--;
-    document.getElementById('countdown').textContent = cdVal;
-    if (cdVal <= 0) {
-      clearInterval(cdTimer);
-      loadData().then(startCountdown);
-    }
-  }, 1000);
+let cdVal=60, cdTimer=null;
+function startCountdown(){
+  cdVal=60;
+  if(cdTimer)clearInterval(cdTimer);
+  cdTimer=setInterval(()=>{
+    document.getElementById('countdown').textContent=--cdVal;
+    if(cdVal<=0){clearInterval(cdTimer);loadData().then(startCountdown);}
+  },1000);
 }
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
+updateMarketStatus();
+loadIndices();
+setInterval(()=>{updateMarketStatus();loadIndices();},60000);
 loadData().then(startCountdown);
 </script>
 </body>
