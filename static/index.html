@@ -2089,10 +2089,16 @@ async function runComparison(){
     try{const hist=await fetch(`/api/stock/${t}/history?period=${_cmpPeriod}&interval=1d`).then(r=>r.ok?r.json():null);return{t,hist,color:_CMP_COLORS[i]};}
     catch(_){return{t,hist:null,color:_CMP_COLORS[i]};}
   }));
+  const valid=results.filter(r=>r.hist&&r.hist.length);
   if(_cmpLwChart){try{_cmpLwChart.remove();}catch(_){}}_cmpLwChart=null;
   chartEl.innerHTML='';
-  _cmpLwChart=LightweightCharts.createChart(chartEl,{..._lwOpts,width:chartEl.clientWidth,height:300});
-  const valid=results.filter(r=>r.hist&&r.hist.length);
+  if(!valid.length){
+    chartEl.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:.85rem">Nessun dato disponibile per i ticker inseriti.</div>';
+    return;
+  }
+  await new Promise(r=>requestAnimationFrame(r));
+  const w=chartEl.offsetWidth||800;
+  _cmpLwChart=LightweightCharts.createChart(chartEl,{..._lwOpts,width:w,height:300});
   valid.forEach(({hist,color})=>{
     const base=hist[0].close;
     const s=_cmpLwChart.addLineSeries({color,lineWidth:2,priceFormat:{type:'custom',formatter:v=>v.toFixed(1)+'%'}});
