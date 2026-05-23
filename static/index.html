@@ -448,8 +448,11 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   .print-header{display:block!important;text-align:center;padding:12px 0 16px;border-bottom:2px solid #222;margin-bottom:18px}
   .print-header h1{font-size:1.35rem;font-weight:900;color:#111;margin-bottom:3px}
   .print-header p{font-size:.75rem;color:#555}
-  .grid{display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:7px!important;padding:0 8px!important}
-  .card{background:#f7f7fb!important;border:1px solid #ccc!important;box-shadow:none!important;break-inside:avoid;color:#000!important;page-break-inside:avoid}
+  .grid{display:grid!important;grid-template-columns:repeat(5,1fr)!important;gap:6px!important;padding:0 6px!important}
+  .card{background:#f7f7fb!important;border:1px solid #ccc!important;box-shadow:none!important;break-inside:avoid;color:#000!important;page-break-inside:avoid;font-size:.72rem!important}
+  .price-val{font-size:.9rem!important}
+  .card-ticker{font-size:.85rem!important}
+  .chips{display:none!important}
   .card-ticker,.price-val{color:#111!important}
   .card-name,.score-label,.score-num{color:#555!important}
   .chg-pos{background:#e6f7ed!important;color:#1a7a3a!important}
@@ -656,7 +659,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   <button class="tab-btn" data-tab="heatmap">📈 Mercati</button>
   <button class="tab-btn" data-tab="portfolio">💼 Portafoglio</button>
   <button class="tab-btn" data-tab="watchlist">⭐ Watchlist</button>
-  <button class="tab-btn" data-tab="aichat">🤖 AI</button>
+  <button class="tab-btn" data-tab="ai-chat">🤖 AI</button>
 </div>
 
 <!-- ── History view (nascosta di default) ── -->
@@ -1859,7 +1862,7 @@ initAuth();
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab switching (5 tab)
 // ══════════════════════════════════════════════════════════════════════════════
-const _VIEWS = ['live','history','heatmap','portfolio','watchlist','aichat'];
+const _VIEWS = ['live','history','heatmap','portfolio','watchlist','ai-chat'];
 let _tabLoaded = {};
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
