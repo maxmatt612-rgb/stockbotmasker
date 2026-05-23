@@ -1487,7 +1487,7 @@ async function renderPortfolio(){
     totalInv+=inv; totalVal+=currP>0?val:inv;
     const plCls=pl>=0?'port-pl-pos':'port-pl-neg';
     const plSign=pl>=0?'+':'';
-    return `<tr>
+    return `<tr style="cursor:pointer" onclick="openModal({ticker:'${t}',current_price:${currP},day_change_pct:0,name:'${pos.name||t}',score_10:5})">
       <td><div class="port-ticker-cell">${t}</div><div class="port-name-cell">${pos.name||t}</div></td>
       <td>${qty}</td>
       <td>$${buyP.toFixed(4)}</td>
@@ -1496,7 +1496,7 @@ async function renderPortfolio(){
       <td>${currP>0?'$'+val.toFixed(2):'—'}</td>
       <td class="${plCls}">${currP>0?plSign+'$'+pl.toFixed(2):'—'}</td>
       <td class="${plCls}">${currP>0?plSign+plPct.toFixed(2)+'%':'—'}</td>
-      <td><button class="port-del-btn" onclick="deletePortfolio('${t}')">✕</button></td>
+      <td><button class="port-del-btn" onclick="deletePortfolio('${t}');event.stopPropagation()">✕</button></td>
     </tr>`;
   }).join('');
 
