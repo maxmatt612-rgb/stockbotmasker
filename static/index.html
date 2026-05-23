@@ -502,6 +502,28 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .tg-login-btn{background:var(--surf-v);border:1px solid var(--border);border-radius:100px;padding:5px 11px;font-size:.72rem;color:var(--text-dim);cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'Inter',sans-serif;transition:all .15s;white-space:nowrap}
 .tg-login-btn:hover{border-color:var(--border-hi);color:var(--text)}
 
+/* ── FX Toggle ── */
+.fx-toggle{background:var(--surf-v);border:1px solid var(--border);border-radius:100px;padding:5px 12px;font-size:.72rem;color:var(--text-dim);cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;white-space:nowrap;font-weight:600}
+.fx-toggle.eur{border-color:var(--primary);color:var(--primary);background:var(--primary-dim)}
+
+/* ── Note nel modale ── */
+.note-section{margin:14px 0 0;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden}
+.note-hd{padding:9px 14px;font-size:.64rem;font-weight:700;color:var(--text-dim);letter-spacing:.08em;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)}
+.note-area{width:100%;background:transparent;border:none;outline:none;resize:none;color:var(--text);font-family:'Inter',sans-serif;font-size:.8rem;padding:10px 14px;min-height:72px;line-height:1.55}
+.note-area::placeholder{color:var(--text-dim)}
+
+/* ── Leaderboard portafoglio ── */
+.lb-wrap{padding:0 28px 48px;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.lb-col{background:linear-gradient(145deg,rgba(196,166,255,.04),rgba(128,255,219,.02));border:1px solid var(--border);border-radius:var(--r-xl);overflow:hidden}
+.lb-col-hd{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);font-size:.72rem;font-weight:800;letter-spacing:.04em}
+.lb-item{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.03);cursor:pointer;transition:background .15s}
+.lb-item:hover{background:rgba(255,255,255,.025)}
+.lb-item:last-child{border-bottom:none}
+.lb-rank{font-size:.68rem;color:var(--text-dim);min-width:18px;text-align:center}
+.lb-ticker{font-size:.86rem;font-weight:800;min-width:60px}
+.lb-name{font-size:.72rem;color:var(--text-dim);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-pct{font-size:.82rem;font-weight:700;min-width:68px;text-align:right}
+
 
 /* ── Responsive ── */
 @media(max-width:640px){
@@ -565,6 +587,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     <input id="search-input" type="text" placeholder="Cerca azione... TSLA · NVDA · AAPL" autocomplete="off" spellcheck="false" autocapitalize="characters" />
   </div>
   <div class="header-right">
+    <button class="fx-toggle" id="fx-toggle" onclick="toggleFX()">$ USD</button>
     <div id="auth-widget" class="auth-widget"></div>
     <div class="live-badge">
       <div class="live-dot"></div>
@@ -696,6 +719,8 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   <div class="port-table-wrap" id="port-table-wrap">
     <div class="history-empty"><span class="icon">💼</span>Aggiungi la tua prima posizione sopra.</div>
   </div>
+  <!-- Leaderboard -->
+  <div id="port-leaderboard" style="display:none"></div>
 </div>
 
 <!-- ── Watchlist view ── -->
@@ -809,6 +834,12 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
       </div>
     </div>
 
+    <!-- Note personali -->
+    <div class="note-section">
+      <div class="note-hd">📝 NOTE PERSONALI</div>
+      <textarea class="note-area" id="m-note" placeholder="Aggiungi appunti su questo titolo..."></textarea>
+    </div>
+
     <!-- Forecast 7 giorni -->
     <div class="forecast-section" id="m-forecast-wrap">
       <div class="forecast-hd">
@@ -909,8 +940,22 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 // ══════════════════════════════════════════════════════════════════════════════
 // Helpers
 // ══════════════════════════════════════════════════════════════════════════════
-const fmtP = v => (v != null && v !== 0) ? '$'+(v<1?v.toFixed(4):v.toFixed(2)) : '—';
+// ── FX (valuta) ──────────────────────────────────────────────────────────────
+let _fxRate=1, _fxSym='$', _fxActive=localStorage.getItem('masker_fx')==='eur';
+const fmtP = v => {
+  if(v==null||v===0) return '—';
+  const c=v*_fxRate;
+  return _fxSym+(c<1?c.toFixed(4):c.toFixed(2));
+};
 const fmtC = v => (v>=0?'+':'')+v.toFixed(2)+'%';
+function toggleFX(){localStorage.setItem('masker_fx',_fxActive?'usd':'eur');location.reload();}
+async function initFX(){
+  if(!_fxActive) return;
+  try{const r=await fetch('/api/fx').then(r=>r.json());_fxRate=r.rate||0.92;}catch(_){_fxRate=0.92;}
+  _fxSym='€';
+  const btn=document.getElementById('fx-toggle');
+  if(btn){btn.textContent='€ EUR';btn.classList.add('eur');}
+}
 const now  = () => { const d=new Date(); return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0'); };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1228,6 +1273,11 @@ async function openModal(stock){
 
   // Forecast 7 giorni (fire & forget — non blocca il modal)
   _loadForecast(stock.ticker);
+
+  // Note personali
+  const _noteEl=document.getElementById('m-note');
+  _noteEl.value=_loadNotes()[stock.ticker]||'';
+  _noteEl.oninput=()=>_saveNote(stock.ticker,_noteEl.value.trim());
 }
 
 async function _loadForecast(ticker){
@@ -1478,6 +1528,7 @@ async function renderPortfolio(){
   try{quotes=await fetch('/api/batch_quotes?tickers='+tickers.join(',')).then(r=>r.json());}catch(_){}
 
   let totalInv=0, totalVal=0;
+  const _lbPositions=[];
   const rows=tickers.map(t=>{
     const pos=port[t];
     const qty=pos.qty||0, buyP=pos.buyPrice||0;
@@ -1485,16 +1536,18 @@ async function renderPortfolio(){
     const inv=buyP*qty; const val=currP*qty;
     const pl=val-inv; const plPct=inv>0?(pl/inv*100):0;
     totalInv+=inv; totalVal+=currP>0?val:inv;
+    _lbPositions.push({t,name:pos.name||t,currP,buyP,inv,val,pl,plPct});
     const plCls=pl>=0?'port-pl-pos':'port-pl-neg';
     const plSign=pl>=0?'+':'';
+    const _sym=_fxSym, _r=_fxRate;
     return `<tr style="cursor:pointer" onclick="openModal({ticker:'${t}',current_price:${currP},day_change_pct:0,name:'${pos.name||t}',score_10:5})">
       <td><div class="port-ticker-cell">${t}</div><div class="port-name-cell">${pos.name||t}</div></td>
       <td>${qty}</td>
-      <td>$${buyP.toFixed(4)}</td>
-      <td>${currP>0?'$'+currP.toFixed(4):'—'}</td>
-      <td>$${inv.toFixed(2)}</td>
-      <td>${currP>0?'$'+val.toFixed(2):'—'}</td>
-      <td class="${plCls}">${currP>0?plSign+'$'+pl.toFixed(2):'—'}</td>
+      <td>${fmtP(buyP)}</td>
+      <td>${currP>0?fmtP(currP):'—'}</td>
+      <td>${_sym+(inv*_r).toFixed(2)}</td>
+      <td>${currP>0?_sym+(val*_r).toFixed(2):'—'}</td>
+      <td class="${plCls}">${currP>0?plSign+_sym+(Math.abs(pl)*_r).toFixed(2):'—'}</td>
       <td class="${plCls}">${currP>0?plSign+plPct.toFixed(2)+'%':'—'}</td>
       <td><button class="port-del-btn" onclick="deletePortfolio('${t}');event.stopPropagation()">✕</button></td>
     </tr>`;
@@ -1502,14 +1555,14 @@ async function renderPortfolio(){
 
   wrap.innerHTML=`<table class="port-table"><thead><tr>
     <th>Azione</th><th>Qty</th><th>Acquisto</th><th>Ora</th>
-    <th>Investito</th><th>Valore</th><th>P&amp;L $</th><th>P&amp;L %</th><th></th>
+    <th>Investito</th><th>Valore</th><th>P&amp;L</th><th>P&amp;L %</th><th></th>
   </tr></thead><tbody>${rows}</tbody></table>`;
 
   const totalPL=totalVal-totalInv, totalPLPct=totalInv>0?(totalPL/totalInv*100):0;
-  document.getElementById('ps-invested').textContent='$'+totalInv.toFixed(2);
-  document.getElementById('ps-value').textContent='$'+totalVal.toFixed(2);
+  document.getElementById('ps-invested').textContent=_fxSym+(totalInv*_fxRate).toFixed(2);
+  document.getElementById('ps-value').textContent=_fxSym+(totalVal*_fxRate).toFixed(2);
   const plEl=document.getElementById('ps-pl');
-  plEl.textContent=(totalPL>=0?'+':'')+totalPL.toFixed(2)+' ('+totalPLPct.toFixed(2)+'%)';
+  plEl.textContent=(totalPL>=0?'+':'')+_fxSym+(Math.abs(totalPL)*_fxRate).toFixed(2)+' ('+totalPLPct.toFixed(2)+'%)';
   plEl.style.color=totalPL>=0?'var(--green)':'var(--red)';
   sum.style.display='grid';
   document.getElementById('port-valuta-row').style.display='block';
@@ -1517,6 +1570,9 @@ async function renderPortfolio(){
 
   // Portfolio chart (andamento ultimi 30gg, tutte le posizioni)
   _renderPortfolioChart(port, tickers, chartWrap);
+
+  // Leaderboard migliori/peggiori
+  _renderLeaderboard(_lbPositions);
 }
 
 async function _renderPortfolioChart(port, tickers, chartWrap){
@@ -1708,6 +1764,7 @@ document.getElementById('wl-add-btn').addEventListener('click',async()=>{
 updateMarketStatus();
 loadIndices();
 setInterval(()=>{updateMarketStatus();loadIndices();},60000);
+initFX();
 loadData().then(startCountdown);
 initAuth();
 
@@ -1800,6 +1857,45 @@ async function loadHistoryDay(date) {
   } catch(e) {
     hgrid.innerHTML = '<div class="history-empty"><span class="icon">❌</span>Errore nel caricamento.</div>';
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Note personali (localStorage)
+// ══════════════════════════════════════════════════════════════════════════════
+const _NOTES_KEY='masker_notes';
+function _loadNotes(){try{return JSON.parse(localStorage.getItem(_NOTES_KEY)||'{}')}catch(_){return {};}}
+function _saveNote(ticker,text){const n=_loadNotes();if(text)n[ticker]=text;else delete n[ticker];localStorage.setItem(_NOTES_KEY,JSON.stringify(n));}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Leaderboard portafoglio
+// ══════════════════════════════════════════════════════════════════════════════
+function _renderLeaderboard(positions){
+  const el=document.getElementById('port-leaderboard');
+  if(!el) return;
+  const valid=positions.filter(p=>p.currP>0);
+  if(valid.length<2){el.style.display='none';return;}
+  const sorted=[...valid].sort((a,b)=>b.plPct-a.plPct);
+  const best=sorted.slice(0,3);
+  const worst=[...sorted].reverse().slice(0,3);
+  const medals=['🥇','🥈','🥉'];
+  const _rows=(arr,pos)=>arr.map((p,i)=>`
+    <div class="lb-item" onclick="openModal({ticker:'${p.t}',current_price:${p.currP},day_change_pct:0,name:'${p.name}',score_10:5})">
+      <span class="lb-rank">${medals[i]}</span>
+      <span class="lb-ticker">${p.t}</span>
+      <span class="lb-name">${p.name}</span>
+      <span class="lb-pct" style="color:${pos?'var(--green)':'var(--red)'}">${pos?(p.plPct>=0?'+':'')+p.plPct.toFixed(2)+'%':p.plPct.toFixed(2)+'%'}</span>
+    </div>`).join('');
+  el.innerHTML=`<div class="lb-wrap">
+    <div class="lb-col">
+      <div class="lb-col-hd">🏆 Migliori posizioni</div>
+      ${_rows(best,true)}
+    </div>
+    <div class="lb-col">
+      <div class="lb-col-hd">📉 Peggiori posizioni</div>
+      ${_rows(worst,false)}
+    </div>
+  </div>`;
+  el.style.display='block';
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

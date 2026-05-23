@@ -105,6 +105,7 @@ _SCAN_TTL     = 300    # 5 min — scanner
 _STOCK_TTL    = 180    # 3 min — analisi singola
 _AI_TTL       = 600    # 10 min — AI (chiamata Groq costosa)
 _FORECAST_TTL = 14400  # 4 h — previsione 7 giorni
+_FX_TTL       = 3600   # 1 h — tasso di cambio EUR/USD
 
 
 def _cached(key: str, ttl: int):
@@ -765,6 +766,26 @@ async def api_history_date(date: str):
         "generated_at": snap.get("generated_at"),
         "stocks": enriched,
     })
+
+
+# ─── FX rate ──────────────────────────────────────────────────────────────────
+
+@app.get("/api/fx")
+async def api_fx():
+    """Tasso EUR/USD in tempo reale — cache 1h."""
+    key = "fx:eurusd"
+    if (c := _cached(key, _FX_TTL)) is not None:
+        return c
+    def _get():
+        import yfinance as yf
+        try:
+            rate = yf.Ticker("EURUSD=X").fast_info.last_price
+            return {"rate": round(float(rate), 4)}
+        except Exception:
+            return {"rate": 0.92}
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return data
 
 
 # ─── Auth — Telegram Login ────────────────────────────────────────────────────
