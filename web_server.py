@@ -914,6 +914,90 @@ async def api_user_watchlist_post(body: BodyWatchlist, authorization: Optional[s
     return {"ok": True}
 
 
+# ─── Notizie titolo ───────────────────────────────────────────────────────────
+
+@app.get("/api/stock/{ticker}/news")
+async def api_news(ticker: str):
+    t = ticker.upper()
+    key = f"news:{t}"
+    if (c := _cached(key, 1800)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        items = yf.Ticker(t).news or []
+        result = []
+        for n in items[:6]:
+            cnt = n.get("content", {}) if isinstance(n.get("content"), dict) else {}
+            title = cnt.get("title") or n.get("title", "")
+            if not title:
+                continue
+            link = ""
+            for k in ("canonicalUrl", "clickThroughUrl"):
+                v = cnt.get(k)
+                if isinstance(v, dict):
+                    link = v.get("url", ""); break
+            if not link:
+                link = n.get("link", "")
+            pub = (cnt.get("provider") or {}).get("displayName") or n.get("publisher", "")
+            ts = cnt.get("pubDate") or n.get("providerPublishTime")
+            result.append({"title": title, "link": link, "publisher": pub, "time": ts})
+        return result
+
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return data
+
+
+# ─── Chat AI ──────────────────────────────────────────────────────────────────
+
+class ChatBody(BaseModel):
+    message: str
+    portfolio: Optional[dict] = {}
+    watchlist: Optional[list] = []
+    history: Optional[list] = []
+
+
+@app.post("/api/chat")
+async def api_chat(body: ChatBody):
+    if not groq_client:
+        return JSONResponse({"error": "GROQ_API_KEY non configurata"}, status_code=503)
+
+    port_ctx = ""
+    if body.portfolio:
+        port_ctx = "\nPortafoglio utente:\n"
+        for t, p in body.portfolio.items():
+            port_ctx += f"  - {t}: {p.get('qty', 0)} azioni, prezzo acquisto ${p.get('buyPrice', 0):.2f}\n"
+
+    wl_ctx = ""
+    if body.watchlist:
+        wl_ctx = f"\nWatchlist: {', '.join(str(x) for x in body.watchlist)}"
+
+    messages = [{"role": "system", "content": (
+        "Sei Masker AI, assistente finanziario di una piattaforma italiana di analisi azioni. "
+        "Rispondi SEMPRE in italiano. Sii conciso, utile e preciso. "
+        "Puoi analizzare dati, spiegare concetti e fare confronti, "
+        "ma ricorda sempre che le informazioni sono solo indicative e non costituiscono consulenza finanziaria."
+        + port_ctx + wl_ctx
+    )}]
+
+    for msg in (body.history or [])[-10:]:
+        if isinstance(msg, dict) and msg.get("role") in ("user", "assistant"):
+            messages.append({"role": msg["role"], "content": msg["content"]})
+    messages.append({"role": "user", "content": body.message})
+
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            max_tokens=600,
+            temperature=0.7,
+        )
+        return {"reply": resp.choices[0].message.content.strip()}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 # ─── Health ───────────────────────────────────────────────────────────────────
 
 @app.get("/health")
