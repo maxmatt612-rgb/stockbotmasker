@@ -487,11 +487,11 @@ def scan_cheap_stocks(max_price: float = 20.0, top_n: int = 10) -> list:
                     returns = close.pct_change().dropna()
                     volatility = float(returns.std() * (252 ** 0.5) * 100) if len(returns) > 1 else 50.0
                     if volatility < 30:
-                        risk_emoji = "🟢"
+                        risk_level, risk_emoji = "Basso", "🟢"
                     elif volatility < 60:
-                        risk_emoji = "🟡"
+                        risk_level, risk_emoji = "Medio", "🟡"
                     else:
-                        risk_emoji = "🔴"
+                        risk_level, risk_emoji = "Alto", "🔴"
 
                     # Normalizza score grezzo (-5..10) → 0-10
                     score_10 = round(min(10.0, max(0.0, (score + 5) / 15 * 10)), 1)
@@ -505,6 +505,7 @@ def scan_cheap_stocks(max_price: float = 20.0, top_n: int = 10) -> list:
                         "score": score,
                         "score_10": score_10,
                         "risk_emoji": risk_emoji,
+                        "risk_level": risk_level,
                         "volatility": volatility,
                     })
                 except Exception:
