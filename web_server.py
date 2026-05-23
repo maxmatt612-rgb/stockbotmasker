@@ -1,5 +1,6 @@
 """Web dashboard per Stock Bot — FastAPI server."""
 import asyncio
+import json
 import os
 import time
 from pathlib import Path
@@ -12,6 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from analyzer import get_enriched_analysis, scan_cheap_stocks
 
 STATIC = Path(__file__).parent / "static"
+HISTORY_FILE = Path(__file__).parent / "analysis_history.json"
 
 app = FastAPI(title="Stock Bot Dashboard", docs_url=None, redoc_url=None)
 app.add_middleware(
@@ -251,6 +253,71 @@ async def api_sparklines(tickers: str):
     data = await asyncio.to_thread(_get)
     _store(key, data)
     return data
+
+
+@app.get("/api/history")
+async def api_history_list():
+    """Lista date disponibili nello storico analisi."""
+    if not HISTORY_FILE.exists():
+        return []
+    try:
+        history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    dates = sorted(history.keys(), reverse=True)
+    return [
+        {
+            "date": d,
+            "count": len(history[d].get("stocks", [])),
+            "generated_at": history[d].get("generated_at", d),
+        }
+        for d in dates
+    ]
+
+
+@app.get("/api/history/{date}")
+async def api_history_date(date: str):
+    """Azioni analizzate in una data specifica + prezzo attuale per confronto."""
+    if not HISTORY_FILE.exists():
+        return JSONResponse({"error": "nessuno storico disponibile"}, status_code=404)
+    try:
+        history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return JSONResponse({"error": "errore lettura storico"}, status_code=500)
+
+    if date not in history:
+        return JSONResponse({"error": "data non trovata"}, status_code=404)
+
+    snap = history[date]
+    stocks = snap.get("stocks", [])
+
+    def _get_current_prices(tickers: list) -> dict:
+        import yfinance as yf
+        result = {}
+        for t in tickers:
+            try:
+                fi = yf.Ticker(t).fast_info
+                result[t] = float(fi.last_price or 0)
+            except Exception:
+                result[t] = 0.0
+        return result
+
+    tickers = [s["ticker"] for s in stocks]
+    current_prices = await asyncio.to_thread(_get_current_prices, tickers)
+
+    enriched = []
+    for s in stocks:
+        t = s["ticker"]
+        cp = current_prices.get(t, 0.0)
+        pa = s.get("price_at_analysis", 0.0)
+        pct = round((cp - pa) / pa * 100, 2) if pa > 0 and cp > 0 else None
+        enriched.append({**s, "current_price": round(cp, 4), "pct_since_analysis": pct})
+
+    return _clean({
+        "date": date,
+        "generated_at": snap.get("generated_at"),
+        "stocks": enriched,
+    })
 
 
 @app.get("/health")

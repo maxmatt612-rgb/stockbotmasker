@@ -222,6 +222,84 @@ header{
 /* ── Footer ── */
 footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72rem;border-top:1px solid var(--border)}
 
+/* ── Tab Navigation ── */
+.tab-nav{
+  display:flex;gap:6px;
+  padding:12px 28px 0;max-width:1180px;margin:0 auto;
+  border-bottom:1px solid var(--border);
+}
+.tab-btn{
+  background:transparent;border:none;cursor:pointer;
+  font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;
+  color:var(--text-dim);padding:9px 18px;border-radius:var(--r-sm) var(--r-sm) 0 0;
+  border-bottom:2px solid transparent;margin-bottom:-1px;
+  transition:color .15s,border-color .15s;
+}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--primary);border-bottom-color:var(--primary)}
+
+/* ── History view ── */
+#history-view{padding:0 0 96px}
+.history-toolbar{
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px;
+  padding:20px 28px 16px;max-width:1180px;margin:0 auto;
+}
+.history-toolbar h2{font-size:.95rem;font-weight:700;color:var(--text);flex-shrink:0}
+.date-pills{display:flex;flex-wrap:wrap;gap:6px;flex:1}
+.date-pill{
+  background:var(--surf);border:1px solid var(--border);
+  border-radius:100px;padding:5px 14px;
+  font-size:.74rem;font-weight:600;color:var(--text-dim);
+  cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.date-pill:hover{border-color:var(--border-hi);color:var(--text)}
+.date-pill.active{background:var(--primary-dim);border-color:rgba(196,166,255,.4);color:var(--primary)}
+.history-empty{
+  text-align:center;padding:60px 24px;color:var(--text-dim);
+  font-size:.85rem;line-height:1.8;
+}
+.history-empty .icon{font-size:2.4rem;display:block;margin-bottom:12px}
+
+/* ── History cards ── */
+.hgrid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));
+  gap:14px;padding:0 28px 48px;max-width:1180px;margin:0 auto;
+}
+.hcard{
+  background:linear-gradient(145deg,rgba(196,166,255,.04),rgba(128,255,219,.02));
+  border:1px solid var(--border);border-radius:var(--r-xl);padding:20px;
+  animation:fadeUp .4s ease both;
+}
+.hcard-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.hcard-ticker{font-size:1.45rem;font-weight:900;letter-spacing:-.03em;line-height:1}
+.hcard-name{font-size:.72rem;color:var(--text-dim);margin-top:3px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hcard-score{text-align:right}
+.hcard-score-val{font-size:1.1rem;font-weight:800;color:var(--primary)}
+.hcard-score-sub{font-size:.65rem;color:var(--text-dim)}
+
+/* Performance block */
+.hcard-perf{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--surf-v);border-radius:var(--r-md);
+  padding:12px 14px;margin-bottom:12px;
+}
+.hcard-perf-col{display:flex;flex-direction:column;gap:2px}
+.hcard-perf-label{font-size:.63rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em}
+.hcard-perf-price{font-size:.88rem;font-weight:700}
+.hcard-perf-arrow{font-size:1.4rem;opacity:.5}
+.hcard-pct{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:1.35rem;font-weight:900;letter-spacing:-.02em;
+  padding:6px 12px;border-radius:var(--r-md);margin-bottom:10px;
+  width:100%;justify-content:center;
+}
+.hcard-pct.pos{background:rgba(114,239,160,.12);color:var(--green)}
+.hcard-pct.neg{background:rgba(255,107,107,.12);color:var(--red)}
+.hcard-pct.neu{background:rgba(255,255,255,.05);color:var(--text-dim)}
+.hcard-meta{display:flex;flex-wrap:wrap;gap:5px}
+.hcard-chip{font-size:.66rem;padding:2px 8px;border-radius:100px;border:1px solid var(--border);color:var(--text-dim)}
+.hcard-verdict{font-size:.76rem;color:var(--text-dim);line-height:1.5;margin-top:8px;border-left:2px solid rgba(196,166,255,.2);padding-left:8px}
+
 /* ── Responsive ── */
 @media(max-width:640px){
   header{padding:8px 12px;gap:8px}
@@ -230,8 +308,8 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   .logo span.logo-text{display:none}
   .indices-tape{top:60px}
   .hero{padding:32px 14px 24px}
-  .controls-bar,.grid{padding-left:14px;padding-right:14px}
-  .grid{gap:12px}
+  .tab-nav,.controls-bar,.grid,.hgrid,.history-toolbar{padding-left:14px;padding-right:14px}
+  .grid,.hgrid{gap:12px}
   .modal-sheet{padding:18px}
   .ctrl-div{display:none}
 }
@@ -289,6 +367,30 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   </div>
 </div>
 
+<!-- ── Tab navigation ── -->
+<div class="tab-nav">
+  <button class="tab-btn active" data-tab="live">📊 Live</button>
+  <button class="tab-btn" data-tab="history">📅 Storico</button>
+</div>
+
+<!-- ── History view (nascosta di default) ── -->
+<div id="history-view" style="display:none">
+  <div class="history-toolbar">
+    <h2>Storico Analisi</h2>
+    <div class="date-pills" id="date-pills"></div>
+  </div>
+  <div id="hgrid" class="hgrid">
+    <div class="history-empty">
+      <span class="icon">📅</span>
+      Seleziona una data per vedere l'analisi di quel giorno
+      e come sono andati i titoli da allora.
+    </div>
+  </div>
+</div>
+
+<!-- ── Live view ── -->
+<div id="live-view">
+
 <!-- ── Hero ── -->
 <section class="hero">
   <h1>Mercato in<br>Tempo Reale</h1>
@@ -333,6 +435,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   <div class="skel-card"><div class="skel-line" style="height:13px;width:38%"></div><div class="skel-line" style="height:34px;width:52%"></div><div class="skel-line" style="height:11px;width:100%"></div><div class="skel-line" style="height:11px;width:70%"></div></div>
 </div>
 
+</div><!-- #live-view -->
 </div><!-- .app -->
 
 <!-- ── Modal ── -->
@@ -826,6 +929,149 @@ updateMarketStatus();
 loadIndices();
 setInterval(()=>{updateMarketStatus();loadIndices();},60000);
 loadData().then(startCountdown);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Tab switching
+// ══════════════════════════════════════════════════════════════════════════════
+let historyLoaded = false;
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    document.getElementById('live-view').style.display   = tab === 'live'    ? '' : 'none';
+    document.getElementById('history-view').style.display = tab === 'history' ? '' : 'none';
+    if (tab === 'history' && !historyLoaded) {
+      historyLoaded = true;
+      loadHistoryDates();
+    }
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// History — carica date disponibili
+// ══════════════════════════════════════════════════════════════════════════════
+const _GIORNI = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+const _MESI   = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+
+function fmtDateLabel(iso) {
+  const [y,m,d] = iso.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  return `${_GIORNI[dt.getDay()]} ${d} ${_MESI[m-1]}`;
+}
+
+async function loadHistoryDates() {
+  const pills = document.getElementById('date-pills');
+  pills.innerHTML = '<span style="color:var(--text-dim);font-size:.76rem">Caricamento…</span>';
+  try {
+    const dates = await fetch('/api/history').then(r => r.json());
+    if (!dates.length) {
+      pills.innerHTML = '<span style="color:var(--text-dim);font-size:.76rem">Nessuna analisi salvata ancora. Le analisi vengono salvate ogni mattina lun–ven alle 7:30.</span>';
+      return;
+    }
+    pills.innerHTML = '';
+    dates.forEach((entry, i) => {
+      const pill = document.createElement('button');
+      pill.className = 'date-pill' + (i === 0 ? ' active' : '');
+      pill.textContent = fmtDateLabel(entry.date) + ` (${entry.count})`;
+      pill.title = `${entry.count} azioni analizzate`;
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('.date-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        loadHistoryDay(entry.date);
+      });
+      pills.appendChild(pill);
+    });
+    // Carica automaticamente il giorno più recente
+    if (dates.length) loadHistoryDay(dates[0].date);
+  } catch(e) {
+    pills.innerHTML = '<span style="color:var(--red);font-size:.76rem">Errore connessione</span>';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// History — carica azioni di un giorno specifico
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadHistoryDay(date) {
+  const hgrid = document.getElementById('hgrid');
+  hgrid.innerHTML = '<div class="history-empty"><span class="icon" style="font-size:1.6rem">⏳</span>Caricamento prezzi attuali…</div>';
+
+  try {
+    const snap = await fetch(`/api/history/${date}`).then(r => r.ok ? r.json() : null);
+    if (!snap || !snap.stocks?.length) {
+      hgrid.innerHTML = '<div class="history-empty"><span class="icon">⚠️</span>Nessun dato per questa data.</div>';
+      return;
+    }
+    hgrid.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    snap.stocks.forEach((s, i) => {
+      const card = buildHistoryCard(s, i, date);
+      frag.appendChild(card);
+    });
+    hgrid.appendChild(frag);
+  } catch(e) {
+    hgrid.innerHTML = '<div class="history-empty"><span class="icon">❌</span>Errore nel caricamento.</div>';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// History — costruisce una singola card performance
+// ══════════════════════════════════════════════════════════════════════════════
+function buildHistoryCard(s, idx, date) {
+  const pct    = s.pct_since_analysis;
+  const hasCP  = s.current_price > 0;
+  const isPos  = pct != null && pct >= 0;
+  const isNeg  = pct != null && pct < 0;
+  const pctCls = pct == null ? 'neu' : (isPos ? 'pos' : 'neg');
+  const pctTxt = pct == null ? '—' : (isPos ? '▲ +' : '▼ ') + Math.abs(pct).toFixed(2) + '%';
+  const pctSub = pct == null ? 'prezzo attuale non disponibile' : (isPos ? 'salita dall\'analisi' : 'scesa dall\'analisi');
+
+  const div = document.createElement('div');
+  div.className = 'hcard';
+  div.style.animationDelay = (idx * 0.06) + 's';
+  div.innerHTML = `
+    <div class="hcard-top">
+      <div>
+        <div class="hcard-ticker">${s.ticker}</div>
+        <div class="hcard-name">${s.name ?? s.ticker}</div>
+      </div>
+      <div class="hcard-score">
+        <div class="hcard-score-val">${s.score_10?.toFixed(1) ?? '—'}</div>
+        <div class="hcard-score-sub">/ 10</div>
+      </div>
+    </div>
+
+    <div class="hcard-perf">
+      <div class="hcard-perf-col">
+        <span class="hcard-perf-label">Analisi</span>
+        <span class="hcard-perf-price">$${s.price_at_analysis?.toFixed(4) ?? '—'}</span>
+      </div>
+      <div class="hcard-perf-arrow">→</div>
+      <div class="hcard-perf-col" style="text-align:right">
+        <span class="hcard-perf-label">Ora</span>
+        <span class="hcard-perf-price">${hasCP ? '$' + s.current_price.toFixed(4) : '—'}</span>
+      </div>
+    </div>
+
+    <div class="hcard-pct ${pctCls}">
+      ${pctTxt}
+    </div>
+    <div style="font-size:.68rem;color:var(--text-dim);text-align:center;margin-bottom:10px;margin-top:-6px">${pctSub}</div>
+
+    <div class="hcard-meta">
+      <span class="hcard-chip">${s.risk_emoji ?? '🟡'} ${s.risk_level ?? 'Medio'}</span>
+      <span class="hcard-chip">RSI ${s.rsi?.toFixed(0) ?? '—'}</span>
+      <span class="hcard-chip">${s.day_change_pct >= 0 ? '📈' : '📉'} ${s.day_change_pct >= 0 ? '+' : ''}${s.day_change_pct?.toFixed(1) ?? '0'}% analisi</span>
+    </div>
+    ${s.verdict ? `<div class="hcard-verdict">🎯 ${s.verdict}</div>` : ''}
+  `;
+  div.addEventListener('click', () => openModal({
+    ticker: s.ticker, day_change_pct: s.day_change_pct ?? 0,
+    current_price: s.current_price ?? s.price_at_analysis, name: s.name, score_10: s.score_10
+  }));
+  return div;
+}
 </script>
 </body>
 </html>

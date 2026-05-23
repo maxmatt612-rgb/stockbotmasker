@@ -738,6 +738,44 @@ async def _send_to_group(bot, text: str, topic_id: int, **kwargs):
             logger.warning(f"Errore invio topic {topic_id}: {e}")
 
 
+def _save_history_snapshot(date_iso: str, enriched: list, ai_verdicts: list):
+    """Salva snapshot analisi giornaliera su analysis_history.json (ultimi 60 gg)."""
+    history_file = Path("analysis_history.json")
+    try:
+        history = json.loads(history_file.read_text(encoding="utf-8")) if history_file.exists() else {}
+    except Exception:
+        history = {}
+
+    history[date_iso] = {
+        "date": date_iso,
+        "generated_at": f"{date_iso}T07:30:00",
+        "stocks": [
+            {
+                "ticker": d["ticker"],
+                "name": d.get("name", d["ticker"]),
+                "price_at_analysis": round(float(d.get("current_price", 0)), 4),
+                "score_10": float(d.get("score_10", 5.0)),
+                "risk_level": d.get("risk_level", "Medio"),
+                "risk_emoji": d.get("risk_emoji", "🟡"),
+                "day_change_pct": round(float(d.get("day_change_pct", 0)), 2),
+                "rsi": round(float(d.get("rsi", 50)), 1),
+                "verdict": (ai_verdicts[i] or {}).get("verdict", "") if i < len(ai_verdicts) else "",
+            }
+            for i, d in enumerate(enriched)
+        ],
+    }
+
+    # Mantieni solo gli ultimi 60 giorni
+    all_dates = sorted(history.keys(), reverse=True)
+    history = {k: history[k] for k in all_dates[:60]}
+
+    try:
+        history_file.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+        logger.info(f"Storico salvato: {date_iso} ({len(enriched)} azioni)")
+    except Exception as e:
+        logger.error(f"Errore salvataggio storico: {e}")
+
+
 async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
     from datetime import datetime as _dt
     now = _dt.now(ROME)
@@ -800,7 +838,10 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
         + "\n\n<i>Dati: Yahoo Finance | AI: Groq Llama 70B</i>"
     )
 
-    # 5 ── Invia: UN messaggio al gruppo + UN messaggio per ogni DM
+    # 5 ── Salva snapshot storico
+    _save_history_snapshot(now.strftime("%Y-%m-%d"), enriched, ai_verdicts)
+
+    # 6 ── Invia: UN messaggio al gruppo + UN messaggio per ogni DM
     await _send_to_group(context.bot, text, TOPIC_ANALISI_ID)
     for uid in all_uids:
         try:
