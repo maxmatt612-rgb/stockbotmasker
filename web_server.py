@@ -255,6 +255,133 @@ async def api_sparklines(tickers: str):
     return data
 
 
+_INTRADAY_INTERVALS = {"1m","2m","5m","15m","30m","60m","90m","1h"}
+
+_HEATMAP_TICKERS = [
+    "AAPL","MSFT","NVDA","GOOGL","AMZN","META","TSLA","AVGO","AMD","INTC",
+    "ORCL","CRM","NFLX","DIS","PYPL",
+    "JPM","BAC","GS","V","MA",
+    "JNJ","UNH","LLY","ABBV","PFE",
+    "XOM","CVX",
+    "WMT","HD","COST","PG","NKE",
+    "BA","CAT","GE",
+]
+
+
+@app.get("/api/stock/{ticker}/ohlc")
+async def api_ohlc(ticker: str, period: str = "1mo", interval: str = "1d"):
+    """OHLC candlestick data — usato per grafico linea e candele nel modal."""
+    t = ticker.upper()
+    key = f"ohlc:{t}:{period}:{interval}"
+    ttl = 60 if interval in _INTRADAY_INTERVALS else _STOCK_TTL
+    if (c := _cached(key, ttl)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        h = yf.Ticker(t).history(period=period, interval=interval)
+        if h.empty:
+            return []
+        intraday = interval in _INTRADAY_INTERVALS
+        result = []
+        for idx, row in h.iterrows():
+            o, hi, lo, cl = (float(row[k]) for k in ["Open", "High", "Low", "Close"])
+            if any(v != v for v in [o, hi, lo, cl]):
+                continue
+            vol = int(row["Volume"]) if str(row["Volume"]) not in ("nan", "None", "0.0") else 0
+            result.append({
+                "time": int(idx.timestamp()) if intraday else str(idx.date()),
+                "open": round(o, 4), "high": round(hi, 4),
+                "low": round(lo, 4), "close": round(cl, 4),
+                "volume": vol,
+            })
+        return result
+
+    result = await asyncio.to_thread(_get)
+    _store(key, result)
+    return result
+
+
+@app.get("/api/batch_quotes")
+async def api_batch_quotes(tickers: str):
+    """Prezzi + variazione giornaliera in batch — usato da heatmap e portafoglio."""
+    key = f"bq:{tickers}"
+    if (c := _cached(key, 60)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        import pandas as pd
+        tlist = [t.strip().upper() for t in tickers.split(",") if t.strip()][:50]
+        if not tlist:
+            return {}
+        try:
+            raw = yf.download(tlist, period="2d", interval="1d", auto_adjust=True, progress=False)
+            if raw.empty:
+                return {}
+            close_df = raw["Close"] if isinstance(raw.columns, pd.MultiIndex) else None
+            if close_df is None:
+                return {}
+            result = {}
+            for t in tlist:
+                if t not in close_df.columns:
+                    continue
+                vals = close_df[t].dropna()
+                if len(vals) >= 2:
+                    curr = float(vals.iloc[-1]); prev = float(vals.iloc[-2])
+                    chg = round((curr - prev) / prev * 100, 2) if prev else 0
+                    result[t] = {"price": round(curr, 4), "chg": chg}
+                elif len(vals) == 1:
+                    result[t] = {"price": round(float(vals.iloc[-1]), 4), "chg": 0}
+            return result
+        except Exception as e:
+            print(f"[batch_quotes] {e}")
+            return {}
+
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return data
+
+
+@app.get("/api/heatmap")
+async def api_heatmap_data():
+    """Heatmap 35 azioni principali USA — cache 60s."""
+    key = "heatmap:main"
+    if (c := _cached(key, 60)) is not None:
+        return c
+    tickers_csv = ",".join(_HEATMAP_TICKERS)
+
+    def _get():
+        import yfinance as yf
+        import pandas as pd
+        try:
+            raw = yf.download(_HEATMAP_TICKERS, period="2d", interval="1d", auto_adjust=True, progress=False)
+            if raw.empty:
+                return {}
+            close_df = raw["Close"] if isinstance(raw.columns, pd.MultiIndex) else None
+            if close_df is None:
+                return {}
+            result = {}
+            for t in _HEATMAP_TICKERS:
+                if t not in close_df.columns:
+                    continue
+                vals = close_df[t].dropna()
+                if len(vals) >= 2:
+                    curr = float(vals.iloc[-1]); prev = float(vals.iloc[-2])
+                    chg = round((curr - prev) / prev * 100, 2) if prev else 0
+                    result[t] = {"price": round(curr, 2), "chg": chg}
+                elif len(vals) == 1:
+                    result[t] = {"price": round(float(vals.iloc[-1]), 2), "chg": 0}
+            return result
+        except Exception as e:
+            print(f"[heatmap] {e}")
+            return {}
+
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return _clean(data)
+
+
 @app.get("/api/history")
 async def api_history_list():
     """Lista date disponibili nello storico analisi."""
