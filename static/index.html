@@ -734,20 +734,6 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 <!-- ── Controls ── -->
 <div class="controls-bar">
-  <span class="ctrl-label">Ordina:</span>
-  <div class="ctrl-group">
-    <button class="ctrl-btn active" data-sort="score">Score ↓</button>
-    <button class="ctrl-btn" data-sort="chg">Variazione</button>
-    <button class="ctrl-btn" data-sort="risk">Rischio ↑</button>
-  </div>
-  <div class="ctrl-div"></div>
-  <span class="ctrl-label">Rischio:</span>
-  <div class="ctrl-group">
-    <button class="ctrl-btn active" data-risk="all">Tutti</button>
-    <button class="ctrl-btn" data-risk="Basso">🟢 Basso</button>
-    <button class="ctrl-btn" data-risk="Medio">🟡 Medio</button>
-    <button class="ctrl-btn" data-risk="Alto">🔴 Alto</button>
-  </div>
   <div class="ctrl-div"></div>
   <button class="ctrl-btn" id="export-pdf-btn" title="Esporta analisi corrente in PDF" onclick="exportPDF()">📄 PDF</button>
 </div>
@@ -1073,17 +1059,14 @@ function animateBars(grid){
 // ══════════════════════════════════════════════════════════════════════════════
 // Filter & Sort
 // ══════════════════════════════════════════════════════════════════════════════
-let cardsData=[], currentSort='score', currentRisk='all';
+let cardsData=[], currentSort='score';
 
 const sortFns={
-  score:  (a,b)=>(b.score_10??0)-(a.score_10??0),
-  chg:    (a,b)=>Math.abs(b.day_change_pct)-Math.abs(a.day_change_pct),
-  risk:   (a,b)=>({Basso:0,Medio:1,Alto:2}[a.risk_level??'Medio']??1)-({Basso:0,Medio:1,Alto:2}[b.risk_level??'Medio']??1),
+  score: (a,b)=>(b.score_10??0)-(a.score_10??0),
 };
 
 function applyAndRender(){
   let data=[...cardsData];
-  if(currentRisk!=='all') data=data.filter(d=>d.risk_level===currentRisk);
   data.sort(sortFns[currentSort]||sortFns.score);
   renderCards(data);
 }
@@ -1108,14 +1091,6 @@ document.querySelectorAll('.ctrl-btn[data-sort]').forEach(btn=>{
     document.querySelectorAll('.ctrl-btn[data-sort]').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     currentSort=btn.dataset.sort;
-    applyAndRender();
-  });
-});
-document.querySelectorAll('.ctrl-btn[data-risk]').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    document.querySelectorAll('.ctrl-btn[data-risk]').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    currentRisk=btn.dataset.risk;
     applyAndRender();
   });
 });
