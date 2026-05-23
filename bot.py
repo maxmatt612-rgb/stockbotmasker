@@ -741,6 +741,11 @@ async def _send_to_group(bot, text: str, topic_id: int, **kwargs):
 async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
     from datetime import datetime as _dt
     now = _dt.now(ROME)
+
+    # Solo lun–ven
+    if now.weekday() >= 5:
+        return
+
     date_str = f"{_GIORNI_IT[now.weekday()]} {now.day} {_MESI_IT[now.month - 1]} {now.year}"
 
     data = load_data()
@@ -774,7 +779,7 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
     if not enriched:
         return
 
-    # 3 ── Generazione AI verdict concorrente
+    # 3 ── AI verdicts concorrenti
     logger.info(f"Report mattutino: AI per {len(enriched)} azioni...")
     ai_raw = await asyncio.gather(*[generate_ai_verdict(d) for d in enriched], return_exceptions=True)
     ai_verdicts = [
@@ -782,58 +787,36 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
         for r in ai_raw
     ]
 
-    # 4 ── Costruzione messaggi (5 azioni per messaggio)
-    total = len(enriched)
-    chunks = [enriched[i:i + 5] for i in range(0, total, 5)]
-    ai_chunks = [ai_verdicts[i:i + 5] for i in range(0, total, 5)]
-    num_parts = len(chunks)
-    SEP = "\n\n" + "━" * 20 + "\n\n"
+    # 4 ── UN SOLO messaggio con format_scan_card (compatto)
+    SEP = "\n" + "─" * 18 + "\n"
+    cards = [
+        format_scan_card(d, ai, i + 1)
+        for i, (d, ai) in enumerate(zip(enriched, ai_verdicts))
+    ]
+    text = (
+        f"📊 <b>Analisi mattutina — {date_str}</b>\n"
+        f"<i>Top {len(enriched)} azioni sotto $20</i>\n\n"
+        + SEP.join(cards)
+        + "\n\n<i>Dati: Yahoo Finance | AI: Groq Llama 70B</i>"
+    )
 
-    # 5 ── Costruzione testo completo per il gruppo
-    all_cards = []
-    base_rank = 1
-    for ci, (chunk, ai_chunk) in enumerate(zip(chunks, ai_chunks)):
-        part_label = f"({ci + 1}/{num_parts})"
-        cards = [
-            format_morning_card(d, ai, base_rank + i)
-            for i, (d, ai) in enumerate(zip(chunk, ai_chunk))
-        ]
-        base_rank += len(chunk)
-        body = SEP.join(cards)
-        full_msg = (
-            f"🔝 <b>Top {total} azioni sotto $20 {part_label}</b>\n\n"
-            + body
-            + "\n\n<i>Dati: Yahoo Finance | Analisi: AI</i>"
-        )
-        all_cards.append(full_msg)
-
-    # 6 ── Invia al topic Analisi del gruppo
-    header_group = f"📊 <b>Analisi automatica — {date_str}</b>"
-    await _send_to_group(context.bot, header_group, TOPIC_ANALISI_ID)
-    for msg_part in all_cards:
-        await _send_to_group(context.bot, msg_part, TOPIC_ANALISI_ID)
-
-    # 7 ── Invia anche ai singoli utenti in DM
+    # 5 ── Invia: UN messaggio al gruppo + UN messaggio per ogni DM
+    await _send_to_group(context.bot, text, TOPIC_ANALISI_ID)
     for uid in all_uids:
         try:
-            await context.bot.send_message(
-                int(uid),
-                f"📊 <b>Analisi automatica — {date_str}</b>",
-                parse_mode=ParseMode.HTML,
-            )
+            await context.bot.send_message(int(uid), text, parse_mode=ParseMode.HTML)
         except Exception as e:
-            logger.warning(f"Errore header {uid}: {e}")
-            continue
-        for msg_part in all_cards:
-            try:
-                await context.bot.send_message(int(uid), msg_part, parse_mode=ParseMode.HTML)
-            except Exception as e:
-                logger.warning(f"Errore msg {uid}: {e}")
+            logger.warning(f"Errore report mattutino {uid}: {e}")
 
 
 # ─── Job serale (22:00) ──────────────────────────────────────────────────────
 
 async def job_evening_report(context: ContextTypes.DEFAULT_TYPE):
+    from datetime import datetime as _dt
+    # Solo lun–ven
+    if _dt.now(ROME).weekday() >= 5:
+        return
+
     data = load_data()
     all_uids = list(data["watchlists"].keys())
     if not all_uids and not GROUP_CHAT_ID:
@@ -1036,14 +1019,12 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_callback))
 
     jq = app.job_queue
-    jq.run_daily(job_daily_report, time=time(hour=7, minute=30, tzinfo=ROME))
-    jq.run_daily(job_evening_report, time=time(hour=22, minute=0, tzinfo=ROME))
-    jq.run_daily(
-        job_weekly_report,
-        time=time(hour=10, minute=0, tzinfo=ROME),
-        days=(5,),  # 5 = sabato
-    )
-    jq.run_repeating(job_news_portafoglio, interval=14400, first=60)  # ogni 4 ore
+    # Analisi mattutina lun–ven alle 7:30
+    jq.run_daily(job_daily_report, time=time(hour=7, minute=30, tzinfo=ROME), days=(0, 1, 2, 3, 4))
+    # Recap serale lun–ven alle 22:00
+    jq.run_daily(job_evening_report, time=time(hour=22, minute=0, tzinfo=ROME), days=(0, 1, 2, 3, 4))
+    # Notizie portafoglio ogni 4 ore
+    jq.run_repeating(job_news_portafoglio, interval=14400, first=60)
 
     logger.info("Bot avviato!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
