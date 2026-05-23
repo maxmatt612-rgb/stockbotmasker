@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Masker — Stock Intelligence</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#C4A6FF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
@@ -573,6 +578,54 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .chat-send-btn:hover{background:rgba(196,166,255,.25)}
 
 
+/* ── Screener ── */
+.screener-panel{background:var(--surf);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px 22px;margin:0 28px 18px;max-width:1180px;margin-left:auto;margin-right:auto;display:none}
+.screener-panel.open{display:block}
+.screener-title{font-size:.72rem;font-weight:700;color:var(--text-dim);letter-spacing:.08em;margin-bottom:14px}
+.screener-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.screener-select,.screener-input{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:.8rem;outline:none;min-width:0}
+.screener-select:focus,.screener-input:focus{border-color:var(--border-hi)}
+.screener-input{width:88px}
+.screener-label{font-size:.72rem;color:var(--text-dim);align-self:center;white-space:nowrap}
+.screener-sep{align-self:center;color:var(--text-dim);font-size:.8rem}
+.screener-btn{background:linear-gradient(135deg,rgba(196,166,255,.22),rgba(128,255,219,.1));border:1px solid rgba(196,166,255,.4);color:var(--primary);border-radius:var(--r-sm);padding:8px 20px;font-family:'Inter',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap}
+.screener-btn:hover{background:rgba(196,166,255,.28)}
+.screener-results{margin-top:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.screener-card{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;cursor:pointer;transition:border-color .2s}
+.screener-card:hover{border-color:var(--border-hi)}
+.sc-ticker{font-size:.82rem;font-weight:800;margin-bottom:4px}
+.sc-price{font-size:1rem;font-weight:700}
+.sc-chg{font-size:.75rem;font-weight:600;margin-top:3px}
+.sc-mcap{font-size:.62rem;color:var(--text-dim);margin-top:3px}
+.screener-empty{text-align:center;color:var(--text-dim);font-size:.8rem;padding:18px 0;grid-column:1/-1}
+
+/* ── Diario operazioni ── */
+.diary-section{padding:0 28px 32px;max-width:1180px;margin:0 auto}
+.diary-hd{font-size:.72rem;font-weight:700;color:var(--text-dim);letter-spacing:.08em;padding:18px 0 12px;border-top:1px solid var(--border);margin-top:8px}
+.diary-form{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.diary-input,.diary-select{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:.8rem;outline:none;min-width:0}
+.diary-input:focus,.diary-select:focus{border-color:var(--border-hi)}
+.diary-input-date{width:130px}
+.diary-input-ticker{width:90px;text-transform:uppercase}
+.diary-select{width:110px}
+.diary-input-price,.diary-input-qty{width:90px}
+.diary-input-note{flex:1;min-width:140px}
+.diary-add-btn{background:linear-gradient(135deg,rgba(196,166,255,.22),rgba(128,255,219,.1));border:1px solid rgba(196,166,255,.4);color:var(--primary);border-radius:var(--r-sm);padding:8px 18px;font-family:'Inter',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;white-space:nowrap}
+.diary-table{width:100%;border-collapse:collapse;font-size:.78rem}
+.diary-table th{padding:7px 10px;text-align:left;color:var(--text-dim);font-size:.67rem;font-weight:700;letter-spacing:.06em;border-bottom:1px solid var(--border)}
+.diary-table td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+.diary-table tr:last-child td{border-bottom:none}
+.diary-badge{display:inline-block;padding:2px 8px;border-radius:100px;font-size:.67rem;font-weight:700}
+.diary-badge.buy{background:rgba(114,239,160,.15);color:var(--green)}
+.diary-badge.sell{background:rgba(255,107,107,.15);color:var(--red)}
+.diary-del{background:transparent;border:none;color:var(--text-dim);cursor:pointer;font-size:.85rem;padding:2px 6px;border-radius:var(--r-sm);transition:color .15s}
+.diary-del:hover{color:var(--red)}
+.diary-summary{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.diary-stat{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 16px;font-size:.75rem}
+.diary-stat-label{color:var(--text-dim);margin-bottom:3px}
+.diary-stat-val{font-weight:700;font-size:.92rem}
+.diary-empty{text-align:center;color:var(--text-dim);font-size:.8rem;padding:20px 0}
+
 /* ── Responsive ── */
 @media(max-width:640px){
   header{padding:8px 12px;gap:8px}
@@ -749,6 +802,25 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   </div>
   <!-- Leaderboard -->
   <div id="port-leaderboard" style="display:none"></div>
+
+  <!-- Diario operazioni -->
+  <div class="diary-section">
+    <div class="diary-hd">📓 DIARIO OPERAZIONI</div>
+    <div class="diary-form">
+      <input class="diary-input diary-input-date" id="diary-date" type="date">
+      <input class="diary-input diary-input-ticker" id="diary-ticker" type="text" placeholder="Ticker" maxlength="10" autocapitalize="characters" spellcheck="false">
+      <select class="diary-select" id="diary-action">
+        <option value="buy">Acquisto</option>
+        <option value="sell">Vendita</option>
+      </select>
+      <input class="diary-input diary-input-price" id="diary-price" type="number" placeholder="Prezzo $" step="0.0001" min="0">
+      <input class="diary-input diary-input-qty" id="diary-qty" type="number" placeholder="Qty" step="1" min="1">
+      <input class="diary-input diary-input-note" id="diary-note" type="text" placeholder="Nota (opzionale)" maxlength="120">
+      <button class="diary-add-btn" onclick="diaryAdd()">+ Aggiungi</button>
+    </div>
+    <div class="diary-summary" id="diary-summary"></div>
+    <div id="diary-table-wrap"><div class="diary-empty">Nessuna operazione registrata.</div></div>
+  </div>
 </div>
 
 <!-- ── Watchlist view ── -->
@@ -805,8 +877,57 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 <!-- ── Controls ── -->
 <div class="controls-bar">
   <div class="ctrl-div"></div>
+  <button class="ctrl-btn" onclick="toggleScreener()">🔍 Screener</button>
   <button class="ctrl-btn" onclick="openComparison()">📊 Confronta</button>
   <button class="ctrl-btn" id="export-pdf-btn" title="Esporta analisi corrente in PDF" onclick="exportPDF()">📄 PDF</button>
+</div>
+
+<!-- ── Screener panel ── -->
+<div class="screener-panel" id="screener-panel">
+  <div class="screener-title">🔍 SCREENER AVANZATO</div>
+  <div class="screener-row">
+    <span class="screener-label">Universo</span>
+    <select class="screener-select" id="sc-universe">
+      <option value="us_large">🇺🇸 S&amp;P 500 Top</option>
+      <option value="us_tech">💻 NASDAQ Tech</option>
+      <option value="europa">🇪🇺 Europa</option>
+      <option value="asia">🌏 Asia</option>
+      <option value="custom">✏️ Custom</option>
+    </select>
+    <span class="screener-label">Direzione</span>
+    <select class="screener-select" id="sc-direction">
+      <option value="all">Tutti</option>
+      <option value="up">▲ Rialzo</option>
+      <option value="down">▼ Ribasso</option>
+    </select>
+    <span class="screener-label">Market Cap</span>
+    <select class="screener-select" id="sc-mcap">
+      <option value="all">Tutti</option>
+      <option value="mega">Mega (&gt;200B)</option>
+      <option value="large">Large (10-200B)</option>
+      <option value="mid">Mid (2-10B)</option>
+      <option value="small">Small (&lt;2B)</option>
+    </select>
+  </div>
+  <div class="screener-row">
+    <span class="screener-label">Variazione %</span>
+    <input class="screener-input" id="sc-min-chg" type="number" placeholder="Min" step="0.1">
+    <span class="screener-sep">—</span>
+    <input class="screener-input" id="sc-max-chg" type="number" placeholder="Max" step="0.1">
+    <span class="screener-label" style="margin-left:8px">Prezzo $</span>
+    <input class="screener-input" id="sc-min-price" type="number" placeholder="Min" min="0">
+    <span class="screener-sep">—</span>
+    <input class="screener-input" id="sc-max-price" type="number" placeholder="Max" min="0">
+  </div>
+  <div class="screener-row" id="sc-custom-row" style="display:none">
+    <span class="screener-label">Ticker (virgola)</span>
+    <input class="screener-input" id="sc-custom-tickers" type="text" placeholder="AAPL, MSFT, TSLA…" style="width:260px">
+  </div>
+  <div class="screener-row">
+    <button class="screener-btn" onclick="runScreener()">Cerca</button>
+    <button class="screener-btn" style="background:transparent;border-color:var(--border);color:var(--text-dim)" onclick="resetScreener()">Reset</button>
+  </div>
+  <div class="screener-results" id="screener-results"></div>
 </div>
 
 <!-- ── Stats ── -->
@@ -2330,6 +2451,139 @@ function buildHistoryCard(s, idx, date) {
     current_price: s.current_price ?? s.price_at_analysis, name: s.name, score_10: s.score_10
   }));
   return div;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Screener
+// ══════════════════════════════════════════════════════════════════════════════
+function toggleScreener(){
+  const p=document.getElementById('screener-panel');
+  p.classList.toggle('open');
+}
+
+document.getElementById('sc-universe').addEventListener('change',function(){
+  document.getElementById('sc-custom-row').style.display=this.value==='custom'?'flex':'none';
+});
+
+async function runScreener(){
+  const res=document.getElementById('screener-results');
+  res.innerHTML='<div class="screener-empty">⏳ Ricerca in corso…</div>';
+  const universe=document.getElementById('sc-universe').value;
+  const direction=document.getElementById('sc-direction').value;
+  const mcap=document.getElementById('sc-mcap').value;
+  const minChg=document.getElementById('sc-min-chg').value;
+  const maxChg=document.getElementById('sc-max-chg').value;
+  const minPrice=document.getElementById('sc-min-price').value;
+  const maxPrice=document.getElementById('sc-max-price').value;
+  const customRaw=document.getElementById('sc-custom-tickers').value;
+  const customTickers=customRaw?customRaw.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean):[];
+  const body={universe,direction,mcap};
+  if(minChg!=='') body.min_change=parseFloat(minChg);
+  if(maxChg!=='') body.max_change=parseFloat(maxChg);
+  if(minPrice!=='') body.min_price=parseFloat(minPrice);
+  if(maxPrice!=='') body.max_price=parseFloat(maxPrice);
+  if(universe==='custom') body.custom_tickers=customTickers;
+  try{
+    const data=await fetch('/api/screener',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+    if(!data||!data.length){res.innerHTML='<div class="screener-empty">Nessun titolo trovato con questi filtri.</div>';return;}
+    const fmtMcap=m=>{if(!m)return'—';if(m>=1e12)return(m/1e12).toFixed(1)+'T';if(m>=1e9)return(m/1e9).toFixed(1)+'B';return(m/1e6).toFixed(0)+'M'};
+    res.innerHTML=data.map(d=>`
+      <div class="screener-card" onclick="openModal({ticker:'${d.ticker}',current_price:${d.price},day_change_pct:${d.chg_pct},name:'${d.ticker}',score_10:5})">
+        <div class="sc-ticker">${d.ticker}</div>
+        <div class="sc-price">${fmtP(d.price)}</div>
+        <div class="sc-chg ${d.chg_pct>=0?'pos':'neg'}">${d.chg_pct>=0?'▲ +':'▼ '}${Math.abs(d.chg_pct).toFixed(2)}%</div>
+        <div class="sc-mcap">${fmtMcap(d.mcap)}</div>
+      </div>`).join('');
+  }catch(e){res.innerHTML='<div class="screener-empty">❌ Errore di connessione.</div>';}
+}
+
+function resetScreener(){
+  document.getElementById('sc-universe').value='us_large';
+  document.getElementById('sc-direction').value='all';
+  document.getElementById('sc-mcap').value='all';
+  ['sc-min-chg','sc-max-chg','sc-min-price','sc-max-price','sc-custom-tickers'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('sc-custom-row').style.display='none';
+  document.getElementById('screener-results').innerHTML='';
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Diario operazioni
+// ══════════════════════════════════════════════════════════════════════════════
+const _DIARY_KEY='masker_diary';
+function _loadDiary(){try{return JSON.parse(localStorage.getItem(_DIARY_KEY)||'[]');}catch{return[];}}
+function _saveDiary(d){localStorage.setItem(_DIARY_KEY,JSON.stringify(d));}
+
+function diaryAdd(){
+  const date=document.getElementById('diary-date').value;
+  const ticker=document.getElementById('diary-ticker').value.trim().toUpperCase();
+  const action=document.getElementById('diary-action').value;
+  const price=parseFloat(document.getElementById('diary-price').value);
+  const qty=parseFloat(document.getElementById('diary-qty').value);
+  const note=document.getElementById('diary-note').value.trim();
+  if(!date||!ticker||!price||!qty){alert('Compila data, ticker, prezzo e quantità.');return;}
+  const diary=_loadDiary();
+  diary.push({id:Date.now(),date,ticker,action,price,qty,note});
+  _saveDiary(diary);
+  document.getElementById('diary-ticker').value='';
+  document.getElementById('diary-price').value='';
+  document.getElementById('diary-qty').value='';
+  document.getElementById('diary-note').value='';
+  renderDiary();
+}
+
+function diaryDelete(id){
+  _saveDiary(_loadDiary().filter(e=>e.id!==id));
+  renderDiary();
+}
+
+function renderDiary(){
+  const diary=_loadDiary();
+  const sum=document.getElementById('diary-summary');
+  const wrap=document.getElementById('diary-table-wrap');
+  if(!diary.length){
+    sum.innerHTML='';
+    wrap.innerHTML='<div class="diary-empty">Nessuna operazione registrata.</div>';
+    return;
+  }
+  const buys=diary.filter(e=>e.action==='buy');
+  const sells=diary.filter(e=>e.action==='sell');
+  const totBuy=buys.reduce((a,e)=>a+e.price*e.qty,0);
+  const totSell=sells.reduce((a,e)=>a+e.price*e.qty,0);
+  sum.innerHTML=`
+    <div class="diary-stat"><div class="diary-stat-label">Acquisti</div><div class="diary-stat-val">${buys.length}</div></div>
+    <div class="diary-stat"><div class="diary-stat-label">Vendite</div><div class="diary-stat-val">${sells.length}</div></div>
+    <div class="diary-stat"><div class="diary-stat-label">Tot. investito</div><div class="diary-stat-val">${fmtP(totBuy)}</div></div>
+    <div class="diary-stat"><div class="diary-stat-label">Tot. incassato</div><div class="diary-stat-val">${fmtP(totSell)}</div></div>`;
+  const sorted=[...diary].sort((a,b)=>b.date.localeCompare(a.date));
+  wrap.innerHTML=`<table class="diary-table">
+    <thead><tr><th>Data</th><th>Ticker</th><th>Azione</th><th>Prezzo</th><th>Qty</th><th>Totale</th><th>Nota</th><th></th></tr></thead>
+    <tbody>${sorted.map(e=>`<tr>
+      <td>${e.date}</td>
+      <td style="font-weight:700">${e.ticker}</td>
+      <td><span class="diary-badge ${e.action==='buy'?'buy':'sell'}">${e.action==='buy'?'Acquisto':'Vendita'}</span></td>
+      <td>${fmtP(e.price)}</td>
+      <td>${e.qty}</td>
+      <td style="font-weight:600">${fmtP(e.price*e.qty)}</td>
+      <td style="color:var(--text-dim);font-size:.72rem">${e.note||'—'}</td>
+      <td><button class="diary-del" onclick="diaryDelete(${e.id})" title="Elimina">✕</button></td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+// Inizializza data odierna e renderizza diario
+(()=>{
+  const d=new Date();
+  document.getElementById('diary-date').value=d.toISOString().slice(0,10);
+  renderDiary();
+})();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PWA — Service Worker
+// ══════════════════════════════════════════════════════════════════════════════
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
 }
 </script>
 </body>

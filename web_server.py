@@ -998,6 +998,121 @@ async def api_chat(body: ChatBody):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+# ─── Screener ─────────────────────────────────────────────────────────────────
+
+_SCREENER_UNIVERSES: dict[str, list[str]] = {
+    "us_large": [
+        "AAPL","MSFT","NVDA","GOOGL","AMZN","META","TSLA","AVGO","AMD","INTC",
+        "ORCL","CRM","NFLX","QCOM","TXN","MU","JPM","BAC","GS","V","MA","WFC",
+        "BLK","MS","JNJ","UNH","LLY","ABBV","PFE","MRK","XOM","CVX","BA","CAT",
+        "GE","HON","WMT","HD","COST","PG","NKE","DIS","MCD","SBUX",
+    ],
+    "us_tech": [
+        "AAPL","MSFT","NVDA","GOOGL","META","TSLA","AVGO","AMD","INTC","ORCL",
+        "CRM","NFLX","QCOM","TXN","MU","SHOP","SNOW","NET","PLTR","UBER","ABNB",
+        "DDOG","ZS","CRWD","HOOD","SOFI","ARM","SMCI","DELL","HPQ",
+    ],
+    "europa": [
+        "ASML","SAP","STM","ERIC","AZN","SNY","NVS","SHEL","BP","EQNR",
+        "UBS","ING","BBVA","SAN","TTE","RIO","GSK","VOD",
+    ],
+    "asia": [
+        "TSM","TM","SONY","BIDU","JD","BABA","INFY","WIT","HDB",
+        "SE","MELI","NIO","LI","XPEV","BEKE",
+    ],
+}
+_SCREENER_TTL = 120  # 2 min
+
+
+class ScreenerBody(BaseModel):
+    universe: str = "us_large"
+    custom_tickers: Optional[List[str]] = []
+    min_change: Optional[float] = None
+    max_change: Optional[float] = None
+    min_price: Optional[float] = None
+    max_price: Optional[float] = None
+    direction: str = "all"  # all | up | down
+    mcap: str = "all"       # all | mega | large | mid | small
+
+
+@app.post("/api/screener")
+async def api_screener(body: ScreenerBody):
+    if body.universe == "custom" and body.custom_tickers:
+        tickers = [t.upper() for t in body.custom_tickers[:40]]
+    else:
+        tickers = _SCREENER_UNIVERSES.get(body.universe, _SCREENER_UNIVERSES["us_large"])
+
+    cache_key = f"screener:{body.universe}:{hash(tuple(sorted(tickers)))}"
+    universe_data = _cached(cache_key, _SCREENER_TTL)
+
+    if universe_data is None:
+        def _fetch_one(t: str):
+            import yfinance as yf
+            try:
+                fi = yf.Ticker(t).fast_info
+                price = fi.last_price
+                prev  = fi.regular_market_previous_close
+                if not price or not prev or prev == 0:
+                    return None
+                chg = (price - prev) / prev * 100
+                return {
+                    "ticker": t,
+                    "price": round(float(price), 4),
+                    "chg_pct": round(float(chg), 2),
+                    "mcap": int(fi.market_cap or 0),
+                }
+            except Exception:
+                return None
+
+        tasks = [asyncio.to_thread(_fetch_one, t) for t in tickers]
+        results = await asyncio.gather(*tasks)
+        universe_data = [r for r in results if r]
+        _store(cache_key, universe_data)
+
+    out = list(universe_data)
+
+    if body.direction == "up":
+        out = [x for x in out if x["chg_pct"] > 0]
+    elif body.direction == "down":
+        out = [x for x in out if x["chg_pct"] < 0]
+    if body.min_change is not None:
+        out = [x for x in out if x["chg_pct"] >= body.min_change]
+    if body.max_change is not None:
+        out = [x for x in out if x["chg_pct"] <= body.max_change]
+    if body.min_price is not None:
+        out = [x for x in out if x["price"] >= body.min_price]
+    if body.max_price is not None:
+        out = [x for x in out if x["price"] <= body.max_price]
+    if body.mcap != "all":
+        def _mcap_ok(m: int) -> bool:
+            if body.mcap == "mega":  return m >= 200_000_000_000
+            if body.mcap == "large": return 10_000_000_000 <= m < 200_000_000_000
+            if body.mcap == "mid":   return 2_000_000_000 <= m < 10_000_000_000
+            if body.mcap == "small": return 0 < m < 2_000_000_000
+            return True
+        out = [x for x in out if _mcap_ok(x["mcap"])]
+
+    out.sort(key=lambda x: abs(x["chg_pct"]), reverse=True)
+    return out[:30]
+
+
+# ─── Manifest / SW (PWA) ──────────────────────────────────────────────────────
+
+@app.get("/manifest.json")
+async def pwa_manifest():
+    return FileResponse(str(STATIC / "manifest.json"), media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+async def pwa_sw():
+    return FileResponse(str(STATIC / "sw.js"), media_type="application/javascript")
+
+
+@app.get("/icon.svg")
+async def pwa_icon():
+    return FileResponse(str(STATIC / "icon.svg"), media_type="image/svg+xml")
+
+
 # ─── Health ───────────────────────────────────────────────────────────────────
 
 @app.get("/health")
