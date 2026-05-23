@@ -441,6 +441,9 @@ footer{
 
   <div class="grid" id="grid">
     <!-- skeleton -->
+    <div id="loading-msg" style="grid-column:1/-1;text-align:center;padding:32px 0 16px;color:var(--text-dim);font-size:.85rem;animation:shimmer 1.8s infinite">
+      ⏳ &nbsp;Scansione mercato in corso — prima richiesta ~30 sec…
+    </div>
     <div class="skel-card"><div class="skel-line" style="height:14px;width:40%"></div><div class="skel-line" style="height:36px;width:55%"></div><div class="skel-line" style="height:12px;width:100%"></div><div class="skel-line" style="height:12px;width:75%"></div></div>
     <div class="skel-card"><div class="skel-line" style="height:14px;width:40%"></div><div class="skel-line" style="height:36px;width:55%"></div><div class="skel-line" style="height:12px;width:100%"></div><div class="skel-line" style="height:12px;width:75%"></div></div>
     <div class="skel-card"><div class="skel-line" style="height:14px;width:40%"></div><div class="skel-line" style="height:36px;width:55%"></div><div class="skel-line" style="height:12px;width:100%"></div><div class="skel-line" style="height:12px;width:75%"></div></div>
@@ -705,7 +708,8 @@ async function openModal(stock) {
       `<div class="detail-cell"><div class="detail-cell-label">${l}</div><div class="detail-cell-val">${v}</div></div>`
     ).join('');
 
-    document.getElementById('m-verdict').textContent = full.signals?.join(' · ') ?? '';
+    const sigText = full.signals?.join(' · ');
+    document.getElementById('m-verdict').textContent = sigText ?? '';
 
     // Chart
     if (activeChart) { activeChart.destroy(); activeChart = null; }
@@ -823,8 +827,9 @@ async function loadData() {
           if (!card) return;
           card.querySelector('.card-name').textContent = full.name ?? stock.ticker;
           const vEl = card.querySelector('.verdict');
-          if (vEl && full.verdict) {
-            vEl.textContent = '🎯 ' + full.verdict;
+          const sig = full.signals?.slice(0, 2).join(' · ');
+          if (vEl && sig) {
+            vEl.textContent = '🔍 ' + sig;
             vEl.classList.add('show');
           }
           // Aggiorna chips con notizie/earnings se non presenti
