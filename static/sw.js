@@ -1,9 +1,9 @@
-const CACHE = 'masker-v1';
-const STATIC_ASSETS = ['/', '/manifest.json', '/icon.svg'];
+const CACHE = 'masker-v2';
+const IMMUTABLE = ['/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(STATIC_ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE).then(c => c.addAll(IMMUTABLE)).then(() => self.skipWaiting())
   );
 });
 
@@ -17,12 +17,24 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  // API calls: network-first, no cache fallback
+
+  // API: network-first, nessuna cache
   if (url.pathname.startsWith('/api/')) {
-    e.respondWith(fetch(e.request).catch(() => new Response('{"error":"offline"}', {headers:{'Content-Type':'application/json'}})));
+    e.respondWith(fetch(e.request).catch(() =>
+      new Response('{"error":"offline"}', { headers: { 'Content-Type': 'application/json' } })
+    ));
     return;
   }
-  // Static assets: cache-first
+
+  // HTML (index.html, /): network-first — così i deploy si vedono subito
+  if (e.request.headers.get('accept')?.includes('text/html') || url.pathname === '/') {
+    e.respondWith(
+      fetch(e.request).catch(() => caches.match('/'))
+    );
+    return;
+  }
+
+  // Risorse statiche immutabili (icon, manifest): cache-first
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
