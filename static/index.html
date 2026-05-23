@@ -330,38 +330,6 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .port-del-btn:hover{background:rgba(255,107,107,.1)}
 
 /* ── Disclaimer ── */
-.disc-overlay{
-  position:fixed;inset:0;background:rgba(6,6,26,.97);
-  backdrop-filter:blur(24px);z-index:2000;
-  display:flex;align-items:center;justify-content:center;padding:16px;
-}
-.disc-box{
-  background:var(--surf);border:1px solid rgba(255,184,108,.35);
-  border-radius:var(--r-xl);max-width:520px;width:100%;
-  padding:34px 32px;box-shadow:0 40px 80px rgba(0,0,0,.7),0 0 50px rgba(255,184,108,.07);
-}
-.disc-icon{font-size:2.8rem;text-align:center;margin-bottom:14px}
-.disc-title{font-size:1.25rem;font-weight:900;text-align:center;color:var(--gold);margin-bottom:18px;letter-spacing:-.025em}
-.disc-body p{font-size:.82rem;color:var(--text-dim);line-height:1.75;margin-bottom:12px}
-.disc-body strong{color:var(--text)}
-.disc-body ul{padding-left:18px;margin-bottom:12px}
-.disc-body li{font-size:.82rem;color:var(--text-dim);line-height:1.75;margin-bottom:4px}
-.disc-check{
-  display:flex;align-items:flex-start;gap:10px;
-  padding:14px;background:rgba(255,184,108,.06);
-  border:1px solid rgba(255,184,108,.18);border-radius:var(--r-md);
-  cursor:pointer;margin:18px 0 20px;font-size:.82rem;color:var(--text);line-height:1.5;
-}
-.disc-check input{width:16px;height:16px;flex-shrink:0;margin-top:2px;accent-color:var(--gold);cursor:pointer}
-.disc-btn{
-  width:100%;padding:13px;border:none;border-radius:var(--r-md);
-  background:linear-gradient(135deg,var(--gold),#E09B50);
-  color:#1a1000;font-family:'Inter',sans-serif;font-size:.9rem;font-weight:800;
-  cursor:pointer;letter-spacing:.01em;transition:opacity .15s;
-}
-.disc-btn:disabled{opacity:.35;cursor:not-allowed}
-.disc-btn:not(:disabled):hover{opacity:.88}
-.disc-legal{font-size:.65rem;color:var(--text-dim);text-align:center;margin-top:12px;line-height:1.6}
 
 /* ── Disclaimer banner (sempre visibile) ── */
 .disc-banner{
@@ -473,7 +441,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .print-header{display:none}
 @media print{
   #bg-canvas,header,.indices-tape,.tab-nav,.controls-bar,.stats-bar,.refresh-pill,.disc-banner,
-  footer,.modal-overlay,.disc-overlay,#history-view,#heatmap-view,#portfolio-view,
+  footer,.modal-overlay,#history-view,#heatmap-view,#portfolio-view,
   #watchlist-view,.auth-widget,.sparkline-wrap,#export-pdf-btn,.verdict,.live-badge{display:none!important}
   body{background:#fff!important;color:#000!important;font-family:Inter,sans-serif}
   .hero{display:none!important}
@@ -619,28 +587,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 </head>
 <body>
 <!-- ── Disclaimer modal (prima visita) ── -->
-<div class="disc-overlay" id="disc-overlay">
-  <div class="disc-box">
-    <div class="disc-icon">⚠️</div>
-    <div class="disc-title">Avviso Legale Importante</div>
-    <div class="disc-body">
-      <p>Questo sito ha <strong>scopo puramente informativo ed educativo</strong> e non è un servizio di consulenza finanziaria.</p>
-      <ul>
-        <li>Le analisi, i punteggi e le valutazioni AI mostrati <strong>non costituiscono consulenza finanziaria</strong> né raccomandazione di investimento personalizzata ai sensi del D.Lgs. 58/1998 (TUF) e della Direttiva MiFID II/UE.</li>
-        <li>I dati di mercato sono forniti da <strong>Yahoo Finance</strong> e potrebbero non essere in tempo reale.</li>
-        <li>Investire in strumenti finanziari comporta <strong>rischi significativi</strong>, inclusa la perdita totale del capitale.</li>
-        <li>Prima di investire, consulta sempre un <strong>consulente finanziario autorizzato Consob</strong>.</li>
-      </ul>
-      <p>Continuando, dichiari di aver letto questo avviso e di usare il sito solo a scopo informativo.</p>
-    </div>
-    <label class="disc-check">
-      <input type="checkbox" id="disc-cb" />
-      Ho letto e capito: questo sito è solo informativo, non è consulenza finanziaria.
-    </label>
-    <button class="disc-btn" id="disc-btn" disabled>Accetta e continua →</button>
-    <div class="disc-legal">Questo avviso viene mostrato una sola volta per sessione.</div>
-  </div>
-</div>
+
 
 <canvas id="bg-canvas"></canvas>
 
@@ -1901,23 +1848,6 @@ document.getElementById('wl-add-btn').addEventListener('click',async()=>{
   renderWatchlist();
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Disclaimer — mostra solo se non già accettato in questa sessione
-// ══════════════════════════════════════════════════════════════════════════════
-(function(){
-  const overlay = document.getElementById('disc-overlay');
-  const cb      = document.getElementById('disc-cb');
-  const btn     = document.getElementById('disc-btn');
-
-  if(sessionStorage.getItem('disc_ok')){
-    overlay.style.display='none';
-  }
-  cb.addEventListener('change', ()=>{ btn.disabled = !cb.checked; });
-  btn.addEventListener('click', ()=>{
-    sessionStorage.setItem('disc_ok','1');
-    overlay.style.display='none';
-  });
-})();
 
 updateMarketStatus();
 loadIndices();
