@@ -176,7 +176,7 @@ async def api_scan(top: int = 10):
     key = f"scan:{top}"
     if (c := _cached(key, _SCAN_TTL)) is not None:
         return c
-    results = await asyncio.to_thread(scan_cheap_stocks, 20.0, top)
+    results = await asyncio.to_thread(scan_cheap_stocks, 40.0, top)
     clean = _clean(results or [])
     _store(key, clean)
     return clean

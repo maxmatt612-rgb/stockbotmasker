@@ -397,7 +397,7 @@ def _sign(v: float) -> str:
 
 # ─── Scanner mercato ─────────────────────────────────────────────────────────
 
-def scan_cheap_stocks(max_price: float = 20.0, top_n: int = 10) -> list:
+def scan_cheap_stocks(max_price: float = 40.0, top_n: int = 10) -> list:
     from config import REVOLUT_UNIVERSE
 
     risultati = []

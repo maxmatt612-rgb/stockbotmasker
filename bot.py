@@ -242,7 +242,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
     await update.message.reply_text(
         "📖 <b>Comandi disponibili:</b>\n\n"
-        "📊 /analisi — top 10 azioni sotto $20 adesso\n"
+        "📊 /analisi — top 10 azioni sotto €35 (~$40) adesso\n"
         "📈 /apr — analisi completa di una azione\n"
         "🎯 /trading — day trading: compra e vendi subito\n"
         "⚔️ /confronto — confronta due azioni con AI\n"
@@ -258,10 +258,10 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_analisi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text(
-        "🔍 <b>Scansiono ~250 azioni Revolut sotto i $20...</b>\n<i>Con notizie + AI — circa 60 secondi</i>",
+        "🔍 <b>Scansiono ~400 azioni Revolut sotto €35...</b>\n<i>Con notizie + AI — circa 60 secondi</i>",
         parse_mode=ParseMode.HTML,
     )
-    risultati = await asyncio.to_thread(scan_cheap_stocks, 20.0, 10)
+    risultati = await asyncio.to_thread(scan_cheap_stocks, 40.0, 10)
 
     if not risultati:
         await msg.edit_text("❌ Nessun dato disponibile. Riprova tra qualche minuto.")
@@ -304,7 +304,7 @@ async def cmd_analisi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     body = SEP.join(cards)
     full_msg = (
-        f"📊 <b>Top {total} azioni sotto $20 — adesso</b>\n\n"
+        f"📊 <b>Top {total} azioni sotto €35 (~$40) — adesso</b>\n\n"
         + body
         + "\n\n<i>Dati: Yahoo Finance | AI: Groq Llama 70B</i>"
     )
@@ -914,7 +914,7 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
 
     # 1 ── Scanner top 10
     logger.info("Report mattutino: scansione in corso...")
-    risultati = await asyncio.to_thread(scan_cheap_stocks, 20.0, 10)
+    risultati = await asyncio.to_thread(scan_cheap_stocks, 40.0, 10)
     if not risultati:
         for uid in all_uids:
             try:
@@ -954,7 +954,7 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
     ]
     text = (
         f"📊 <b>Analisi mattutina — {date_str}</b>\n"
-        f"<i>Top {len(enriched)} azioni sotto $20</i>\n\n"
+        f"<i>Top {len(enriched)} azioni sotto €35 (~$40)</i>\n\n"
         + SEP.join(cards)
         + "\n\n<i>Dati: Yahoo Finance | AI: Groq Llama 70B</i>"
     )
@@ -985,7 +985,7 @@ async def job_evening_report(context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Usa lo scanner per il recap serale (stesso metodo del mattino)
-    scanner_raw = await asyncio.to_thread(scan_cheap_stocks, 20.0, 10)
+    scanner_raw = await asyncio.to_thread(scan_cheap_stocks, 40.0, 10)
     if not scanner_raw:
         return
 
@@ -1028,7 +1028,7 @@ async def job_weekly_report(context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Usa lo scanner per il recap settimanale
-    scanner_raw = await asyncio.to_thread(scan_cheap_stocks, 20.0, 10)
+    scanner_raw = await asyncio.to_thread(scan_cheap_stocks, 40.0, 10)
     if not scanner_raw:
         return
 
