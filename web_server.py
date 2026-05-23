@@ -1,5 +1,6 @@
 """Web dashboard per Stock Bot — FastAPI server."""
 import asyncio
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -20,16 +21,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ─── Groq AI client ───────────────────────────────────────────────────────────
+_GROQ_KEY = os.getenv("GROQ_API_KEY")
+try:
+    from groq import AsyncGroq
+    groq_client = AsyncGroq(api_key=_GROQ_KEY) if _GROQ_KEY else None
+except Exception:
+    groq_client = None
+
 # ─── Cache semplice in memoria ────────────────────────────────────────────────
-_cache: dict[str, dict] = {}   # key → {"data": ..., "ts": float}
-_SCAN_TTL   = 300   # 5 minuti per lo scanner
-_STOCK_TTL  = 180   # 3 minuti per analisi singola
+_cache: dict[str, dict] = {}
+_SCAN_TTL   = 300    # 5 min — scanner
+_STOCK_TTL  = 180    # 3 min — analisi singola
+_AI_TTL     = 600    # 10 min — AI (chiamata Groq costosa)
 
 
 def _cached(key: str, ttl: int):
-    entry = _cache.get(key)
-    if entry and time.monotonic() - entry["ts"] < ttl:
-        return entry["data"]
+    e = _cache.get(key)
+    if e and time.monotonic() - e["ts"] < ttl:
+        return e["data"]
     return None
 
 
@@ -39,25 +49,18 @@ def _store(key: str, data: Any):
 
 # ─── Serializzazione sicura (numpy → Python native) ──────────────────────────
 def _clean(obj: Any) -> Any:
-    """Converte ricorsivamente numpy/pandas types in tipi JSON-serializzabili."""
     if isinstance(obj, dict):
         return {k: _clean(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
         return [_clean(v) for v in obj]
-    # numpy integer
     try:
         import numpy as np
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.floating):
-            return None if (obj != obj) else float(obj)   # NaN → None
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        if isinstance(obj, np.bool_):
-            return bool(obj)
+        if isinstance(obj, np.integer):  return int(obj)
+        if isinstance(obj, np.floating): return None if (obj != obj) else float(obj)
+        if isinstance(obj, np.ndarray):  return obj.tolist()
+        if isinstance(obj, np.bool_):    return bool(obj)
     except ImportError:
         pass
-    # Python float NaN/Inf → None
     if isinstance(obj, float):
         import math
         if math.isnan(obj) or math.isinf(obj):
@@ -69,12 +72,9 @@ def _clean(obj: Any) -> Any:
 
 @app.get("/api/scan")
 async def api_scan(top: int = 10):
-    """Scanner top N azioni sotto $20 con cache 5 min."""
     key = f"scan:{top}"
-    cached = _cached(key, _SCAN_TTL)
-    if cached is not None:
-        return cached
-
+    if (c := _cached(key, _SCAN_TTL)) is not None:
+        return c
     results = await asyncio.to_thread(scan_cheap_stocks, 20.0, top)
     clean = _clean(results or [])
     _store(key, clean)
@@ -83,13 +83,10 @@ async def api_scan(top: int = 10):
 
 @app.get("/api/stock/{ticker}")
 async def api_stock(ticker: str):
-    """Analisi arricchita singolo ticker con cache 3 min."""
     t = ticker.upper()
     key = f"stock:{t}"
-    cached = _cached(key, _STOCK_TTL)
-    if cached is not None:
-        return cached
-
+    if (c := _cached(key, _STOCK_TTL)) is not None:
+        return c
     data = await asyncio.to_thread(get_enriched_analysis, t)
     if not data:
         return JSONResponse({"error": "ticker non trovato"}, status_code=404)
@@ -100,12 +97,10 @@ async def api_stock(ticker: str):
 
 @app.get("/api/stock/{ticker}/history")
 async def api_history(ticker: str, period: str = "1mo"):
-    """Storico prezzi per grafico con cache 3 min."""
     t = ticker.upper()
     key = f"history:{t}:{period}"
-    cached = _cached(key, _STOCK_TTL)
-    if cached is not None:
-        return cached
+    if (c := _cached(key, _STOCK_TTL)) is not None:
+        return c
 
     def _get():
         import yfinance as yf
@@ -115,12 +110,85 @@ async def api_history(ticker: str, period: str = "1mo"):
         return [
             {"date": str(idx.date()), "close": round(float(c), 4)}
             for idx, c in zip(h.index, h["Close"])
-            if c == c  # skip NaN
+            if c == c
         ]
 
     result = await asyncio.to_thread(_get)
     _store(key, result)
     return result
+
+
+@app.get("/api/stock/{ticker}/ai")
+async def api_ai(ticker: str):
+    """Analisi AI: perché investire, rischi, conclusione SI/NO."""
+    t = ticker.upper()
+    key = f"ai:{t}"
+    if (c := _cached(key, _AI_TTL)) is not None:
+        return c
+
+    if not groq_client:
+        return JSONResponse({"error": "GROQ_API_KEY non configurata"}, status_code=503)
+
+    data = await asyncio.to_thread(get_enriched_analysis, t)
+    if not data:
+        return JSONResponse({"error": "ticker non trovato"}, status_code=404)
+    data = _clean(data)
+
+    prompt = (
+        f"Analisi dell'azione {data['ticker']} ({data.get('name', data['ticker'])}) per un investitore retail:\n"
+        f"- Prezzo: ${data['current_price']:.2f}, oggi {data['day_change_pct']:+.1f}%\n"
+        f"- RSI: {data.get('rsi', 50):.0f}, Rischio: {data.get('risk_level', 'N/D')}, "
+        f"Volatilità: {data.get('volatility', 0):.0f}%\n"
+        f"- Settimana: {(data.get('week_return') or 0):+.1f}%, "
+        f"Mese: {(data.get('month_return') or 0):+.1f}%\n"
+        f"- Notizie: {data.get('news_sentiment_label', 'Neutre')}\n"
+        f"- Prossimi earnings: {data.get('next_earnings_str', 'N/D')}\n\n"
+        "Rispondi SOLO con questo formato esatto (italiano, conciso, max 2 righe per sezione):\n"
+        "PERCHE_SI: [2-3 motivi concreti per cui potrebbe valere la pena investire]\n"
+        "RISCHI: [2-3 rischi specifici e reali da considerare]\n"
+        "CONCLUSIONE: [1-2 frasi dirette — concludi con consiglio chiaro]\n"
+        "VERDICT: SI oppure NO oppure NEUTRO"
+    )
+
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=350,
+            messages=[
+                {"role": "system", "content": "Sei un analista finanziario. Rispondi in italiano, diretto e sintetico. Non dare mai consigli finanziari definitivi."},
+                {"role": "user",   "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+
+        perche_si = rischi = conclusione = verdict = ""
+        for line in text.split("\n"):
+            l = line.strip()
+            if l.upper().startswith("PERCHE_SI:"):   perche_si  = l[10:].strip()
+            elif l.upper().startswith("RISCHI:"):    rischi     = l[7:].strip()
+            elif l.upper().startswith("CONCLUSIONE:"): conclusione = l[12:].strip()
+            elif l.upper().startswith("VERDICT:"):   verdict    = l[8:].strip().upper()
+
+        if not verdict:
+            low = conclusione.lower()
+            if any(w in low for w in ["sì", "si ", "consiglio", "opportunità", "interessante", "acquistare"]):
+                verdict = "SI"
+            elif any(w in low for w in ["no ", "evitare", "non consiglio", "troppo rischios"]):
+                verdict = "NO"
+            else:
+                verdict = "NEUTRO"
+
+        result = {
+            "perche_si":  perche_si  or "Dati insufficienti.",
+            "rischi":     rischi     or "Dati insufficienti.",
+            "conclusione": conclusione or text,
+            "verdict":    verdict if verdict in ("SI", "NO", "NEUTRO") else "NEUTRO",
+        }
+        _store(key, result)
+        return result
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.get("/health")

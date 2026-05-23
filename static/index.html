@@ -370,6 +370,46 @@ header{
   padding-left:12px;
 }
 
+/* ── AI section ── */
+.ai-section{margin-top:20px;display:flex;flex-direction:column;gap:10px}
+
+.ai-card{
+  border-radius:var(--r-md);
+  padding:14px 16px;
+  border-left:3px solid;
+}
+
+.ai-card.ai-green{background:rgba(114,239,160,.07);border-color:var(--green)}
+.ai-card.ai-red{background:rgba(255,107,107,.07);border-color:var(--red)}
+.ai-card.ai-si{background:rgba(114,239,160,.12);border-color:var(--green)}
+.ai-card.ai-no{background:rgba(255,107,107,.12);border-color:var(--red)}
+.ai-card.ai-neutro{background:rgba(255,184,108,.07);border-color:var(--gold)}
+
+.ai-card-title{
+  font-size:.68rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.08em;
+  margin-bottom:7px;
+}
+
+.ai-card-text{font-size:.83rem;line-height:1.62;color:var(--text-dim)}
+
+.verdict-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  margin-top:10px;
+  padding:5px 14px;border-radius:100px;
+  font-size:.8rem;font-weight:800;letter-spacing:.04em;
+}
+
+.badge-si{background:rgba(114,239,160,.2);color:var(--green)}
+.badge-no{background:rgba(255,107,107,.2);color:var(--red)}
+.badge-neutro{background:rgba(255,184,108,.15);color:var(--gold)}
+
+.ai-loading{
+  text-align:center;padding:20px;
+  font-size:.82rem;color:var(--text-dim);
+  animation:shimmer 1.8s infinite;
+}
+
 /* ── Refresh pill ── */
 .refresh-pill{
   position:fixed;bottom:20px;right:20px;
@@ -472,6 +512,26 @@ footer{
     </div>
     <div class="detail-grid" id="m-details"></div>
     <div class="modal-verdict" id="m-verdict"></div>
+
+    <!-- AI Analysis -->
+    <div class="ai-section" id="m-ai-section">
+      <div class="ai-loading" id="m-ai-loading">🤖 &nbsp;Analisi AI in corso...</div>
+      <div id="m-ai-content" style="display:none;flex-direction:column;gap:10px">
+        <div class="ai-card ai-green" id="m-ai-perche">
+          <div class="ai-card-title" style="color:var(--green)">✅ Perché investirci</div>
+          <div class="ai-card-text" id="m-ai-perche-text"></div>
+        </div>
+        <div class="ai-card ai-red" id="m-ai-rischi">
+          <div class="ai-card-title" style="color:var(--red)">⚠️ Rischi</div>
+          <div class="ai-card-text" id="m-ai-rischi-text"></div>
+        </div>
+        <div class="ai-card" id="m-ai-conclusione">
+          <div class="ai-card-title" id="m-ai-conc-title">🎯 Conclusione</div>
+          <div class="ai-card-text" id="m-ai-conc-text"></div>
+          <div id="m-ai-badge"></div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -668,6 +728,11 @@ let activeChart = null;
 
 async function openModal(stock) {
   const overlay = document.getElementById('modal-overlay');
+
+  // Reset AI section
+  document.getElementById('m-ai-loading').style.display = 'block';
+  document.getElementById('m-ai-content').style.display = 'none';
+
   overlay.classList.add('open');
 
   // Prima mostra dati di base dal card
@@ -769,6 +834,38 @@ async function openModal(stock) {
 
   } catch (e) {
     console.error('Errore modal:', e);
+  }
+
+  // ── Analisi AI (separata, non blocca il modal) ──────────────────────────
+  try {
+    const ai = await fetch(`/api/stock/${stock.ticker}/ai`).then(r => r.ok ? r.json() : null);
+    if (ai && !ai.error) {
+      document.getElementById('m-ai-perche-text').textContent = ai.perche_si  ?? '';
+      document.getElementById('m-ai-rischi-text').textContent = ai.rischi     ?? '';
+      document.getElementById('m-ai-conc-text').textContent   = ai.conclusione ?? '';
+
+      const concCard = document.getElementById('m-ai-conclusione');
+      const badge    = document.getElementById('m-ai-badge');
+      const v = (ai.verdict ?? 'NEUTRO').toUpperCase();
+      if (v === 'SI') {
+        concCard.className = 'ai-card ai-si';
+        badge.innerHTML = '<span class="verdict-badge badge-si">✅ SÌ — Vale la pena</span>';
+      } else if (v === 'NO') {
+        concCard.className = 'ai-card ai-no';
+        badge.innerHTML = '<span class="verdict-badge badge-no">❌ NO — Da evitare ora</span>';
+      } else {
+        concCard.className = 'ai-card ai-neutro';
+        badge.innerHTML = '<span class="verdict-badge badge-neutro">⚖️ NEUTRO — Valuta con cautela</span>';
+      }
+
+      document.getElementById('m-ai-loading').style.display  = 'none';
+      document.getElementById('m-ai-content').style.display  = 'flex';
+    } else {
+      document.getElementById('m-ai-loading').textContent = '⚠️ AI non disponibile.';
+    }
+  } catch (e) {
+    document.getElementById('m-ai-loading').textContent = '⚠️ Errore analisi AI.';
+    console.error('Errore AI:', e);
   }
 }
 
