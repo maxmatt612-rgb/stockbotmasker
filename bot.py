@@ -877,7 +877,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode=ParseMode.HTML, reply_markup=keyboard,
         )
     elif data == "help_analisi":
-        await query.message.reply_text("📊 <b>/analisi</b>\n\nScansiona ~250 azioni Revolut sotto i $20 e mostra le top 10 migliori in questo momento.\n\nScrivi solo: /analisi", parse_mode=ParseMode.HTML)
+        await query.message.reply_text("📊 <b>/analisi</b>\n\nScansiona ~400 azioni Revolut sotto €35 (~$40) e mostra le top 10 migliori in questo momento.\n\nScrivi solo: /analisi", parse_mode=ParseMode.HTML)
     elif data == "help_apr":
         await query.message.reply_text("📈 <b>/apr TICKER</b>\n\nAnalisi completa: prezzo, rendimento, rischio, RSI, medie mobili, notizie e valutazione.\n\nEsempio: /apr PLTR", parse_mode=ParseMode.HTML)
     elif data == "help_trading":
