@@ -524,6 +524,55 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .lb-name{font-size:.72rem;color:var(--text-dim);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lb-pct{font-size:.82rem;font-weight:700;min-width:68px;text-align:right}
 
+/* ── Simulatore ── */
+.sim-fab{position:fixed;bottom:20px;left:20px;z-index:200;width:46px;height:46px;border-radius:50%;background:var(--surf);border:1px solid var(--border);color:var(--primary);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;backdrop-filter:blur(12px)}
+.sim-fab:hover{border-color:var(--border-hi);transform:scale(1.08)}
+.sim-panel{position:fixed;bottom:76px;left:20px;z-index:500;width:340px;background:var(--surf);border:1px solid var(--border);border-radius:var(--r-xl);padding:20px;box-shadow:0 24px 64px rgba(0,0,0,.6);display:none;backdrop-filter:blur(20px)}
+.sim-panel.open{display:block}
+.sim-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.sim-title{font-size:.88rem;font-weight:800}
+.sim-close{background:none;border:none;color:var(--text-dim);font-size:.95rem;cursor:pointer}
+.sim-label{font-size:.64rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px}
+.sim-input{width:100%;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:8px 11px;color:var(--text);font-family:'Inter',sans-serif;font-size:.83rem;outline:none;transition:border-color .2s;margin-bottom:12px}
+.sim-input:focus{border-color:var(--border-hi)}
+.sim-period-group{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
+.sim-period-btn{background:var(--surf-v);border:1px solid var(--border);border-radius:100px;padding:3px 9px;font-size:.67rem;color:var(--text-dim);cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s}
+.sim-period-btn.active{border-color:var(--primary);color:var(--primary);background:var(--primary-dim)}
+.sim-run-btn{width:100%;padding:9px;background:var(--primary-dim);border:1px solid var(--primary);border-radius:var(--r-md);color:var(--primary);font-family:'Inter',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;transition:all .15s}
+.sim-run-btn:hover{background:rgba(196,166,255,.25)}
+.sim-result{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.sim-result-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;font-size:.78rem}
+.sim-result-label{color:var(--text-dim)}
+.sim-result-val{font-weight:700}
+.sim-result-big{font-size:1.05rem;font-weight:900}
+
+/* ── Confronto titoli ── */
+.cmp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(14px);z-index:1800;display:none;align-items:center;justify-content:center;padding:20px}
+.cmp-overlay.open{display:flex}
+.cmp-box{background:var(--surf);border:1px solid var(--border);border-radius:var(--r-xl);padding:24px;width:100%;max-width:880px;max-height:90vh;overflow-y:auto}
+.cmp-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.cmp-title{font-size:.95rem;font-weight:800}
+.cmp-close{background:none;border:1px solid var(--border);border-radius:50%;color:var(--text-dim);font-size:.8rem;cursor:pointer;width:30px;height:30px;display:flex;align-items:center;justify-content:center}
+.cmp-add-row{display:flex;gap:8px;margin-bottom:10px}
+.cmp-ticker-input{flex:1;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:8px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:.83rem;outline:none;transition:border-color .2s}
+.cmp-ticker-input:focus{border-color:var(--border-hi)}
+.cmp-add-btn{background:var(--primary-dim);border:1px solid var(--primary);border-radius:var(--r-md);padding:8px 14px;color:var(--primary);font-family:'Inter',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap}
+.cmp-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;min-height:28px}
+.cmp-chip{display:flex;align-items:center;gap:5px;background:var(--surf-v);border:1px solid var(--border);border-radius:100px;padding:3px 10px;font-size:.72rem;font-weight:700}
+.cmp-chip-del{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:.75rem;line-height:1}
+.cmp-period-row{display:flex;gap:5px;margin-bottom:14px}
+.cmp-period-btn{background:var(--surf-v);border:1px solid var(--border);border-radius:100px;padding:4px 10px;font-size:.68rem;color:var(--text-dim);cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s}
+.cmp-period-btn.active{border-color:var(--primary);color:var(--primary);background:var(--primary-dim)}
+.cmp-chart-wrap{height:300px;background:var(--surf-v);border-radius:var(--r-md);margin-bottom:14px;overflow:hidden}
+.cmp-legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.cmp-legend-item{display:flex;align-items:center;gap:5px;font-size:.74rem;font-weight:600}
+.cmp-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.cmp-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.cmp-stat-card{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:12px}
+.cmp-stat-ticker{font-size:.72rem;font-weight:800;margin-bottom:4px}
+.cmp-stat-val{font-size:1.05rem;font-weight:900}
+.cmp-stat-sub{font-size:.67rem;color:var(--text-dim);margin-top:3px}
+
 
 /* ── Responsive ── */
 @media(max-width:640px){
@@ -760,6 +809,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 <!-- ── Controls ── -->
 <div class="controls-bar">
   <div class="ctrl-div"></div>
+  <button class="ctrl-btn" onclick="openComparison()">📊 Confronta</button>
   <button class="ctrl-btn" id="export-pdf-btn" title="Esporta analisi corrente in PDF" onclick="exportPDF()">📄 PDF</button>
 </div>
 
@@ -850,6 +900,56 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
         <div class="forecast-loading">🔮 &nbsp;Calcolo in corso…</div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Simulatore flottante -->
+<button class="sim-fab" id="sim-fab" onclick="toggleSimulator()" title="Simulatore investimento">🧮</button>
+<div class="sim-panel" id="sim-panel">
+  <div class="sim-hd">
+    <span class="sim-title">🧮 Simulatore Investimento</span>
+    <button class="sim-close" onclick="toggleSimulator()">✕</button>
+  </div>
+  <div class="sim-label">Ticker</div>
+  <input class="sim-input" id="sim-ticker" type="text" placeholder="es. NVDA" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter')runSimulator()"/>
+  <div class="sim-label">Importo investito ($)</div>
+  <input class="sim-input" id="sim-amount" type="number" min="1" placeholder="1000" value="1000"/>
+  <div class="sim-label">Periodo</div>
+  <div class="sim-period-group">
+    <button class="sim-period-btn" data-p="3mo" onclick="_simSetPeriod('3mo')">3M</button>
+    <button class="sim-period-btn" data-p="6mo" onclick="_simSetPeriod('6mo')">6M</button>
+    <button class="sim-period-btn active" data-p="1y" onclick="_simSetPeriod('1y')">1A</button>
+    <button class="sim-period-btn" data-p="3y" onclick="_simSetPeriod('3y')">3A</button>
+    <button class="sim-period-btn" data-p="5y" onclick="_simSetPeriod('5y')">5A</button>
+  </div>
+  <button class="sim-run-btn" onclick="runSimulator()">▶ Calcola</button>
+  <div id="sim-result"></div>
+</div>
+
+<!-- Confronto titoli -->
+<div class="cmp-overlay" id="cmp-overlay" onclick="if(event.target===this)closeComparison()">
+  <div class="cmp-box">
+    <div class="cmp-hd">
+      <span class="cmp-title">📊 Confronto Titoli</span>
+      <button class="cmp-close" onclick="closeComparison()">✕</button>
+    </div>
+    <div class="cmp-add-row">
+      <input class="cmp-ticker-input" id="cmp-ticker-input" type="text" placeholder="Aggiungi ticker (es. AAPL)..." autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter')_cmpAddTicker()" maxlength="10"/>
+      <button class="cmp-add-btn" onclick="_cmpAddTicker()">+ Aggiungi</button>
+    </div>
+    <div class="cmp-chips" id="cmp-chips"></div>
+    <div class="cmp-period-row">
+      <button class="cmp-period-btn" data-p="3mo" onclick="_cmpSetPeriod('3mo')">3M</button>
+      <button class="cmp-period-btn" data-p="6mo" onclick="_cmpSetPeriod('6mo')">6M</button>
+      <button class="cmp-period-btn active" data-p="1y" onclick="_cmpSetPeriod('1y')">1A</button>
+      <button class="cmp-period-btn" data-p="3y" onclick="_cmpSetPeriod('3y')">3A</button>
+      <button class="cmp-period-btn" data-p="5y" onclick="_cmpSetPeriod('5y')">5A</button>
+    </div>
+    <div class="cmp-chart-wrap" id="cmp-chart-container">
+      <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:.85rem">Aggiungi ticker per confrontare</div>
+    </div>
+    <div class="cmp-legend" id="cmp-legend"></div>
+    <div class="cmp-stats" id="cmp-stats"></div>
   </div>
 </div>
 
@@ -1857,6 +1957,112 @@ async function loadHistoryDay(date) {
   } catch(e) {
     hgrid.innerHTML = '<div class="history-empty"><span class="icon">❌</span>Errore nel caricamento.</div>';
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Simulatore investimento
+// ══════════════════════════════════════════════════════════════════════════════
+let _simPeriod='1y';
+function toggleSimulator(){document.getElementById('sim-panel').classList.toggle('open');}
+function _simSetPeriod(p){
+  _simPeriod=p;
+  document.querySelectorAll('.sim-period-btn').forEach(b=>b.classList.toggle('active',b.dataset.p===p));
+}
+async function runSimulator(){
+  const ticker=(document.getElementById('sim-ticker').value.trim().toUpperCase()||'').replace(/[^A-Z0-9.]/g,'');
+  const amount=parseFloat(document.getElementById('sim-amount').value)||1000;
+  const resEl=document.getElementById('sim-result');
+  if(!ticker){resEl.innerHTML='<div style="color:var(--red);font-size:.78rem;text-align:center;padding:8px">Inserisci un ticker</div>';return;}
+  resEl.innerHTML='<div style="text-align:center;padding:12px;color:var(--text-dim);font-size:.8rem">⏳ Calcolo in corso…</div>';
+  try{
+    const hist=await fetch(`/api/stock/${ticker}/history?period=${_simPeriod}&interval=1d`).then(r=>r.ok?r.json():null);
+    if(!hist||!hist.length){resEl.innerHTML='<div style="color:var(--red);font-size:.78rem;text-align:center;padding:8px">Dati non disponibili.</div>';return;}
+    const startP=hist[0].close, endP=hist[hist.length-1].close;
+    const shares=amount/startP, endVal=shares*endP;
+    const pl=endVal-amount, plPct=pl/amount*100;
+    const plCol=pl>=0?'var(--green)':'var(--red)';
+    const sym=_fxSym, r=_fxRate;
+    resEl.innerHTML=`<div class="sim-result">
+      <div class="sim-result-row"><span class="sim-result-label">Investimento</span><span class="sim-result-val">${sym}${(amount*r).toFixed(2)}</span></div>
+      <div class="sim-result-row"><span class="sim-result-label">Prezzo inizio</span><span class="sim-result-val">${fmtP(startP)}</span></div>
+      <div class="sim-result-row"><span class="sim-result-label">Prezzo attuale</span><span class="sim-result-val">${fmtP(endP)}</span></div>
+      <div class="sim-result-row"><span class="sim-result-label">Azioni acquistate</span><span class="sim-result-val">${shares.toFixed(4)}</span></div>
+      <div class="sim-result-row" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <span class="sim-result-label">Valore oggi</span>
+        <span class="sim-result-val sim-result-big">${sym}${(endVal*r).toFixed(2)}</span>
+      </div>
+      <div class="sim-result-row">
+        <span class="sim-result-label">Guadagno / Perdita</span>
+        <span class="sim-result-val" style="color:${plCol}">${pl>=0?'+':''}${sym}${(Math.abs(pl)*r).toFixed(2)} (${pl>=0?'+':''}${plPct.toFixed(2)}%)</span>
+      </div>
+    </div>`;
+  }catch(e){resEl.innerHTML='<div style="color:var(--red);font-size:.78rem;text-align:center;padding:8px">Errore nel calcolo.</div>';}
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Confronto titoli
+// ══════════════════════════════════════════════════════════════════════════════
+const _CMP_COLORS=['#C4A6FF','#80FFDB','#FFB86C','#FF6B6B'];
+let _cmpTickers=[], _cmpPeriod='1y', _cmpLwChart=null;
+
+function openComparison(){document.getElementById('cmp-overlay').classList.add('open');}
+function closeComparison(){document.getElementById('cmp-overlay').classList.remove('open');}
+
+function _cmpAddTicker(){
+  const input=document.getElementById('cmp-ticker-input');
+  const t=input.value.trim().toUpperCase().replace(/[^A-Z0-9.]/g,'');
+  if(!t||_cmpTickers.includes(t)||_cmpTickers.length>=4) return;
+  _cmpTickers.push(t); input.value='';
+  _renderCmpChips(); runComparison();
+}
+function _cmpRemoveTicker(t){
+  _cmpTickers=_cmpTickers.filter(x=>x!==t);
+  _renderCmpChips();
+  if(_cmpTickers.length) runComparison(); else _clearCmpChart();
+}
+function _renderCmpChips(){
+  document.getElementById('cmp-chips').innerHTML=_cmpTickers.map((t,i)=>
+    `<div class="cmp-chip"><span style="color:${_CMP_COLORS[i]}">●</span> ${t} <button class="cmp-chip-del" onclick="_cmpRemoveTicker('${t}')">✕</button></div>`
+  ).join('');
+}
+function _cmpSetPeriod(p){
+  _cmpPeriod=p;
+  document.querySelectorAll('.cmp-period-btn').forEach(b=>b.classList.toggle('active',b.dataset.p===p));
+  if(_cmpTickers.length) runComparison();
+}
+async function runComparison(){
+  const chartEl=document.getElementById('cmp-chart-container');
+  const statsEl=document.getElementById('cmp-stats');
+  const legendEl=document.getElementById('cmp-legend');
+  chartEl.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:.85rem">⏳ Caricamento…</div>';
+  statsEl.innerHTML=''; legendEl.innerHTML='';
+  const results=await Promise.all(_cmpTickers.map(async(t,i)=>{
+    try{const hist=await fetch(`/api/stock/${t}/history?period=${_cmpPeriod}&interval=1d`).then(r=>r.ok?r.json():null);return{t,hist,color:_CMP_COLORS[i]};}
+    catch(_){return{t,hist:null,color:_CMP_COLORS[i]};}
+  }));
+  if(_cmpLwChart){try{_cmpLwChart.remove();}catch(_){}}_cmpLwChart=null;
+  chartEl.innerHTML='';
+  _cmpLwChart=LightweightCharts.createChart(chartEl,{..._lwOpts,width:chartEl.clientWidth,height:300});
+  const valid=results.filter(r=>r.hist&&r.hist.length);
+  valid.forEach(({hist,color})=>{
+    const base=hist[0].close;
+    const s=_cmpLwChart.addLineSeries({color,lineWidth:2,priceFormat:{type:'custom',formatter:v=>v.toFixed(1)+'%'}});
+    s.setData(hist.map(h=>({time:h.time,value:(h.close-base)/base*100})));
+  });
+  _cmpLwChart.timeScale().fitContent();
+  legendEl.innerHTML=valid.map(({t,color,hist})=>{
+    const ret=(hist[hist.length-1].close-hist[0].close)/hist[0].close*100;
+    return `<div class="cmp-legend-item"><div class="cmp-legend-dot" style="background:${color}"></div><b>${t}</b>&nbsp;<span style="color:${ret>=0?'var(--green)':'var(--red)'}">${ret>=0?'+':''}${ret.toFixed(2)}%</span></div>`;
+  }).join('');
+  statsEl.innerHTML=valid.map(({t,color,hist})=>{
+    const s=hist[0].close, e=hist[hist.length-1].close, ret=(e-s)/s*100;
+    return `<div class="cmp-stat-card"><div class="cmp-stat-ticker" style="color:${color}">${t}</div><div class="cmp-stat-val" style="color:${ret>=0?'var(--green)':'var(--red)'}">${ret>=0?'+':''}${ret.toFixed(2)}%</div><div class="cmp-stat-sub">${fmtP(s)} → ${fmtP(e)}</div></div>`;
+  }).join('');
+}
+function _clearCmpChart(){
+  document.getElementById('cmp-chart-container').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:.85rem">Aggiungi ticker per confrontare</div>';
+  document.getElementById('cmp-stats').innerHTML='';
+  document.getElementById('cmp-legend').innerHTML='';
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
