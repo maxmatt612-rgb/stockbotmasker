@@ -140,24 +140,31 @@ def _clean(obj: Any) -> Any:
     return obj
 
 
-# ─── Heatmap tickers (USA large-cap + Europa ADR) ────────────────────────────
-_HEATMAP_TICKERS = [
-    # 🇺🇸 Mega Tech
-    "AAPL","MSFT","NVDA","GOOGL","AMZN","META","TSLA","AVGO","AMD","INTC",
-    "ORCL","CRM","NFLX","QCOM","TXN",
-    # 🇺🇸 Finance
-    "JPM","BAC","GS","V","MA","WFC","BLK","MS",
-    # 🇺🇸 Health & Pharma
-    "JNJ","UNH","LLY","ABBV","PFE","MRK","TMO",
-    # 🇺🇸 Consumer & Retail
-    "WMT","HD","COST","PG","NKE","DIS","MCD","SBUX",
-    # 🇺🇸 Energy & Industrial
-    "XOM","CVX","BA","CAT","GE","HON",
-    # 🌍 Europa (ADR su NYSE/NASDAQ)
-    "ASML","SAP","AZN","SHEL","BP","SNY","NVS",
-    # 🌏 Asia / International
-    "TSM","TM","BABA",
-]
+# ─── Ticker per area geografica (Top/Flop 5 per regione) ─────────────────────
+_MOVERS_TICKERS: dict = {
+    "usa": [
+        "AAPL","MSFT","NVDA","GOOGL","AMZN","META","TSLA","AVGO","AMD","INTC",
+        "ORCL","CRM","NFLX","QCOM","TXN","MU",
+        "JPM","BAC","GS","V","MA","WFC","BLK","MS",
+        "JNJ","UNH","LLY","ABBV","PFE","MRK","TMO","ISRG",
+        "WMT","HD","COST","PG","NKE","DIS","MCD","SBUX","TGT",
+        "XOM","CVX","BA","CAT","GE","HON","MP",
+    ],
+    "europa": [
+        "ASML","SAP","STM","ERIC",
+        "AZN","SNY","NVS",
+        "SHEL","BP","EQNR",
+        "UBS","ING","BBVA","SAN",
+    ],
+    "asia": [
+        "TSM","TM","SONY","BIDU","JD","BABA",
+        "INFY","WIT","HDB",
+        "SE","MELI","GRAB",
+    ],
+}
+
+# Flat list per backwards-compat (/api/heatmap rimane funzionante)
+_HEATMAP_TICKERS = [t for tlist in _MOVERS_TICKERS.values() for t in tlist]
 
 # ─── Earnings tickers (~50 major) ─────────────────────────────────────────────
 _EARNINGS_TICKERS = [
@@ -529,6 +536,59 @@ async def api_batch_quotes(tickers: str):
     data = await asyncio.to_thread(_get)
     _store(key, data)
     return data
+
+
+@app.get("/api/market/movers")
+async def api_market_movers():
+    """Top 5 e Bottom 5 per area geografica — cache 60s."""
+    key = "market:movers"
+    if (c := _cached(key, 60)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        import pandas as pd
+
+        all_tickers = list(dict.fromkeys(t for tlist in _MOVERS_TICKERS.values() for t in tlist))
+        try:
+            raw = yf.download(all_tickers, period="2d", interval="1d", auto_adjust=True, progress=False)
+            if raw.empty:
+                return {}
+            close_df = raw["Close"] if isinstance(raw.columns, pd.MultiIndex) else None
+            if close_df is None:
+                return {}
+
+            quotes: dict = {}
+            for t in all_tickers:
+                if t not in close_df.columns:
+                    continue
+                vals = close_df[t].dropna()
+                if len(vals) >= 2:
+                    curr = float(vals.iloc[-1]); prev = float(vals.iloc[-2])
+                    chg  = round((curr - prev) / prev * 100, 2) if prev else 0.0
+                    quotes[t] = {"price": round(curr, 2), "chg": chg}
+                elif len(vals) == 1:
+                    quotes[t] = {"price": round(float(vals.iloc[-1]), 2), "chg": 0.0}
+
+            labels = {"usa": "🇺🇸 USA", "europa": "🌍 Europa", "asia": "🌏 Asia & International"}
+            result: dict = {}
+            for region, tickers in _MOVERS_TICKERS.items():
+                rows = [{"ticker": t, **quotes[t]} for t in tickers if t in quotes]
+                rows.sort(key=lambda x: x["chg"], reverse=True)
+                result[region] = {
+                    "label": labels.get(region, region),
+                    "top":    rows[:5],
+                    "bottom": list(reversed(rows[-5:])) if len(rows) >= 5 else list(reversed(rows)),
+                    "total":  len(rows),
+                }
+            return result
+        except Exception as e:
+            print(f"[movers] {e}")
+            return {}
+
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return _clean(data)
 
 
 @app.get("/api/heatmap")

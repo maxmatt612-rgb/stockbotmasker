@@ -238,7 +238,33 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .pview-title{font-size:1.1rem;font-weight:800;letter-spacing:-.02em;margin-bottom:3px}
 .pview-sub{font-size:.76rem;color:var(--text-dim)}
 
-/* ── Heatmap ── */
+/* ── Mercati Top/Flop (ex Heatmap) ── */
+.movers-wrap{display:flex;flex-direction:column;gap:14px;padding:14px 28px 96px;max-width:1180px;margin:0 auto}
+.movers-region{background:linear-gradient(145deg,rgba(196,166,255,.04),rgba(128,255,219,.02));border:1px solid var(--border);border-radius:var(--r-xl);overflow:hidden}
+.movers-region-hd{display:flex;align-items:center;gap:10px;padding:13px 20px;border-bottom:1px solid var(--border)}
+.movers-region-name{font-size:.9rem;font-weight:800;letter-spacing:-.015em}
+.movers-region-cnt{margin-left:auto;font-size:.68rem;color:var(--text-dim);background:var(--surf-v);padding:2px 9px;border-radius:100px}
+.movers-cols{display:grid;grid-template-columns:1fr 1fr}
+.movers-col{padding:6px 0 10px}
+.movers-col-top{border-right:1px solid var(--border)}
+.movers-col-hd{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;padding:7px 18px 5px;opacity:.85}
+.movers-col-top .movers-col-hd{color:var(--green)}
+.movers-col-bot .movers-col-hd{color:var(--red)}
+.mover-row{display:flex;align-items:center;gap:8px;padding:7px 18px;cursor:pointer;transition:background .12s}
+.mover-row:hover{background:rgba(255,255,255,.03)}
+.mover-rank{font-size:.62rem;color:var(--text-dim);min-width:13px;text-align:right;flex-shrink:0}
+.mover-ticker{font-size:.84rem;font-weight:800;min-width:48px;letter-spacing:-.01em}
+.mover-price{font-size:.71rem;color:var(--text-dim);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mover-chg{font-size:.8rem;font-weight:700;white-space:nowrap}
+.mover-pos{color:var(--green)}.mover-neg{color:var(--red)}
+.movers-loading{text-align:center;padding:40px;color:var(--text-dim);animation:shimmer 1.8s infinite}
+@media(max-width:640px){
+  .movers-wrap{padding-left:14px;padding-right:14px}
+  .movers-cols{grid-template-columns:1fr}
+  .movers-col-top{border-right:none;border-bottom:1px solid var(--border)}
+}
+
+/* ── Heatmap (legacy — non più in uso nel tab) ── */
 .heatmap-grid{
   display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));
   gap:6px;padding:14px 28px 96px;max-width:1180px;margin:0 auto;
@@ -598,7 +624,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   <button class="tab-btn active" data-tab="live">📊 Live</button>
   <button class="tab-btn" data-tab="history">📅 Storico</button>
   <button class="tab-btn" data-tab="earnings">📆 Earnings</button>
-  <button class="tab-btn" data-tab="heatmap">🌡️ Heatmap</button>
+  <button class="tab-btn" data-tab="heatmap">📈 Mercati</button>
   <button class="tab-btn" data-tab="portfolio">💼 Portafoglio</button>
   <button class="tab-btn" data-tab="watchlist">⭐ Watchlist</button>
 </div>
@@ -629,13 +655,15 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   </div>
 </div>
 
-<!-- ── Heatmap view ── -->
+<!-- ── Mercati view (Top/Flop 5 per regione) ── -->
 <div id="heatmap-view" style="display:none">
   <div class="pview-head">
-    <h2 class="pview-title">🌡️ Heatmap Mercato</h2>
-    <span class="pview-sub">~54 titoli — USA large-cap + Europa ADR — variazione giornaliera</span>
+    <h2 class="pview-title">📈 Mercati — Top &amp; Flop</h2>
+    <span class="pview-sub">Migliori e peggiori per area geografica · <span id="movers-ts">—</span></span>
   </div>
-  <div id="heatmap-grid" class="heatmap-grid"></div>
+  <div id="movers-wrap" class="movers-wrap">
+    <div class="movers-loading">⏳ Caricamento dati mercato…</div>
+  </div>
 </div>
 
 <!-- ── Portfolio view ── -->
@@ -1385,26 +1413,78 @@ function exportPDF(){
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Heatmap
+// Mercati — Top & Flop 5 per regione (sostituisce la vecchia heatmap)
 // ══════════════════════════════════════════════════════════════════════════════
-async function loadHeatmap(){
-  const grid=document.getElementById('heatmap-grid');
-  grid.innerHTML='<div class="hm-load">⏳ Caricamento dati mercato…</div>';
+async function loadHeatmap(){   // mantiene il nome per compatibilità con il tab switcher
+  const wrap=document.getElementById('movers-wrap');
+  wrap.innerHTML='<div class="movers-loading">⏳ Caricamento dati mercato…</div>';
   try{
-    const data=await fetch('/api/heatmap').then(r=>r.json());
-    grid.innerHTML='';
+    const data=await fetch('/api/market/movers').then(r=>r.json());
+    if(!data||!Object.keys(data).length){
+      wrap.innerHTML='<div class="movers-loading">⚠️ Dati non disponibili</div>';
+      return;
+    }
+    wrap.innerHTML='';
+    document.getElementById('movers-ts').textContent='aggiornato alle '+now();
     const frag=document.createDocumentFragment();
-    Object.entries(data).sort((a,b)=>b[1].chg-a[1].chg).forEach(([t,d])=>{
-      const c=d.chg, cls=c>2?'hm-pp':c>0?'hm-p':c<-2?'hm-nn':c<0?'hm-n':'hm-0';
-      const cell=document.createElement('div');
-      cell.className=`hm-cell ${cls}`;
-      cell.innerHTML=`<div class="hm-ticker">${t}</div><div class="hm-price">$${d.price.toFixed(2)}</div><div class="hm-chg">${c>=0?'+':''}${c.toFixed(2)}%</div>`;
-      cell.title=`${t} — ${c>=0?'+':''}${c.toFixed(2)}%`;
-      cell.addEventListener('click',()=>openModal({ticker:t,day_change_pct:c,current_price:d.price,name:t,score_10:5}));
-      frag.appendChild(cell);
+
+    ['usa','europa','asia'].forEach(region=>{
+      const d=data[region];
+      if(!d) return;
+      const regionDiv=document.createElement('div');
+      regionDiv.className='movers-region';
+
+      const topRows=_buildMoverRows(d.top,'top');
+      const botRows=_buildMoverRows(d.bottom,'bottom');
+
+      regionDiv.innerHTML=`
+        <div class="movers-region-hd">
+          <span class="movers-region-name">${d.label}</span>
+          <span class="movers-region-cnt">${d.total} titoli monitorati</span>
+        </div>
+        <div class="movers-cols">
+          <div class="movers-col movers-col-top">
+            <div class="movers-col-hd">🟢 Top 5</div>
+            <div class="movers-list-top">${topRows}</div>
+          </div>
+          <div class="movers-col movers-col-bot">
+            <div class="movers-col-hd">🔴 Flop 5</div>
+            <div class="movers-list-bot">${botRows}</div>
+          </div>
+        </div>`;
+
+      // Click su ogni riga → apre il modal
+      regionDiv.querySelectorAll('.mover-row').forEach(row=>{
+        row.addEventListener('click',()=>{
+          const t=row.dataset.ticker;
+          const price=parseFloat(row.dataset.price||0);
+          const chg=parseFloat(row.dataset.chg||0);
+          openModal({ticker:t,day_change_pct:chg,current_price:price,name:t,score_10:5});
+        });
+      });
+
+      frag.appendChild(regionDiv);
     });
-    grid.appendChild(frag);
-  }catch(e){grid.innerHTML='<div class="hm-load" style="color:var(--red)">Errore caricamento heatmap</div>';}
+    wrap.appendChild(frag);
+
+    // Auto-refresh ogni 60s se il tab è ancora visibile
+    setTimeout(()=>{if(_tabLoaded.heatmap)loadHeatmap();},60000);
+
+  }catch(e){wrap.innerHTML='<div class="movers-loading" style="color:var(--red)">Errore caricamento dati mercato</div>';}
+}
+
+function _buildMoverRows(rows, side){
+  if(!rows||!rows.length) return '<div style="padding:8px 18px;font-size:.74rem;color:var(--text-dim)">—</div>';
+  return rows.map((r,i)=>{
+    const sign=r.chg>=0?'+':'';
+    const cls=r.chg>=0?'mover-pos':'mover-neg';
+    return `<div class="mover-row" data-ticker="${r.ticker}" data-price="${r.price}" data-chg="${r.chg}">
+      <span class="mover-rank">${i+1}</span>
+      <span class="mover-ticker">${r.ticker}</span>
+      <span class="mover-price">$${r.price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+      <span class="mover-chg ${cls}">${sign}${r.chg.toFixed(2)}%</span>
+    </div>`;
+  }).join('');
 }
 
 // ── Auth state (dichiarato qui, usato da portfolio/watchlist e da initAuth) ──
