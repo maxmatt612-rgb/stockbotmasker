@@ -581,6 +581,127 @@ async def cmd_rimuovi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ <b>{ticker}</b> rimosso.", parse_mode=ParseMode.HTML)
 
 
+# ─── /valuta ─────────────────────────────────────────────────────────────────
+
+async def cmd_valuta(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Valutazione AI del portafoglio: panoramica, rischi, consigli, verdict."""
+    uid = str(update.effective_user.id)
+    data = load_data()
+    port = _port_get(data, uid)
+
+    if not port:
+        await update.message.reply_text(
+            "💼 Portafoglio vuoto.\n\nAggiungi azioni con:\n<code>/portafoglio aggiungi TICKER PREZZO QUANTITÀ</code>",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    if not groq_client:
+        await update.message.reply_text("❌ AI non disponibile (GROQ_API_KEY mancante).", parse_mode=ParseMode.HTML)
+        return
+
+    msg = await update.message.reply_text("🤖 <b>Analisi AI portafoglio in corso…</b>", parse_mode=ParseMode.HTML)
+
+    # Fetch prezzi correnti
+    import yfinance as _yf_v
+    def _get_price(t):
+        try:
+            fi = _yf_v.Ticker(t).fast_info
+            return float(fi.last_price or 0), float(fi.previous_close or 0)
+        except Exception:
+            return 0.0, 0.0
+
+    prices = {}
+    for t in port:
+        cur, prev = await asyncio.to_thread(_get_price, t)
+        prices[t] = {"cur": cur, "prev": prev}
+
+    # Calcola P&L
+    total_inv = 0.0; total_val = 0.0
+    position_lines = []
+    for t, entry in port.items():
+        buy_p = entry.get("price", 0.0)
+        qty = entry.get("qty", 0.0)
+        cur = prices[t]["cur"]
+        inv = buy_p * qty
+        val = cur * qty if cur > 0 else inv
+        pl = val - inv
+        pl_pct = (pl / inv * 100) if inv > 0 else 0.0
+        total_inv += inv; total_val += val
+        sign = "+" if pl >= 0 else ""
+        emoji = "📈" if pl >= 0 else "📉"
+        position_lines.append(
+            f"{emoji} {t}: {qty:.0f} az. | acquisto ${buy_p:.2f} → ora ${cur:.2f} | P&L: {sign}${pl:.2f} ({sign}{pl_pct:.1f}%)"
+        )
+
+    total_pl = total_val - total_inv
+    total_pl_pct = (total_pl / total_inv * 100) if total_inv > 0 else 0.0
+    total_sign = "+" if total_pl >= 0 else ""
+
+    portfolio_summary = "\n".join(position_lines)
+    portfolio_summary += f"\n\nTOTALE — Investito: ${total_inv:.2f} | Valore: ${total_val:.2f} | P&L: {total_sign}${total_pl:.2f} ({total_sign}{total_pl_pct:.1f}%)"
+
+    prompt = (
+        f"Portafoglio dell'investitore:\n{portfolio_summary}\n\n"
+        f"Analizza questo portafoglio e rispondi SOLO in questo formato (italiano, conciso, max 2 righe per sezione):\n"
+        "PANORAMICA: [valuta diversificazione, concentrazione e qualità generale del portafoglio]\n"
+        "RISCHI: [2-3 rischi specifici e concreti di questo portafoglio]\n"
+        "CONSIGLI: [2-3 azioni concrete: cosa vendere, tenere, ribilanciare o aggiungere]\n"
+        "VERDICT: POSITIVO oppure NEUTRO oppure ATTENZIONE"
+    )
+
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=400,
+            messages=[
+                {"role": "system", "content": "Sei un analista finanziario senior. Rispondi in italiano, diretto e concreto. Non dare mai consigli finanziari definitivi."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+
+        panoramica = rischi = consigli = verdict = ""
+        for line in text.split("\n"):
+            l = line.strip()
+            if l.upper().startswith("PANORAMICA:"): panoramica = l[11:].strip()
+            elif l.upper().startswith("RISCHI:"):    rischi     = l[7:].strip()
+            elif l.upper().startswith("CONSIGLI:"):  consigli   = l[9:].strip()
+            elif l.upper().startswith("VERDICT:"):   verdict    = l[8:].strip().upper()
+
+        if not verdict:
+            verdict = "NEUTRO"
+        if verdict not in ("POSITIVO", "NEUTRO", "ATTENZIONE"):
+            verdict = "NEUTRO"
+
+        verdict_emoji = {"POSITIVO": "🟢", "NEUTRO": "🟡", "ATTENZIONE": "🔴"}.get(verdict, "🟡")
+
+        # Riepilogo posizioni
+        pos_recap = []
+        for t, entry in port.items():
+            buy_p = entry.get("price", 0.0); qty = entry.get("qty", 0.0)
+            cur = prices[t]["cur"]
+            pl = (cur - buy_p) * qty if cur > 0 else 0
+            s = "+" if pl >= 0 else ""; e = "📈" if pl >= 0 else "📉"
+            pos_recap.append(f"{e} <b>{t}</b>  ${cur:.2f}  {s}${pl:.2f}")
+
+        result_msg = (
+            f"🤖 <b>Valutazione AI Portafoglio</b>\n\n"
+            + "\n".join(pos_recap)
+            + f"\n\n💰 Totale: ${total_inv:.2f} → ${total_val:.2f}  |  P&L: <b>{total_sign}${total_pl:.2f} ({total_sign}{total_pl_pct:.1f}%)</b>\n\n"
+            + (f"📊 <b>Panoramica:</b>\n{panoramica}\n\n" if panoramica else "")
+            + (f"⚠️ <b>Rischi:</b>\n{rischi}\n\n" if rischi else "")
+            + (f"💡 <b>Consigli:</b>\n{consigli}\n\n" if consigli else "")
+            + f"{verdict_emoji} <b>Verdict: {verdict}</b>\n\n"
+            + "<i>Solo a scopo informativo. Non è consulenza finanziaria.</i>"
+        )
+        await msg.edit_text(result_msg, parse_mode=ParseMode.HTML)
+
+    except Exception as e:
+        logger.error(f"cmd_valuta AI error: {e}")
+        await msg.edit_text("❌ Errore nell'analisi AI. Riprova tra qualche secondo.", parse_mode=ParseMode.HTML)
+
+
 # ─── /chiediai ───────────────────────────────────────────────────────────────
 
 async def cmd_chiediai(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1056,6 +1177,7 @@ def main():
     app.add_handler(CommandHandler("portafoglio", cmd_portafoglio))
     app.add_handler(CommandHandler("aggiungi", cmd_aggiungi))
     app.add_handler(CommandHandler("rimuovi", cmd_rimuovi))
+    app.add_handler(CommandHandler("valuta", cmd_valuta))
     app.add_handler(CommandHandler("chiediai", cmd_chiediai))
     app.add_handler(CallbackQueryHandler(handle_callback))
 

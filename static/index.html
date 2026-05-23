@@ -580,6 +580,33 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     <div id="port-chart-container" style="height:200px;border-radius:var(--r-md);overflow:hidden"></div>
   </div>
 
+  <!-- Valuta button -->
+  <div style="padding:0 28px 14px;max-width:1180px;margin:0 auto;display:none" id="port-valuta-row">
+    <button class="port-add-btn" id="port-valuta-btn" style="background:linear-gradient(135deg,rgba(196,166,255,.18),rgba(128,255,219,.1));border-color:rgba(196,166,255,.4);color:var(--primary);font-size:.84rem;padding:10px 22px;width:100%">
+      🤖 Valuta Portafoglio con AI
+    </button>
+  </div>
+
+  <!-- AI evaluation card -->
+  <div id="port-ai-card" style="display:none;padding:0 28px 18px;max-width:1180px;margin:0 auto">
+    <div class="ai-section" style="margin-top:0">
+      <div class="ai-card ai-green" id="port-ai-panoramica-wrap">
+        <div class="ai-card-title" style="color:var(--secondary)">📊 Panoramica Portafoglio</div>
+        <div class="ai-card-text" id="port-ai-panoramica"></div>
+      </div>
+      <div class="ai-card ai-red" id="port-ai-rischi-wrap">
+        <div class="ai-card-title" style="color:var(--red)">⚠️ Rischi identificati</div>
+        <div class="ai-card-text" id="port-ai-rischi"></div>
+      </div>
+      <div class="ai-card" id="port-ai-consigli-wrap">
+        <div class="ai-card-title" id="port-ai-consigli-title">💡 Consigli</div>
+        <div class="ai-card-text" id="port-ai-consigli"></div>
+        <div id="port-ai-badge" style="margin-top:9px"></div>
+      </div>
+    </div>
+    <div style="font-size:.67rem;color:var(--text-dim);text-align:center;margin-top:8px">Solo a scopo informativo. Non è consulenza finanziaria.</div>
+  </div>
+
   <!-- Table -->
   <div class="port-table-wrap" id="port-table-wrap">
     <div class="history-empty"><span class="icon">💼</span>Aggiungi la tua prima posizione sopra.</div>
@@ -1268,6 +1295,8 @@ async function renderPortfolio(){
   plEl.textContent=(totalPL>=0?'+':'')+totalPL.toFixed(2)+' ('+totalPLPct.toFixed(2)+'%)';
   plEl.style.color=totalPL>=0?'var(--green)':'var(--red)';
   sum.style.display='grid';
+  document.getElementById('port-valuta-row').style.display='block';
+  document.getElementById('port-ai-card').style.display='none';
 
   // Portfolio chart (andamento ultimi 30gg, tutte le posizioni)
   _renderPortfolioChart(port, tickers, chartWrap);
@@ -1299,6 +1328,58 @@ async function _renderPortfolioChart(port, tickers, chartWrap){
 function deletePortfolio(ticker){
   const port=loadPortfolioData(); delete port[ticker]; savePortfolioData(port); renderPortfolio();
 }
+
+// Valuta portafoglio AI
+document.getElementById('port-valuta-btn').addEventListener('click',async()=>{
+  const port=loadPortfolioData(); const tickers=Object.keys(port);
+  if(!tickers.length){alert('Aggiungi posizioni al portafoglio prima.');return;}
+
+  const btn=document.getElementById('port-valuta-btn');
+  btn.textContent='🤖 Analisi AI in corso…'; btn.disabled=true;
+  document.getElementById('port-ai-card').style.display='none';
+
+  // Raccogli prezzi attuali
+  let quotes={};
+  try{quotes=await fetch('/api/batch_quotes?tickers='+tickers.join(',')).then(r=>r.json());}catch(_){}
+
+  const positions=tickers.map(t=>{
+    const pos=port[t];
+    return {ticker:t,buyPrice:pos.buyPrice||0,qty:pos.qty||0,currentPrice:quotes[t]?.price||0,name:pos.name||t};
+  });
+
+  try{
+    const ai=await fetch('/api/portfolio/evaluate',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({positions}),
+    }).then(r=>r.json());
+
+    if(ai.error){throw new Error(ai.error);}
+
+    document.getElementById('port-ai-panoramica').textContent=ai.panoramica||'—';
+    document.getElementById('port-ai-rischi').textContent=ai.rischi||'—';
+    document.getElementById('port-ai-consigli').textContent=ai.consigli||'—';
+
+    const v=(ai.verdict||'NEUTRO').toUpperCase();
+    const conCard=document.getElementById('port-ai-consigli-wrap');
+    const badge=document.getElementById('port-ai-badge');
+    if(v==='POSITIVO'){
+      conCard.className='ai-card ai-si';
+      badge.innerHTML='<span class="verdict-badge badge-si">🟢 Portafoglio POSITIVO</span>';
+    }else if(v==='ATTENZIONE'){
+      conCard.className='ai-card ai-no';
+      badge.innerHTML='<span class="verdict-badge badge-no">🔴 ATTENZIONE — Valuta modifiche</span>';
+    }else{
+      conCard.className='ai-card ai-neutro';
+      badge.innerHTML='<span class="verdict-badge badge-neutro">🟡 Portafoglio NEUTRO</span>';
+    }
+    document.getElementById('port-ai-card').style.display='block';
+  }catch(e){
+    alert('Errore analisi AI: '+e.message);
+  }finally{
+    btn.textContent='🤖 Valuta Portafoglio con AI'; btn.disabled=false;
+  }
+});
 
 document.getElementById('port-add-btn').addEventListener('click',async()=>{
   const t=(document.getElementById('port-ticker').value.trim().toUpperCase().replace(/[^A-Z0-9.]/g,''));

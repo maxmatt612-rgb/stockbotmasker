@@ -9,6 +9,8 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
+from typing import List, Optional
 
 from analyzer import get_enriched_analysis, scan_cheap_stocks
 
@@ -380,6 +382,86 @@ async def api_heatmap_data():
     data = await asyncio.to_thread(_get)
     _store(key, data)
     return _clean(data)
+
+
+class PortfolioPosition(BaseModel):
+    ticker: str
+    buyPrice: float
+    qty: float
+    currentPrice: Optional[float] = 0.0
+    name: Optional[str] = ""
+
+class PortfolioEvalRequest(BaseModel):
+    positions: List[PortfolioPosition]
+
+
+@app.post("/api/portfolio/evaluate")
+async def api_portfolio_evaluate(req: PortfolioEvalRequest):
+    """Valutazione AI del portafoglio — Groq Llama analizza P&L e dà consigli."""
+    if not groq_client:
+        return JSONResponse({"error": "GROQ_API_KEY non configurata"}, status_code=503)
+    if not req.positions:
+        return JSONResponse({"error": "portafoglio vuoto"}, status_code=400)
+
+    total_inv = 0.0; total_val = 0.0
+    lines = []
+    for p in req.positions:
+        inv = p.buyPrice * p.qty
+        val = p.currentPrice * p.qty if p.currentPrice and p.currentPrice > 0 else inv
+        pl = val - inv; pl_pct = (pl / inv * 100) if inv > 0 else 0.0
+        total_inv += inv; total_val += val
+        sign = "+" if pl >= 0 else ""
+        e = "📈" if pl >= 0 else "📉"
+        name_str = f" ({p.name})" if p.name and p.name != p.ticker else ""
+        lines.append(f"{e} {p.ticker}{name_str}: {p.qty:.0f} az. | acquisto ${p.buyPrice:.4f} → ora ${p.currentPrice:.4f} | P&L: {sign}${pl:.2f} ({sign}{pl_pct:.1f}%)")
+
+    total_pl = total_val - total_inv
+    total_pl_pct = (total_pl / total_inv * 100) if total_inv > 0 else 0.0
+    total_sign = "+" if total_pl >= 0 else ""
+    summary = "\n".join(lines) + f"\n\nTOTALE — Investito: ${total_inv:.2f} | Valore: ${total_val:.2f} | P&L: {total_sign}${total_pl:.2f} ({total_sign}{total_pl_pct:.1f}%)"
+
+    prompt = (
+        f"Portafoglio dell'investitore:\n{summary}\n\n"
+        "Analizza questo portafoglio e rispondi SOLO in questo formato (italiano, conciso, max 2 righe per sezione):\n"
+        "PANORAMICA: [valuta diversificazione, concentrazione e qualità generale]\n"
+        "RISCHI: [2-3 rischi specifici e concreti del portafoglio]\n"
+        "CONSIGLI: [2-3 azioni concrete: cosa vendere, tenere, ribilanciare o aggiungere]\n"
+        "VERDICT: POSITIVO oppure NEUTRO oppure ATTENZIONE"
+    )
+
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=420,
+            messages=[
+                {"role": "system", "content": "Sei un analista finanziario senior. Rispondi in italiano, diretto e concreto. Non dare mai consigli finanziari definitivi."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+
+        panoramica = rischi = consigli = verdict = ""
+        for line in text.split("\n"):
+            l = line.strip()
+            if l.upper().startswith("PANORAMICA:"): panoramica = l[11:].strip()
+            elif l.upper().startswith("RISCHI:"):    rischi     = l[7:].strip()
+            elif l.upper().startswith("CONSIGLI:"):  consigli   = l[9:].strip()
+            elif l.upper().startswith("VERDICT:"):   verdict    = l[8:].strip().upper()
+
+        if verdict not in ("POSITIVO", "NEUTRO", "ATTENZIONE"):
+            verdict = "NEUTRO"
+
+        return {
+            "panoramica": panoramica or "Analisi non disponibile.",
+            "rischi":     rischi     or "Analisi non disponibile.",
+            "consigli":   consigli   or "Analisi non disponibile.",
+            "verdict":    verdict,
+            "total_pl":   round(total_pl, 2),
+            "total_pl_pct": round(total_pl_pct, 2),
+        }
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.get("/api/history")
