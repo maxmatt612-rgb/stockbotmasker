@@ -105,7 +105,6 @@ _SCAN_TTL     = 300    # 5 min — scanner
 _STOCK_TTL    = 180    # 3 min — analisi singola
 _AI_TTL       = 600    # 10 min — AI (chiamata Groq costosa)
 _FORECAST_TTL = 14400  # 4 h — previsione 7 giorni
-_EARNINGS_TTL = 21600  # 6 h — calendario earnings
 
 
 def _cached(key: str, ttl: int):
@@ -165,17 +164,6 @@ _MOVERS_TICKERS: dict = {
 
 # Flat list per backwards-compat (/api/heatmap rimane funzionante)
 _HEATMAP_TICKERS = [t for tlist in _MOVERS_TICKERS.values() for t in tlist]
-
-# ─── Earnings tickers (~50 major) ─────────────────────────────────────────────
-_EARNINGS_TICKERS = [
-    "AAPL","MSFT","GOOGL","AMZN","META","TSLA","NVDA","AVGO","AMD","ORCL",
-    "CRM","NFLX","INTC","QCOM","TXN","MU","AMAT",
-    "JPM","BAC","GS","V","MA","WFC","MS","BLK",
-    "JNJ","UNH","LLY","ABBV","PFE","MRK","TMO","ISRG",
-    "WMT","COST","HD","NKE","DIS","MCD","SBUX","TGT",
-    "XOM","CVX","BA","CAT","GE","HON",
-    "ASML","SAP","AZN","TSM",
-]
 
 _INTRADAY_INTERVALS = {"1m","2m","5m","15m","30m","60m","90m","1h"}
 
@@ -628,74 +616,6 @@ async def api_heatmap_data():
     _store(key, data)
     return _clean(data)
 
-
-@app.get("/api/earnings")
-async def api_earnings(days: int = 14):
-    """Calendario earnings prossimi N giorni — cache 6h."""
-    key = f"earnings:{days}"
-    if (c := _cached(key, _EARNINGS_TTL)) is not None:
-        return c
-
-    def _get():
-        import yfinance as yf
-        import pandas as pd
-        from datetime import date as _date, timedelta
-        today = _date.today()
-        end_dt = today + timedelta(days=days)
-        result: dict = {}
-
-        for ticker in _EARNINGS_TICKERS:
-            try:
-                cal = yf.Ticker(ticker).calendar
-                if cal is None:
-                    continue
-
-                # Normalizza a dict o list di date
-                if isinstance(cal, pd.DataFrame):
-                    if "Earnings Date" in cal.index:
-                        row = cal.loc["Earnings Date"]
-                        dates_list = list(row.values) if hasattr(row, "values") else [row]
-                    else:
-                        continue
-                elif isinstance(cal, dict):
-                    dates_list = cal.get("Earnings Date", [])
-                    if not isinstance(dates_list, list):
-                        dates_list = [dates_list] if dates_list is not None else []
-                else:
-                    continue
-
-                eps = None
-                if isinstance(cal, dict):
-                    eps_val = cal.get("Earnings Average")
-                    if eps_val is not None:
-                        try: eps = round(float(eps_val), 2)
-                        except Exception: pass
-
-                for ed in dates_list:
-                    try:
-                        if hasattr(ed, "date"):
-                            d = ed.date()
-                        elif isinstance(ed, str):
-                            from datetime import datetime as _dt2
-                            d = _dt2.strptime(ed[:10], "%Y-%m-%d").date()
-                        else:
-                            continue
-                        if today <= d <= end_dt:
-                            dk = str(d)
-                            if dk not in result:
-                                result[dk] = []
-                            if not any(x["ticker"] == ticker for x in result[dk]):
-                                result[dk].append({"ticker": ticker, "eps_estimate": eps})
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-
-        return dict(sorted(result.items()))
-
-    data = await asyncio.to_thread(_get)
-    _store(key, data)
-    return _clean(data)
 
 
 # ─── Portafoglio AI ───────────────────────────────────────────────────────────

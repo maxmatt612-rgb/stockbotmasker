@@ -473,7 +473,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .print-header{display:none}
 @media print{
   #bg-canvas,header,.indices-tape,.tab-nav,.controls-bar,.stats-bar,.refresh-pill,.disc-banner,
-  footer,.modal-overlay,.disc-overlay,#history-view,#earnings-view,#heatmap-view,#portfolio-view,
+  footer,.modal-overlay,.disc-overlay,#history-view,#heatmap-view,#portfolio-view,
   #watchlist-view,.auth-widget,.sparkline-wrap,#export-pdf-btn,.verdict,.live-badge{display:none!important}
   body{background:#fff!important;color:#000!important;font-family:Inter,sans-serif}
   .hero{display:none!important}
@@ -502,23 +502,6 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .tg-login-btn{background:var(--surf-v);border:1px solid var(--border);border-radius:100px;padding:5px 11px;font-size:.72rem;color:var(--text-dim);cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'Inter',sans-serif;transition:all .15s;white-space:nowrap}
 .tg-login-btn:hover{border-color:var(--border-hi);color:var(--text)}
 
-/* ── Earnings Calendar ── */
-#earnings-view{padding:0 0 96px}
-.earn-grid{display:flex;flex-direction:column;gap:12px;padding:12px 28px 48px;max-width:1180px;margin:0 auto}
-.earn-day{background:linear-gradient(145deg,rgba(196,166,255,.04),rgba(128,255,219,.02));border:1px solid var(--border);border-radius:var(--r-xl);overflow:hidden}
-.earn-day-hd{display:flex;align-items:center;gap:10px;padding:12px 18px;background:rgba(196,166,255,.05);border-bottom:1px solid var(--border)}
-.earn-day-name{font-size:.84rem;font-weight:800;color:var(--primary);letter-spacing:-.01em}
-.earn-day-date{font-size:.7rem;color:var(--text-dim)}
-.earn-day-cnt{margin-left:auto;font-size:.66rem;color:var(--text-dim);background:var(--surf-v);padding:2px 8px;border-radius:100px}
-.earn-list{padding:4px 0}
-.earn-row{display:flex;align-items:center;gap:12px;padding:9px 18px;cursor:pointer;transition:background .15s}
-.earn-row:hover{background:rgba(255,255,255,.025)}
-.earn-ticker{font-size:.86rem;font-weight:800;min-width:58px;letter-spacing:-.01em}
-.earn-name{font-size:.74rem;color:var(--text-dim);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.earn-eps{font-size:.7rem;color:var(--gold);font-weight:600;white-space:nowrap}
-.earn-empty{text-align:center;padding:56px 24px;color:var(--text-dim);font-size:.84rem;line-height:1.8}
-.earn-empty .icon{font-size:2.2rem;display:block;margin-bottom:10px}
-.earn-today-badge{background:rgba(196,166,255,.15);color:var(--primary);padding:1px 7px;border-radius:100px;font-size:.64rem;font-weight:700;letter-spacing:.04em}
 
 /* ── Responsive ── */
 @media(max-width:640px){
@@ -528,7 +511,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   .logo span.logo-text{display:none}
   .indices-tape{top:60px}
   .hero{padding:32px 14px 24px}
-  .tab-nav,.controls-bar,.grid,.hgrid,.history-toolbar,.earn-grid{padding-left:14px;padding-right:14px}
+  .tab-nav,.controls-bar,.grid,.hgrid,.history-toolbar{padding-left:14px;padding-right:14px}
   .grid,.hgrid{gap:12px}
   .modal-sheet{padding:18px}
   .ctrl-div{display:none}
@@ -623,7 +606,6 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 <div class="tab-nav">
   <button class="tab-btn active" data-tab="live">📊 Live</button>
   <button class="tab-btn" data-tab="history">📅 Storico</button>
-  <button class="tab-btn" data-tab="earnings">📆 Earnings</button>
   <button class="tab-btn" data-tab="heatmap">📈 Mercati</button>
   <button class="tab-btn" data-tab="portfolio">💼 Portafoglio</button>
   <button class="tab-btn" data-tab="watchlist">⭐ Watchlist</button>
@@ -644,16 +626,6 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   </div>
 </div>
 
-<!-- ── Earnings Calendar view ── -->
-<div id="earnings-view" style="display:none">
-  <div class="pview-head">
-    <h2 class="pview-title">📆 Calendario Earnings</h2>
-    <span class="pview-sub">Prossimi 14 giorni · <span id="earn-event-count">—</span> eventi · aggiornamento ogni 6 ore</span>
-  </div>
-  <div id="earn-grid" class="earn-grid">
-    <div class="earn-empty"><span class="icon">⏳</span>Caricamento calendario...</div>
-  </div>
-</div>
 
 <!-- ── Mercati view (Top/Flop 5 per regione) ── -->
 <div id="heatmap-view" style="display:none">
@@ -1767,7 +1739,7 @@ initAuth();
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab switching (5 tab)
 // ══════════════════════════════════════════════════════════════════════════════
-const _VIEWS = ['live','history','earnings','heatmap','portfolio','watchlist'];
+const _VIEWS = ['live','history','heatmap','portfolio','watchlist'];
 let _tabLoaded = {};
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1782,7 +1754,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if(!_tabLoaded[tab]){
       _tabLoaded[tab]=true;
       if(tab==='history')  loadHistoryDates();
-      if(tab==='earnings') loadEarnings();
       if(tab==='heatmap')  loadHeatmap();
       if(tab==='portfolio') renderPortfolio();
       if(tab==='watchlist') renderWatchlist();
@@ -1967,78 +1938,6 @@ function _logoutUser() {
   if(tab==='watchlist') renderWatchlist();
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Earnings Calendar
-// ══════════════════════════════════════════════════════════════════════════════
-const _GIORNI_EARN = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
-const _MESI_EARN   = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-
-async function loadEarnings() {
-  const grid = document.getElementById('earn-grid');
-  grid.innerHTML = '<div class="earn-empty"><span class="icon">⏳</span>Ricerca earnings in corso…<br><small style="font-size:.72rem">Può richiedere fino a 30 secondi</small></div>';
-  try {
-    const data = await fetch('/api/earnings?days=14').then(r=>r.json());
-    const dates = Object.keys(data||{}).sort();
-    if(!dates.length){
-      grid.innerHTML='<div class="earn-empty"><span class="icon">📭</span>Nessun earnings previsto nei prossimi 14 giorni.<br><small>I dati si aggiornano ogni 6 ore.</small></div>';
-      document.getElementById('earn-event-count').textContent='0';
-      return;
-    }
-    let totalEvents=0;
-    dates.forEach(dk=>totalEvents+=data[dk].length);
-    document.getElementById('earn-event-count').textContent=totalEvents;
-    grid.innerHTML='';
-    const today=new Date().toISOString().slice(0,10);
-    const frag=document.createDocumentFragment();
-    dates.forEach(dk=>{
-      const [y,m,d]=dk.split('-').map(Number);
-      const dt=new Date(y,m-1,d);
-      const dayName=_GIORNI_EARN[dt.getDay()];
-      const dateLabel=`${d} ${_MESI_EARN[m-1]} ${y}`;
-      const isToday=dk===today;
-      const events=data[dk];
-      const dayDiv=document.createElement('div');
-      dayDiv.className='earn-day';
-      const rowsHtml=events.map(e=>`
-        <div class="earn-row" onclick="openModal({ticker:'${e.ticker}',day_change_pct:0,current_price:0,name:'${e.ticker}',score_10:5})">
-          <div class="earn-ticker">${e.ticker}</div>
-          <div class="earn-name">${e.ticker}</div>
-          ${e.eps_estimate!=null?`<div class="earn-eps">EPS est. $${e.eps_estimate.toFixed(2)}</div>`:'<div class="earn-eps" style="color:var(--text-dim)">EPS n/d</div>'}
-        </div>`).join('');
-      dayDiv.innerHTML=`
-        <div class="earn-day-hd">
-          <span class="earn-day-name">${dayName}</span>
-          <span class="earn-day-date">${dateLabel}</span>
-          ${isToday?'<span class="earn-today-badge">OGGI</span>':''}
-          <span class="earn-day-cnt">${events.length} aziend${events.length===1?'a':'e'}</span>
-        </div>
-        <div class="earn-list">${rowsHtml}</div>`;
-      frag.appendChild(dayDiv);
-    });
-    grid.appendChild(frag);
-    // Arricchisci i nomi in background
-    _enrichEarningsNames(dates, data);
-  } catch(e){
-    grid.innerHTML='<div class="earn-empty"><span class="icon">❌</span>Errore caricamento earnings.</div>';
-  }
-}
-
-async function _enrichEarningsNames(dates, data){
-  // Fetch nomi batch per tutte le azioni trovate
-  const allTickers=[...new Set(dates.flatMap(dk=>data[dk].map(e=>e.ticker)))];
-  const rows=document.querySelectorAll('.earn-row');
-  for(const row of rows){
-    const tickerEl=row.querySelector('.earn-ticker');
-    const nameEl=row.querySelector('.earn-name');
-    if(!tickerEl||!nameEl) continue;
-    const t=tickerEl.textContent;
-    try{
-      const d=await fetch('/api/stock/'+t).then(r=>r.ok?r.json():null);
-      if(d?.name) nameEl.textContent=d.name;
-    }catch(_){}
-    await new Promise(r=>setTimeout(r,120));
-  }
-}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // History — costruisce una singola card performance
