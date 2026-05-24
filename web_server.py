@@ -1796,6 +1796,214 @@ async def api_screener(body: ScreenerBody):
     return out[:30]
 
 
+# ─── Confronto AI tra 2 azioni ───────────────────────────────────────────────
+
+class CompareBody(BaseModel):
+    ticker1: str
+    ticker2: str
+
+
+@app.post("/api/compare")
+async def api_compare(body: CompareBody):
+    """Confronto AI approfondito tra due ticker con verdetto finale."""
+    t1 = body.ticker1.upper().strip()
+    t2 = body.ticker2.upper().strip()
+    if not t1 or not t2 or t1 == t2:
+        return JSONResponse({"error": "Servono due ticker diversi"}, status_code=400)
+    key = f"compare:{t1}:{t2}"
+    if (c := _cached(key, 1800)) is not None:
+        return c
+
+    if not groq_client:
+        return JSONResponse({"error": "GROQ_API_KEY non configurata"}, status_code=503)
+
+    def _fetch(t: str):
+        import yfinance as yf
+        try:
+            tk = yf.Ticker(t)
+            fi = tk.fast_info
+            info = tk.info or {}
+            price = fi.last_price or 0
+            prev = fi.regular_market_previous_close or price
+            chg = (price - prev) / prev * 100 if prev else 0
+            return {
+                "ticker": t,
+                "name": info.get("shortName") or info.get("longName") or t,
+                "price": round(float(price), 2),
+                "chg": round(float(chg), 2),
+                "pe": info.get("forwardPE"),
+                "eps": info.get("trailingEps"),
+                "margin": info.get("profitMargins"),
+                "roe": info.get("returnOnEquity"),
+                "div": info.get("dividendYield"),
+                "mcap": info.get("marketCap"),
+                "sector": info.get("sector", "N/D"),
+            }
+        except Exception:
+            return None
+
+    d1, d2 = await asyncio.gather(
+        asyncio.to_thread(_fetch, t1),
+        asyncio.to_thread(_fetch, t2),
+    )
+    if not d1 or not d2:
+        return JSONResponse({"error": "Dati non disponibili per uno o entrambi i ticker"}, status_code=404)
+
+    def _fmt(d: dict) -> str:
+        pe  = f"{d['pe']:.1f}" if d.get("pe") else "N/D"
+        eps = f"{d['eps']:.2f}" if d.get("eps") else "N/D"
+        mrg = f"{d['margin']*100:.1f}%" if d.get("margin") else "N/D"
+        roe = f"{d['roe']*100:.1f}%" if d.get("roe") else "N/D"
+        div = f"{d['div']*100:.2f}%" if d.get("div") else "N/D"
+        mc  = f"${d['mcap']/1e9:.1f}B" if d.get("mcap") else "N/D"
+        return (f"{d['ticker']} ({d['name']}) — €{d['price']}, oggi {d['chg']:+.1f}%\n"
+                f"  Settore: {d['sector']} | Market Cap: {mc}\n"
+                f"  P/E forward: {pe} | EPS: {eps} | Margine: {mrg} | ROE: {roe} | Dividendo: {div}")
+
+    prompt = (
+        "Confronta queste due azioni e dimmi quale preferire come investimento.\n\n"
+        f"AZIONE 1:\n{_fmt(d1)}\n\n"
+        f"AZIONE 2:\n{_fmt(d2)}\n\n"
+        "Rispondi SOLO con questo formato (in italiano, max 2 righe a sezione):\n"
+        "PRO_1: [punti di forza di AZIONE 1]\n"
+        "PRO_2: [punti di forza di AZIONE 2]\n"
+        "CONTRO_1: [debolezze di AZIONE 1]\n"
+        "CONTRO_2: [debolezze di AZIONE 2]\n"
+        "VINCITORE: [solo il ticker vincitore, es: AAPL]\n"
+        "MOTIVO: [1 frase secca che spiega perché]\n"
+        "CONFIDENZA: [numero intero da 55 a 92]\n"
+    )
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=400,
+            messages=[
+                {"role": "system", "content": "Sei un analista finanziario esperto. Confronta oggettivamente due azioni usando dati fondamentali e tecnici. Sii diretto e dai un vincitore chiaro. Rispondi in italiano."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        pro1 = pro2 = contro1 = contro2 = vincitore = motivo = ""
+        confidenza = 70
+        for line in text.split("\n"):
+            l = line.strip()
+            lu = l.upper()
+            if lu.startswith("PRO_1:"):       pro1      = l[6:].strip()
+            elif lu.startswith("PRO_2:"):     pro2      = l[6:].strip()
+            elif lu.startswith("CONTRO_1:"):  contro1   = l[9:].strip()
+            elif lu.startswith("CONTRO_2:"):  contro2   = l[9:].strip()
+            elif lu.startswith("VINCITORE:"): vincitore = l[10:].strip().upper()
+            elif lu.startswith("MOTIVO:"):    motivo    = l[7:].strip()
+            elif lu.startswith("CONFIDENZA:"):
+                try:
+                    confidenza = int("".join(c for c in l[11:] if c.isdigit())[:2] or "70")
+                except Exception:
+                    confidenza = 70
+        result = {
+            "ticker1": t1, "name1": d1["name"],
+            "ticker2": t2, "name2": d2["name"],
+            "pro1": pro1, "pro2": pro2,
+            "contro1": contro1, "contro2": contro2,
+            "vincitore": vincitore or t1,
+            "motivo": motivo,
+            "confidenza": max(55, min(92, confidenza)),
+        }
+        _store(key, result)
+        return result
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# ─── Briefing mercato giornaliero ─────────────────────────────────────────────
+
+@app.get("/api/briefing")
+async def api_briefing():
+    """AI genera un briefing di mercato giornaliero basato sugli indici principali."""
+    key = "briefing:daily"
+    if (c := _cached(key, 3600)) is not None:
+        return c
+
+    if not groq_client:
+        return JSONResponse({"error": "GROQ_API_KEY non configurata"}, status_code=503)
+
+    def _fetch_indices():
+        import yfinance as yf
+        indices = {
+            "S&P 500": "^GSPC", "NASDAQ": "^IXIC", "DOW JONES": "^DJI",
+            "FTSE MIB": "FTSEMIB.MI", "DAX": "^GDAXI", "CAC 40": "^FCHI",
+            "BTC": "BTC-USD", "ORO": "GC=F", "PETROLIO": "CL=F",
+        }
+        rows = []
+        for name, sym in indices.items():
+            try:
+                fi = yf.Ticker(sym).fast_info
+                price = fi.last_price or 0
+                prev  = fi.regular_market_previous_close or price
+                chg   = (price - prev) / prev * 100 if prev else 0
+                rows.append(f"{name}: {price:,.2f} ({chg:+.2f}%)")
+            except Exception:
+                pass
+        return rows
+
+    rows = await asyncio.to_thread(_fetch_indices)
+    if not rows:
+        return JSONResponse({"error": "Dati indici non disponibili"}, status_code=503)
+
+    market_str = "\n".join(rows)
+    import datetime
+    today = datetime.date.today().strftime("%d %B %Y")
+
+    prompt = (
+        f"Dati di mercato di oggi {today}:\n{market_str}\n\n"
+        "Scrivi un briefing di mercato professionale in italiano. Formato ESATTO:\n"
+        "TITOLO: [titolo breve e incisivo del giorno]\n"
+        "APERTURA: [2-3 frasi sul sentiment generale dei mercati]\n"
+        "MACRO: [1-2 frasi su trend macroeconomici rilevanti dal contesto]\n"
+        "CRYPTO: [1-2 frasi su BTC e crypto]\n"
+        "COMMODITIES: [1-2 frasi su oro e petrolio]\n"
+        "OUTLOOK: [1-2 frasi di outlook per le prossime ore]\n"
+        "MOOD: BULL oppure BEAR oppure NEUTRO\n"
+    )
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=500,
+            messages=[
+                {"role": "system", "content": "Sei un analista di mercato senior che scrive briefing quotidiani per investitori italiani. Tono professionale ma diretto. Scrivi in italiano."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        titolo = apertura = macro = crypto = commodities = outlook = mood = ""
+        for line in text.split("\n"):
+            l = line.strip()
+            lu = l.upper()
+            if lu.startswith("TITOLO:"):       titolo      = l[7:].strip()
+            elif lu.startswith("APERTURA:"):   apertura    = l[9:].strip()
+            elif lu.startswith("MACRO:"):      macro       = l[6:].strip()
+            elif lu.startswith("CRYPTO:"):     crypto      = l[7:].strip()
+            elif lu.startswith("COMMODITIES:"): commodities= l[12:].strip()
+            elif lu.startswith("OUTLOOK:"):    outlook     = l[8:].strip()
+            elif lu.startswith("MOOD:"):
+                raw = l[5:].strip().upper()
+                mood = "BULL" if "BULL" in raw else "BEAR" if "BEAR" in raw else "NEUTRO"
+        result = {
+            "date": today,
+            "indices": rows,
+            "titolo": titolo,
+            "apertura": apertura,
+            "macro": macro,
+            "crypto": crypto,
+            "commodities": commodities,
+            "outlook": outlook,
+            "mood": mood or "NEUTRO",
+        }
+        _store(key, result)
+        return result
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 # ─── Manifest / SW (PWA) ──────────────────────────────────────────────────────
 
 @app.get("/manifest.json")
@@ -1823,3 +2031,8 @@ async def health():
 @app.get("/")
 async def root():
     return FileResponse(str(STATIC / "index.html"))
+
+
+@app.get("/landing")
+async def landing():
+    return FileResponse(str(STATIC / "landing.html"))

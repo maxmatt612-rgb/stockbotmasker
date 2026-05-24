@@ -302,6 +302,58 @@ header{
 .ai-segnale-conf{font-size:.72rem;color:var(--text-dim);margin-top:4px}
 .ai-segnale-motivo{font-size:.76rem;line-height:1.4;margin-top:6px;padding:6px 10px;border-radius:var(--r-md);background:rgba(255,255,255,.05);max-width:100%}
 .badge-neutro{background:rgba(255,184,108,.15);color:var(--gold)}
+/* ── Confronta button ── */
+.btn-confronta{width:100%;margin-top:10px;padding:10px;border:1px dashed var(--border);border-radius:var(--r-md);background:transparent;color:var(--text-dim);font-size:.8rem;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-confronta:hover{border-color:var(--primary);color:var(--primary);background:rgba(99,102,241,.07)}
+/* ── Compare panel ── */
+.compare-panel{padding:14px;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--surf);margin-top:10px;display:none}
+.compare-panel.open{display:block}
+.compare-input-row{display:flex;gap:8px;margin-bottom:10px}
+.compare-input{flex:1;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:8px 12px;color:var(--text);font-size:.82rem}
+.compare-btn{background:var(--primary);border:none;border-radius:var(--r-md);color:#fff;font-size:.8rem;font-weight:700;padding:8px 16px;cursor:pointer}
+.compare-result{display:none}
+.compare-result.loaded{display:block}
+.compare-vs-row{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;margin-bottom:10px}
+.compare-col{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:10px}
+.compare-col.winner{border-color:var(--green)}
+.compare-col-ticker{font-size:1rem;font-weight:800;color:var(--primary)}
+.compare-col-name{font-size:.68rem;color:var(--text-dim);margin-bottom:6px}
+.compare-col-pro{font-size:.72rem;color:var(--green);margin-bottom:3px}
+.compare-col-contro{font-size:.72rem;color:var(--red)}
+.compare-vs-badge{display:flex;align-items:center;justify-content:center;font-weight:900;color:var(--text-dim);font-size:.9rem}
+.compare-winner-row{text-align:center;padding:10px;background:rgba(114,239,160,.08);border:1px solid var(--green);border-radius:var(--r-md);font-size:.8rem}
+.compare-winner-label{font-size:1rem;font-weight:900;color:var(--green)}
+.compare-conf{font-size:.7rem;color:var(--text-dim);margin-top:3px}
+/* ── Briefing view ── */
+#briefing-view{display:none;padding:0 0 80px}
+.briefing-header{padding:22px 24px 0}
+.briefing-title{font-size:1.3rem;font-weight:800;line-height:1.2;margin-bottom:4px}
+.briefing-date{font-size:.72rem;color:var(--text-dim);margin-bottom:14px}
+.briefing-mood{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:.76rem;font-weight:700}
+.briefing-mood.BULL{background:rgba(114,239,160,.15);color:var(--green)}
+.briefing-mood.BEAR{background:rgba(255,107,107,.12);color:var(--red)}
+.briefing-mood.NEUTRO{background:rgba(255,184,108,.1);color:var(--gold)}
+.briefing-section{padding:14px 24px;border-bottom:1px solid var(--border)}
+.briefing-section-hd{font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px}
+.briefing-section-txt{font-size:.84rem;line-height:1.55;color:var(--text)}
+.briefing-indices{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;padding:14px 24px}
+.briefing-idx{background:var(--surf);border:1px solid var(--border);border-radius:var(--r-md);padding:8px 10px}
+.briefing-idx-name{font-size:.62rem;color:var(--text-dim);font-weight:600}
+.briefing-idx-val{font-size:.82rem;font-weight:700;margin-top:2px}
+.briefing-loading{text-align:center;padding:40px;color:var(--text-dim);font-size:.84rem}
+.briefing-refresh{float:right;background:transparent;border:1px solid var(--border);border-radius:var(--r-md);padding:5px 12px;font-size:.72rem;color:var(--text-dim);cursor:pointer}
+.briefing-refresh:hover{border-color:var(--primary);color:var(--primary)}
+/* ── Tax calculator ── */
+.tax-section{padding:14px 28px;max-width:1180px;margin:18px auto 0}
+.tax-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px}
+.tax-hd{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--text-dim);margin-bottom:10px}
+.tax-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)}
+.tax-row:last-child{border-bottom:none;padding-top:8px;margin-top:4px}
+.tax-label{font-size:.78rem;color:var(--text-dim)}
+.tax-val{font-size:.82rem;font-weight:700}
+.tax-val.positive{color:var(--green)}
+.tax-val.negative{color:var(--red)}
+.tax-val.highlight{font-size:.95rem;color:var(--red)}
 .ai-loading{text-align:center;padding:18px;font-size:.8rem;color:var(--text-dim);animation:shimmer 1.8s infinite}
 
 /* ── Dati fondamentali (modal) ── */
@@ -1062,6 +1114,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   <button class="tab-btn" data-tab="watchlist">⭐ Watchlist</button>
   <button class="tab-btn" data-tab="calendar">🗓 Calendario</button>
   <button class="tab-btn" data-tab="ai-chat">🤖 AI</button>
+  <button class="tab-btn" data-tab="briefing">📰 Briefing</button>
 </div>
 
 <!-- ── History view (nascosta di default) ── -->
@@ -1186,6 +1239,35 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   <div class="port-table-wrap" id="port-table-wrap">
     <div class="history-empty"><span class="icon">💼</span>Aggiungi la tua prima posizione sopra.</div>
   </div>
+
+  <!-- Calcolatore tasse 26% -->
+  <div class="tax-section" id="tax-section" style="display:none">
+    <div class="tax-card">
+      <div class="tax-hd">🧾 Calcolatore Plusvalenze</div>
+      <div class="tax-row">
+        <span class="tax-label">Plusvalenza lorda</span>
+        <span class="tax-val positive" id="tax-gain">—</span>
+      </div>
+      <div class="tax-row">
+        <span class="tax-label">Commissioni Revolut (€1 × operazioni)</span>
+        <span class="tax-val negative" id="tax-commissions">—</span>
+      </div>
+      <div class="tax-row">
+        <span class="tax-label">Imponibile netto</span>
+        <span class="tax-val" id="tax-taxable">—</span>
+      </div>
+      <div class="tax-row">
+        <span class="tax-label">Imposta 26% (capital gain italiano)</span>
+        <span class="tax-val highlight" id="tax-due">—</span>
+      </div>
+      <div class="tax-row" style="border-top:1px solid var(--border)">
+        <span class="tax-label" style="font-weight:700">Guadagno netto stimato</span>
+        <span class="tax-val positive" style="font-size:.95rem" id="tax-net">—</span>
+      </div>
+      <div style="font-size:.63rem;color:var(--text-dim);margin-top:8px">⚠️ Stima indicativa. Consulta un commercialista per la dichiarazione ufficiale.</div>
+    </div>
+  </div>
+
   <!-- Earnings prossimi -->
   <div id="port-earnings-wrap" style="display:none" class="earnings-section">
     <div class="earnings-hd">📅 Prossimi bilanci</div>
@@ -1334,6 +1416,23 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
       <input class="chat-input" id="chat-input" type="text" placeholder="Scrivi o allega un grafico 📸..." onkeydown="if(event.key==='Enter')sendChat()"/>
       <button class="chat-send-btn" onclick="sendChat()">▶</button>
     </div>
+  </div>
+</div>
+
+<!-- ── Briefing view ── -->
+<div id="briefing-view">
+  <div class="briefing-header">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <div class="briefing-title" id="br-title">📰 Briefing di Mercato</div>
+        <div class="briefing-date" id="br-date"></div>
+      </div>
+      <button class="briefing-refresh" onclick="_loadBriefing(true)">↻ Aggiorna</button>
+    </div>
+    <div id="br-mood-wrap" style="margin-bottom:14px"></div>
+  </div>
+  <div id="br-body">
+    <div class="briefing-loading">🤖 Generazione briefing in corso…</div>
   </div>
 </div>
 
@@ -1561,6 +1660,16 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
           <div id="m-ai-badge"></div>
         </div>
       </div>
+    </div>
+
+    <!-- Confronta con un'altra azione -->
+    <button class="btn-confronta" id="btn-confronta" onclick="_toggleCompare()">🔀 Confronta con un'altra azione…</button>
+    <div class="compare-panel" id="compare-panel">
+      <div class="compare-input-row">
+        <input class="compare-input" id="compare-input" type="text" placeholder="Es. MSFT, ENI.MI, BTC-USD" autocapitalize="characters" spellcheck="false" maxlength="20"/>
+        <button class="compare-btn" onclick="_runCompare()">Confronta</button>
+      </div>
+      <div class="compare-result" id="compare-result"></div>
     </div>
 
     <!-- Notizie -->
@@ -2081,6 +2190,12 @@ document.getElementById('chart-type-group').addEventListener('click',e=>{
 
 async function openModal(stock){
   _modalTicker=stock.ticker;
+  // Confronta: imposta ticker corrente e resetta panel
+  _compareTicker1=stock.ticker;
+  document.getElementById('compare-panel').classList.remove('open');
+  document.getElementById('compare-result').className='compare-result';
+  document.getElementById('compare-result').innerHTML='';
+  document.getElementById('compare-input').value='';
   document.getElementById('m-ai-loading').style.display='block';
   document.getElementById('m-ai-content').style.display='none';
   document.getElementById('m-forecast-body').innerHTML='<div class="forecast-loading">🔮 &nbsp;Calcolo previsione…</div>';
@@ -2470,7 +2585,9 @@ async function renderPortfolio(){
 
   if(!tickers.length){
     wrap.innerHTML='<div class="history-empty"><span class="icon">💼</span>Aggiungi la tua prima posizione sopra.</div>';
-    sum.style.display='none'; chartWrap.style.display='none'; return;
+    sum.style.display='none'; chartWrap.style.display='none';
+    document.getElementById('tax-section').style.display='none';
+    return;
   }
 
   wrap.innerHTML='<div class="history-empty" style="padding:20px"><span class="icon" style="font-size:1.4rem">⏳</span>Aggiornamento prezzi…</div>';
@@ -2519,6 +2636,9 @@ async function renderPortfolio(){
   sum.style.display='grid';
   document.getElementById('port-valuta-row').style.display='block';
   document.getElementById('port-ai-card').style.display='none';
+
+  // Tax calculator (commissioni €1 + 26% capital gain)
+  _renderTaxSection(totalPL, tickers.length);
 
   // Portfolio chart (andamento ultimi 30gg, tutte le posizioni)
   _renderPortfolioChart(port, tickers, chartWrap);
@@ -3216,7 +3336,7 @@ initAuth();
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab switching (5 tab)
 // ══════════════════════════════════════════════════════════════════════════════
-const _VIEWS = ['live','history','heatmap','portfolio','watchlist','calendar','ai-chat'];
+const _VIEWS = ['live','history','heatmap','portfolio','watchlist','calendar','ai-chat','briefing'];
 let _tabLoaded = {};
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -3240,6 +3360,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       if(tab==='portfolio') renderPortfolio();
       if(tab==='watchlist') renderWatchlist();
       if(tab==='calendar')  loadCalendar();
+      if(tab==='briefing')  _loadBriefing(false);
     }
   });
 });
@@ -4494,6 +4615,145 @@ async function runChartAnalysis(){
     onChartFileSelected(input);
   });
 })();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Confronta AI tra 2 azioni
+// ══════════════════════════════════════════════════════════════════════════════
+let _compareTicker1 = '';
+function _toggleCompare(){
+  const p=document.getElementById('compare-panel');
+  p.classList.toggle('open');
+  if(p.classList.contains('open')) document.getElementById('compare-input').focus();
+}
+async function _runCompare(){
+  const t2=(document.getElementById('compare-input').value.trim().toUpperCase().replace(/[^A-Z0-9.]/g,''));
+  if(!t2||!_compareTicker1){return;}
+  const res=document.getElementById('compare-result');
+  res.className='compare-result';
+  res.innerHTML='<div style="text-align:center;padding:14px;font-size:.8rem;color:var(--text-dim)">🤖 Analisi in corso…</div>';
+  res.classList.add('loaded');
+  try{
+    const data=await fetch('/api/compare',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ticker1:_compareTicker1,ticker2:t2}),
+    }).then(r=>r.json());
+    if(data.error){res.innerHTML=`<div style="color:var(--red);padding:10px">${data.error}</div>`;return;}
+    const w=data.vincitore;
+    const col1Cls=w===data.ticker1?'compare-col winner':'compare-col';
+    const col2Cls=w===data.ticker2?'compare-col winner':'compare-col';
+    res.innerHTML=`
+      <div class="compare-vs-row">
+        <div class="${col1Cls}">
+          <div class="compare-col-ticker">${data.ticker1}</div>
+          <div class="compare-col-name">${data.name1}</div>
+          <div class="compare-col-pro">✅ ${data.pro1||'—'}</div>
+          <div class="compare-col-contro">⚠️ ${data.contro1||'—'}</div>
+        </div>
+        <div class="compare-vs-badge">VS</div>
+        <div class="${col2Cls}">
+          <div class="compare-col-ticker">${data.ticker2}</div>
+          <div class="compare-col-name">${data.name2}</div>
+          <div class="compare-col-pro">✅ ${data.pro2||'—'}</div>
+          <div class="compare-col-contro">⚠️ ${data.contro2||'—'}</div>
+        </div>
+      </div>
+      <div class="compare-winner-row">
+        <div style="font-size:.72rem;color:var(--text-dim);margin-bottom:4px">VINCITORE</div>
+        <div class="compare-winner-label">🏆 ${w}</div>
+        <div class="compare-conf">${data.motivo||''}</div>
+        <div class="compare-conf" style="margin-top:3px">Confidenza AI: ${data.confidenza}%</div>
+      </div>`;
+  }catch(e){
+    res.innerHTML=`<div style="color:var(--red);padding:10px">Errore: ${e.message}</div>`;
+  }
+}
+// Popolato in openModal
+document.getElementById('compare-input').addEventListener('keydown',e=>{if(e.key==='Enter')_runCompare();});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Briefing mercato giornaliero
+// ══════════════════════════════════════════════════════════════════════════════
+async function _loadBriefing(forceRefresh=false){
+  const body=document.getElementById('br-body');
+  body.innerHTML='<div class="briefing-loading">🤖 Generazione briefing AI in corso… (~10s)</div>';
+  try{
+    const url=forceRefresh?'/api/briefing?r='+Date.now():'/api/briefing';
+    const data=await fetch(url).then(r=>r.json());
+    if(data.error){body.innerHTML=`<div class="briefing-loading" style="color:var(--red)">${data.error}</div>`;return;}
+
+    document.getElementById('br-title').textContent=data.titolo||'📰 Briefing di Mercato';
+    document.getElementById('br-date').textContent=data.date||'';
+
+    const moodEl=document.getElementById('br-mood-wrap');
+    const moodEmoji=data.mood==='BULL'?'🐂 BULLISH':data.mood==='BEAR'?'🐻 BEARISH':'😐 NEUTRO';
+    moodEl.innerHTML=`<span class="briefing-mood ${data.mood}">${moodEmoji}</span>`;
+
+    const sections=[
+      {key:'apertura',label:'🌅 Apertura'},
+      {key:'macro',label:'🌍 Macro'},
+      {key:'crypto',label:'₿ Crypto'},
+      {key:'commodities',label:'🛢️ Commodities'},
+      {key:'outlook',label:'🔭 Outlook'},
+    ];
+    let html='';
+    sections.forEach(s=>{
+      if(!data[s.key]) return;
+      html+=`<div class="briefing-section">
+        <div class="briefing-section-hd">${s.label}</div>
+        <div class="briefing-section-txt">${data[s.key]}</div>
+      </div>`;
+    });
+
+    if(data.indices&&data.indices.length){
+      html+='<div class="briefing-indices">';
+      data.indices.forEach(row=>{
+        const parts=row.split(': ');
+        const name=parts[0]||row;
+        const rest=parts.slice(1).join(': ');
+        const isNeg=rest.includes('-')&&rest.match(/\(-[\d.]+%\)/);
+        const color=isNeg?'var(--red)':'var(--green)';
+        html+=`<div class="briefing-idx">
+          <div class="briefing-idx-name">${name}</div>
+          <div class="briefing-idx-val" style="color:${color}">${rest}</div>
+        </div>`;
+      });
+      html+='</div>';
+    }
+    body.innerHTML=html;
+  }catch(e){
+    body.innerHTML=`<div class="briefing-loading" style="color:var(--red)">Errore: ${e.message}</div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Commissione €1 Revolut + Tax calculator 26%
+// ══════════════════════════════════════════════════════════════════════════════
+// Traccia numero di operazioni aggiunte (buy/sell) nel portfolio
+// Ogni posizione aggiunta conta come 1 commissione di €1
+function _calcTax(totalPL, numOps){
+  const commissions=numOps*1; // €1 per trade
+  const taxable=Math.max(0,totalPL-commissions);
+  const taxDue=taxable*0.26;
+  const netGain=totalPL-commissions-taxDue;
+  return {commissions,taxable,taxDue,netGain};
+}
+
+function _renderTaxSection(totalPL, numOps){
+  const sec=document.getElementById('tax-section');
+  if(totalPL<=0){sec.style.display='none';return;}
+  const {commissions,taxable,taxDue,netGain}=_calcTax(totalPL,numOps);
+  const sym=_fxSym, r=_fxRate;
+  const fmt=v=>(v>=0?'+':'')+sym+(Math.abs(v)*r).toFixed(2);
+  document.getElementById('tax-gain').textContent=fmt(totalPL);
+  document.getElementById('tax-commissions').textContent=`-${sym}${(commissions*r).toFixed(2)}`;
+  document.getElementById('tax-taxable').textContent=fmt(taxable);
+  document.getElementById('tax-due').textContent=`-${sym}${(taxDue*r).toFixed(2)}`;
+  const netEl=document.getElementById('tax-net');
+  netEl.textContent=fmt(netGain);
+  netEl.className='tax-val '+(netGain>=0?'positive':'negative');
+  sec.style.display='';
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PWA — Service Worker
