@@ -83,7 +83,27 @@ header{
   background:var(--surf-v);border:1px solid var(--border);
   border-radius:100px;padding:7px 18px;
   transition:border-color .2s,box-shadow .2s;
+  position:relative;
 }
+/* Suggerimenti ricerca globale */
+.search-dropdown{
+  position:absolute;top:calc(100% + 6px);left:0;right:0;
+  background:var(--surf);border:1px solid var(--border-hi);
+  border-radius:var(--r-lg);box-shadow:0 12px 40px rgba(0,0,0,.35);
+  z-index:500;overflow:hidden;display:none;
+}
+.search-dropdown.open{display:block}
+.search-sugg{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;cursor:pointer;transition:background .12s;
+  border-bottom:1px solid var(--border);
+}
+.search-sugg:last-child{border-bottom:none}
+.search-sugg:hover{background:rgba(196,166,255,.1)}
+.sugg-ticker{font-size:.82rem;font-weight:800;color:var(--primary);min-width:56px;flex-shrink:0}
+.sugg-name{font-size:.78rem;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sugg-exch{font-size:.64rem;color:var(--text-dim);flex-shrink:0}
+.sugg-type{font-size:.58rem;padding:1px 5px;border-radius:4px;background:var(--border);color:var(--text-dim);flex-shrink:0;text-transform:uppercase}
 .header-search:focus-within{border-color:var(--border-hi);box-shadow:0 0 0 3px rgba(196,166,255,.09)}
 .header-search input{
   flex:1;background:transparent;border:none;outline:none;
@@ -979,7 +999,8 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   </div>
   <div class="header-search">
     <span style="font-size:.95rem;opacity:.6">🔍</span>
-    <input id="search-input" type="text" placeholder="Cerca azione... TSLA · NVDA · AAPL" autocomplete="off" spellcheck="false" autocapitalize="characters" />
+    <input id="search-input" type="text" placeholder="Cerca qualsiasi azione mondiale... AAPL, ENI.MI, BTC-USD" autocomplete="off" spellcheck="false" />
+    <div class="search-dropdown" id="search-dropdown"></div>
   </div>
   <div class="header-right">
     <div class="level-badge" id="level-badge">
@@ -1086,7 +1107,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
   <!-- Add form -->
   <div class="port-add-wrap">
-    <input id="port-ticker" class="port-input" type="text" placeholder="Ticker (es. NVDA)" maxlength="10" autocapitalize="characters" spellcheck="false"/>
+    <input id="port-ticker" class="port-input" type="text" placeholder="Ticker mondiale (NVDA, ENI.MI, BTC-USD…)" maxlength="20" autocapitalize="characters" spellcheck="false"/>
     <input id="port-price" class="port-input port-input-sm" type="number" placeholder="Prezzo acquisto $" step="0.0001" min="0"/>
     <input id="port-qty" class="port-input port-input-sm" type="number" placeholder="Quantità" step="1" min="1"/>
     <button class="port-add-btn" id="port-add-btn">+ Aggiungi</button>
@@ -1926,19 +1947,79 @@ document.querySelectorAll('.ctrl-btn[data-sort]').forEach(btn=>{
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Search
 // ══════════════════════════════════════════════════════════════════════════════
-let searchTimer=null;
-document.getElementById('search-input').addEventListener('input',e=>{
-  const val=e.target.value.trim().toUpperCase().replace(/[^A-Z0-9.\-^]/g,'');
-  clearTimeout(searchTimer);
-  if(!val)return;
-  searchTimer=setTimeout(()=>{
-    if(val.length>=1) openModal({ticker:val,day_change_pct:0,current_price:0,name:val,score_10:0});
-  },650);
+// Ricerca globale con autocomplete
+// ══════════════════════════════════════════════════════════════════════════════
+let _searchTimer=null;
+const _searchInput=document.getElementById('search-input');
+const _searchDrop=document.getElementById('search-dropdown');
+
+function _closeSearchDrop(){ _searchDrop.classList.remove('open'); _searchDrop.innerHTML=''; }
+
+_searchInput.addEventListener('input', e=>{
+  const q=e.target.value.trim();
+  clearTimeout(_searchTimer);
+  if(!q){ _closeSearchDrop(); return; }
+
+  _searchTimer=setTimeout(async()=>{
+    // Se è un ticker puro (≤7 char, solo lettere+punto+^) mostra subito + cerca
+    const isPureTicker=/^[A-Z0-9.\-\^]{1,7}$/i.test(q);
+
+    try{
+      const results=await fetch('/api/search?q='+encodeURIComponent(q)).then(r=>r.ok?r.json():[]);
+      if(!results.length){
+        // fallback: tratta come ticker diretto
+        if(isPureTicker){
+          _closeSearchDrop();
+          openModal({ticker:q.toUpperCase(),day_change_pct:0,current_price:0,name:q.toUpperCase(),score_10:0});
+        }
+        return;
+      }
+      _searchDrop.innerHTML=results.map(r=>`
+        <div class="search-sugg" data-ticker="${r.ticker}">
+          <span class="sugg-ticker">${r.ticker}</span>
+          <span class="sugg-name">${r.name||r.ticker}</span>
+          <span class="sugg-exch">${r.exchange||''}</span>
+          <span class="sugg-type">${r.type||''}</span>
+        </div>`).join('');
+      _searchDrop.classList.add('open');
+      _searchDrop.querySelectorAll('.search-sugg').forEach(el=>{
+        el.addEventListener('click',()=>{
+          const ticker=el.dataset.ticker;
+          const name=el.querySelector('.sugg-name')?.textContent||ticker;
+          _searchInput.value='';
+          _closeSearchDrop();
+          openModal({ticker,day_change_pct:0,current_price:0,name,score_10:0});
+        });
+      });
+    }catch(_){
+      if(isPureTicker){
+        _closeSearchDrop();
+        openModal({ticker:q.toUpperCase(),day_change_pct:0,current_price:0,name:q.toUpperCase(),score_10:0});
+      }
+    }
+  }, 320);
 });
+
+// Enter su search → apre primo risultato o ticker diretto
+_searchInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const first=_searchDrop.querySelector('.search-sugg');
+    if(first){ first.click(); return; }
+    const q=_searchInput.value.trim().toUpperCase().replace(/\s+/g,'');
+    if(q){ _searchInput.value=''; _closeSearchDrop(); openModal({ticker:q,day_change_pct:0,current_price:0,name:q,score_10:0}); }
+  }
+  if(e.key==='Escape'){ closeModal(); _searchInput.value=''; _closeSearchDrop(); }
+});
+
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){closeModal();document.getElementById('search-input').value='';}
+  if(e.key==='Escape'&&!_searchDrop.classList.contains('open')){closeModal();}
+});
+
+// Chiudi dropdown se click fuori
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.header-search')) _closeSearchDrop();
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

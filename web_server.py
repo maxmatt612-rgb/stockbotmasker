@@ -594,6 +594,42 @@ async def api_market_movers():
     return _clean(data)
 
 
+@app.get("/api/search")
+async def api_search(q: str = ""):
+    """Ricerca globale di qualsiasi azione/ETF/crypto nel mondo via yfinance — cache 5 min."""
+    q = q.strip()
+    if len(q) < 1:
+        return []
+    key = f"search:{q.lower()}"
+    if (c := _cached(key, 300)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        try:
+            res = yf.Search(q, max_results=10, enable_fuzzy_query=True)
+            quotes = res.quotes or []
+            out = []
+            for r in quotes:
+                sym = r.get("symbol", "")
+                if not sym:
+                    continue
+                out.append({
+                    "ticker":   sym,
+                    "name":     r.get("shortName") or r.get("longName") or sym,
+                    "exchange": r.get("fullExchangeName") or r.get("exchange") or "",
+                    "type":     r.get("quoteType") or "",
+                })
+            return out[:8]
+        except Exception as e:
+            print(f"[search] {e}")
+            return []
+
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return _clean(data)
+
+
 @app.get("/api/heatmap")
 async def api_heatmap_data():
     """Heatmap USA large-cap + Europa ADR — cache 60s."""
