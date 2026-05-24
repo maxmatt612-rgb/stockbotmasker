@@ -137,28 +137,27 @@ header{
 .mkt-pill-info{display:flex;flex-direction:column;gap:0;min-width:42px}
 .mkt-pill-label{font-size:.6rem;font-weight:800;letter-spacing:.04em;line-height:1.25}
 .mkt-pill-time{font-size:.58rem;color:var(--text-dim);line-height:1.25;font-variant-numeric:tabular-nums}
-/* ── Rotating ticker (fade one item at a time) ── */
-.tape-scroll-wrap{
-  flex:1;overflow:hidden;position:relative;height:42px;
-  display:flex;align-items:center;padding:0 14px;
+/* ── Infinite scroll ticker ── */
+.tape-scroll-wrap{flex:1;overflow:hidden;position:relative;height:42px}
+.tape-marquee{
+  display:inline-flex;align-items:center;
+  height:42px;white-space:nowrap;
+  animation:marquee-roll 22s linear infinite;
 }
-.tape-slot{
-  display:flex;align-items:center;gap:10px;
-  position:absolute;left:14px;right:14px;
-  opacity:0;
-  transition:opacity .35s ease, transform .35s ease;
-  transform:translateY(6px);
-  pointer-events:none;
+.tape-marquee:hover{animation-play-state:paused}
+@keyframes marquee-roll{
+  from{transform:translateX(0)}
+  to{transform:translateX(-50%)}
 }
-.tape-slot.ts-in{
-  opacity:1;transform:translateY(0);pointer-events:auto;
+.tape-item{
+  display:inline-flex;align-items:center;gap:9px;
+  padding:0 20px;height:42px;
+  border-right:1px solid var(--border);
+  flex-shrink:0;
 }
-.tape-slot.ts-out{
-  opacity:0;transform:translateY(-6px);
-}
-.tape-name{font-size:.66rem;color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:.04em;flex-shrink:0}
-.tape-price{font-size:.86rem;font-weight:900;color:var(--text);flex-shrink:0}
-.tape-chg{font-size:.74rem;font-weight:700;flex-shrink:0}
+.tape-name{font-size:.65rem;color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.tape-price{font-size:.84rem;font-weight:900;color:var(--text)}
+.tape-chg{font-size:.72rem;font-weight:700}
 .pos{color:var(--green)}.neg{color:var(--red)}
 
 /* ── Hero ── */
@@ -1123,10 +1122,9 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
       </div>
     </div>
   </div>
-  <!-- Rotating ticker — 1 indice alla volta, fade in/out -->
+  <!-- Infinite scroll ticker -->
   <div class="tape-scroll-wrap">
-    <div class="tape-slot" id="tape-slot-a"></div>
-    <div class="tape-slot" id="tape-slot-b"></div>
+    <div class="tape-marquee" id="tape-marquee"></div>
   </div>
 </div>
 
@@ -1953,59 +1951,39 @@ function updateMarketStatus(){
 setInterval(updateMarketStatus, 1000); // ogni secondo per l'orologio live
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Rotating ticker — mostra 5 indici uno alla volta, fade in/out ogni 3s
+// Infinite scroll ticker — CSS animation, contenuto duplicato per loop seamless
 // ══════════════════════════════════════════════════════════════════════════════
 const _TAPE_KEYS = ['SP500','NASDAQ','BTC','GOLD','OIL'];
-let _tapeData = {};
-let _tapeIdx = 0;
-let _tapeActive = 'a'; // alterna slot-a e slot-b
 
-function _tapeFmt(it){
-  if(!it||it.price===0) return null;
-  const price = it.price>=1000
-    ? it.price.toLocaleString('it-IT',{minimumFractionDigits:0,maximumFractionDigits:0})
-    : it.price.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const chg = (it.chg>=0?'+':'')+it.chg.toFixed(2)+'%';
-  const cls = it.chg>=0?'pos':'neg';
-  return `<span class="tape-name">${it.label}</span><span class="tape-price">${price}</span><span class="tape-chg ${cls}">${chg}</span>`;
-}
-
-function _tapeStep(){
-  if(!Object.keys(_tapeData).length) return;
-  // trova prossimo indice con dati validi
-  let tries=0, key;
-  do { key=_TAPE_KEYS[_tapeIdx % _TAPE_KEYS.length]; _tapeIdx++; tries++; }
-  while((!_tapeData[key]||_tapeData[key].price===0) && tries<_TAPE_KEYS.length);
-  const html=_tapeFmt(_tapeData[key]);
-  if(!html) return;
-
-  const next = _tapeActive==='a'?'b':'a';
-  const slotIn  = document.getElementById('tape-slot-'+next);
-  const slotOut = document.getElementById('tape-slot-'+_tapeActive);
-
-  slotIn.innerHTML = html;
-  // prima togli classe attiva dall'uscente
-  slotOut.classList.remove('ts-in');
-  slotOut.classList.add('ts-out');
-  // piccolo delay per lasciar partire il fade-out
-  setTimeout(()=>{
-    slotOut.classList.remove('ts-out');
-    slotIn.classList.add('ts-in');
-    _tapeActive = next;
-  }, 50);
+function _buildTapeItems(data){
+  let html = '';
+  _TAPE_KEYS.forEach(k=>{
+    const it = data[k]; if(!it||it.price===0) return;
+    const price = it.price >= 1000
+      ? it.price.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})
+      : it.price.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const chg = (it.chg>=0?'+':'')+it.chg.toFixed(2)+'%';
+    const cls = it.chg>=0?'pos':'neg';
+    html += `<div class="tape-item">
+      <span class="tape-name">${it.label}</span>
+      <span class="tape-price">${price}</span>
+      <span class="tape-chg ${cls}">${chg}</span>
+    </div>`;
+  });
+  return html;
 }
 
 async function loadIndices(){
   try{
-    const d=await fetch('/api/market/indices').then(r=>r.json());
-    _tapeData=d;
-    // Primo render immediato
-    if(!document.getElementById('tape-slot-a').classList.contains('ts-in')) _tapeStep();
+    const d = await fetch('/api/market/indices').then(r=>r.json());
+    const marquee = document.getElementById('tape-marquee');
+    if(!marquee) return;
+    const items = _buildTapeItems(d);
+    if(!items) return;
+    // Duplica: translateX(-50%) = esattamente un giro, loop seamless
+    marquee.innerHTML = items + items;
   }catch(_){}
 }
-
-// Avvia rotazione ogni 3 secondi
-setInterval(_tapeStep, 3000);
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 3D Card Tilt
