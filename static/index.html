@@ -2410,7 +2410,7 @@ async function _renderSectorChart(positions){
   });
   const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
   txt.setAttribute('x',cx);txt.setAttribute('y',cy+4);txt.setAttribute('text-anchor','middle');
-  txt.setAttribute('font-size','9');txt.setAttribute('font-weight','700');txt.setAttribute('fill','#0F172A');
+  txt.setAttribute('font-size','9');txt.setAttribute('font-weight','700');txt.setAttribute('fill','currentColor');
   txt.textContent=Object.keys(byS).length+' settori';
   svg.appendChild(txt);
 }
@@ -2586,7 +2586,7 @@ function _applyIndicators(){
     const rsiData=calcRSI(closes);
     const rsiChart=LightweightCharts.createChart(rsiEl,{
       width:rsiEl.offsetWidth,height:80,
-      layout:{background:{type:'Solid',color:'transparent'},textColor:'#64748B'},
+      layout:{background:{type:'solid',color:'transparent'},textColor:'#64748B'},
       grid:{vertLines:{color:'transparent'},horzLines:{color:'rgba(15,23,42,.06)'}},
       rightPriceScale:{borderColor:'transparent',scaleMargins:{top:.1,bottom:.1}},
       timeScale:{borderColor:'transparent',visible:false},
@@ -3683,7 +3683,7 @@ async function loadCorrelation() {
         const v = data.matrix[t1][t2];
         const bg = t1===t2 ? 'rgba(196,166,255,.3)' : corrColor(v);
         const txt = t1===t2 ? '—' : v.toFixed(2);
-        html += `<div class="corr-cell" style="background:${bg};height:${size}px;font-size:${size<32?'.5':'}.62'}rem" title="${t1}/${t2}: ${v}">${txt}</div>`;
+        html += `<div class="corr-cell" style="background:${bg};height:${size}px;font-size:${size<32?'.5':'.62'}rem" title="${t1}/${t2}: ${v}">${txt}</div>`;
       });
     });
     html += '</div><div style="display:flex;gap:12px;margin-top:8px;font-size:.62rem;color:var(--text-dim);flex-wrap:wrap">'
