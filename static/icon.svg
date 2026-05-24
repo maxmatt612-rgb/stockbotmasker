@@ -1,5 +1,48 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
   <rect width="512" height="512" rx="110" fill="#06061A"/>
-  <rect x="40" y="40" width="432" height="432" rx="80" fill="#0D0D26"/>
-  <text x="256" y="340" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="260" font-weight="900" fill="#C4A6FF">M</text>
+
+  <defs>
+    <clipPath id="il">
+      <ellipse cx="180" cy="249" rx="67.5" ry="52.2"/>
+    </clipPath>
+    <clipPath id="ir">
+      <ellipse cx="333" cy="249" rx="67.5" ry="52.2"/>
+    </clipPath>
+  </defs>
+
+  <!-- Mask body with transparent eye holes (evenodd) -->
+  <path fill-rule="evenodd" clip-rule="evenodd"
+    d="M256 132 C157 132 67 182 67 258 C67 312 112 357 184 375 L256 389 L328 375 C400 357 445 312 445 258 C445 182 355 132 256 132Z
+    M180 196.8 A 67.5 52.2 0 1 0 180 301.2 A 67.5 52.2 0 1 0 180 196.8Z
+    M333 196.8 A 67.5 52.2 0 1 0 333 301.2 A 67.5 52.2 0 1 0 333 196.8Z"
+    fill="#0a0a18"/>
+
+  <!-- Left eye: ascending candlestick chart -->
+  <g clip-path="url(#il)">
+    <!-- Wicks -->
+    <line x1="136" y1="268" x2="136" y2="281" stroke="#10B981" stroke-width="4" stroke-linecap="round"/>
+    <line x1="167" y1="236" x2="167" y2="254" stroke="#10B981" stroke-width="4" stroke-linecap="round"/>
+    <line x1="198" y1="210" x2="198" y2="231" stroke="#10B981" stroke-width="4" stroke-linecap="round"/>
+    <line x1="229" y1="190" x2="229" y2="209" stroke="#10B981" stroke-width="4" stroke-linecap="round"/>
+    <!-- Bodies -->
+    <rect x="126" y="281" width="20" height="18"  rx="4" fill="#10B981"/>
+    <rect x="157" y="254" width="20" height="45"  rx="4" fill="#10B981"/>
+    <rect x="188" y="231" width="20" height="68"  rx="4" fill="#10B981"/>
+    <rect x="219" y="209" width="20" height="90"  rx="4" fill="#10B981"/>
+  </g>
+
+  <!-- Right eye: ascending candlestick chart -->
+  <g clip-path="url(#ir)">
+    <!-- Wicks -->
+    <line x1="289" y1="268" x2="289" y2="281" stroke="#10B981" stroke-width="4" stroke-linecap="round"/>
+    <line x1="320" y1="236" x2="320" y2="254" stroke="#10B981" stroke-width="4" stroke-linecap="round"/>
+    <line x1="351" y1="210" x2="351" y2="231" stroke="#10B981" stroke-width="4" stroke-linecap="round"/>
+    <line x1="382" y1="190" x2="382" y2="209" stroke="#10B981" stroke-width="4" stroke-linecap="round"/>
+    <!-- Bodies -->
+    <rect x="279" y="281" width="20" height="18"  rx="4" fill="#10B981"/>
+    <rect x="310" y="254" width="20" height="45"  rx="4" fill="#10B981"/>
+    <rect x="341" y="231" width="20" height="68"  rx="4" fill="#10B981"/>
+    <rect x="372" y="209" width="20" height="90"  rx="4" fill="#10B981"/>
+  </g>
 </svg>

@@ -54,6 +54,11 @@ body.dark .detail-cell{background:var(--surf-v)}
 body.dark .skel-card{background:var(--surf)}
 body.dark .chat-bubble.ai{background:var(--surf)}
 body.dark .disc-banner{background:rgba(245,158,11,.05);border-color:rgba(245,158,11,.12)}
+body.dark .risk-card{background:var(--surf);box-shadow:none}
+body.dark .rebal-table{background:var(--surf)}
+body.dark .alert-panel{background:var(--surf)}
+body.dark .eco-item{background:var(--surf-v)}
+body.dark .alert-item{background:var(--surf-v)}
 body.dark #ai-chat-view{background:var(--bg)}
 
 /* ── Dark toggle button ── */
@@ -860,11 +865,33 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 <header>
   <div class="logo">
     <div class="logo-icon">
-      <svg width="22" height="16" viewBox="0 0 44 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M22 1C11 1 1 6.5 1 15C1 21 6 26 14 28L22 29.5L30 28C38 26 43 21 43 15C43 6.5 33 1 22 1Z" fill="#000" stroke="rgba(196,166,255,0.5)" stroke-width="1.2"/>
-        <ellipse cx="13.5" cy="14" rx="7.5" ry="5.8" fill="#06061A"/>
-        <ellipse cx="30.5" cy="14" rx="7.5" ry="5.8" fill="#06061A"/>
-        <path d="M21 14C21.5 11.5 22.5 11.5 23 14" stroke="rgba(196,166,255,0.35)" stroke-width="1" stroke-linecap="round" fill="none"/>
+      <svg width="28" height="20" viewBox="0 0 44 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <clipPath id="logo-ml">
+            <ellipse cx="13.5" cy="14" rx="7.5" ry="5.8"/>
+          </clipPath>
+          <clipPath id="logo-mr">
+            <ellipse cx="30.5" cy="14" rx="7.5" ry="5.8"/>
+          </clipPath>
+        </defs>
+        <!-- Mask body with transparent eye holes -->
+        <path fill-rule="evenodd" clip-rule="evenodd"
+          d="M22 1C11 1 1 6.5 1 15C1 21 6 26 14 28L22 29.5L30 28C38 26 43 21 43 15C43 6.5 33 1 22 1Z M13.5 8.2C9.3 8.2 6 10.8 6 14C6 17.2 9.3 19.8 13.5 19.8C17.7 19.8 21 17.2 21 14C21 10.8 17.7 8.2 13.5 8.2Z M30.5 8.2C26.3 8.2 23 10.8 23 14C23 17.2 26.3 19.8 30.5 19.8C34.7 19.8 38 17.2 38 14C38 10.8 34.7 8.2 30.5 8.2Z"
+          fill="#060612"/>
+        <!-- Left eye: ascending chart bars (candlestick) -->
+        <g clip-path="url(#logo-ml)">
+          <rect x="7"    y="17.5" width="2.3" height="2"   rx="0.4" fill="#10B981"/>
+          <rect x="10.5" y="15"   width="2.3" height="4.5" rx="0.4" fill="#10B981"/>
+          <rect x="14"   y="12"   width="2.3" height="7.5" rx="0.4" fill="#10B981"/>
+          <rect x="17.5" y="9.5"  width="2.3" height="10"  rx="0.4" fill="#10B981"/>
+        </g>
+        <!-- Right eye: ascending chart bars (candlestick) -->
+        <g clip-path="url(#logo-mr)">
+          <rect x="24"   y="17.5" width="2.3" height="2"   rx="0.4" fill="#10B981"/>
+          <rect x="27.5" y="15"   width="2.3" height="4.5" rx="0.4" fill="#10B981"/>
+          <rect x="31"   y="12"   width="2.3" height="7.5" rx="0.4" fill="#10B981"/>
+          <rect x="34.5" y="9.5"  width="2.3" height="10"  rx="0.4" fill="#10B981"/>
+        </g>
       </svg>
     </div>
     <span class="logo-text">Masker</span>
@@ -3240,7 +3267,7 @@ async function runComparison(){
   valid.forEach(({hist,color})=>{
     const base=hist[0].close;
     const s=_cmpLwChart.addLineSeries({color,lineWidth:2,priceFormat:{type:'custom',formatter:v=>v.toFixed(1)+'%'}});
-    s.setData(hist.map(h=>({time:h.time,value:(h.close-base)/base*100})));
+    s.setData(hist.map(h=>({time:h.date,value:(h.close-base)/base*100})));
   });
   _cmpLwChart.timeScale().fitContent();
   legendEl.innerHTML=valid.map(({t,color,hist})=>{
