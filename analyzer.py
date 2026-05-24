@@ -84,6 +84,15 @@ def get_full_analysis(ticker: str) -> dict | None:
             "beta": info.get("beta"),
             "sector": info.get("sector"),
             "pe_ratio": info.get("trailingPE"),
+            # Fondamentali aggiuntivi
+            "forward_pe":    info.get("forwardPE"),
+            "eps":           info.get("trailingEps"),
+            "revenue":       info.get("totalRevenue"),
+            "debt_equity":   info.get("debtToEquity"),
+            "profit_margin": info.get("profitMargins"),
+            "dividend_yield":info.get("dividendYield"),
+            "market_cap":    info.get("marketCap"),
+            "roe":           info.get("returnOnEquity"),
         }
     except Exception as e:
         print(f"[analyzer] Errore per {ticker}: {e}")

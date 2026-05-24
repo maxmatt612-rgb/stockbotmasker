@@ -1342,6 +1342,35 @@ async def api_news(ticker: str):
         return result
 
     data = await asyncio.to_thread(_get)
+
+    # Sentiment AI su ogni titolo (una sola chiamata Groq per tutte le headline)
+    if groq_client and data:
+        titles_str = "\n".join(f"{i+1}. {r['title']}" for i, r in enumerate(data))
+        sent_prompt = (
+            f"Per ognuno di questi titoli di notizie finanziarie su {t}, "
+            "rispondi SOLO con il numero e una parola: POSITIVO, NEGATIVO o NEUTRO.\n\n"
+            + titles_str
+        )
+        try:
+            resp = await groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile", max_tokens=60,
+                messages=[{"role": "user", "content": sent_prompt}]
+            )
+            for line in resp.choices[0].message.content.strip().split("\n"):
+                parts = line.strip().split(".", 1)
+                if len(parts) == 2:
+                    try:
+                        idx = int(parts[0].strip()) - 1
+                        s = parts[1].strip().upper()
+                        if 0 <= idx < len(data) and s in ("POSITIVO", "NEGATIVO", "NEUTRO"):
+                            data[idx]["sentiment"] = s
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+    for r in data:
+        r.setdefault("sentiment", "NEUTRO")
+
     _store(key, data)
     return data
 

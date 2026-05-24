@@ -284,6 +284,58 @@ header{
 .badge-neutro{background:rgba(255,184,108,.15);color:var(--gold)}
 .ai-loading{text-align:center;padding:18px;font-size:.8rem;color:var(--text-dim);animation:shimmer 1.8s infinite}
 
+/* ── Dati fondamentali (modal) ── */
+.fund-section{margin-top:12px}
+.fund-hd{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);padding:8px 0 6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border)}
+.fund-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;display:none}
+.fund-grid.open{display:grid}
+.fund-cell{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 12px}
+.fund-cell-label{font-size:.6rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.fund-cell-val{font-size:.84rem;font-weight:700}
+
+/* ── Sentiment badge (notizie) ── */
+.news-sentiment{display:inline-block;font-size:.6rem;font-weight:700;padding:1px 6px;border-radius:4px;margin-left:5px;vertical-align:middle}
+.news-sentiment.pos{background:rgba(16,185,129,.18);color:var(--green)}
+.news-sentiment.neg{background:rgba(239,68,68,.18);color:var(--red)}
+.news-sentiment.neu{background:rgba(142,138,158,.15);color:var(--text-dim)}
+
+/* ── Toast notification ── */
+.app-toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surf);border:1px solid var(--border-hi);border-radius:var(--r-lg);padding:11px 18px;font-size:.8rem;font-weight:600;color:var(--text);box-shadow:0 8px 32px rgba(0,0,0,.35);z-index:2000;opacity:0;transition:all .35s;white-space:nowrap;max-width:90vw;text-align:center}
+.app-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── XP Bar (header) ── */
+.xp-chip{display:flex;align-items:center;gap:5px;background:var(--surf-v);border:1px solid var(--border);border-radius:100px;padding:4px 10px 4px 8px;cursor:pointer;transition:border-color .2s}
+.xp-chip:hover{border-color:var(--primary)}
+.xp-level-badge{font-size:.62rem;font-weight:800;padding:2px 6px;border-radius:100px;background:var(--primary);color:#fff}
+.xp-bar-wrap{width:54px;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.xp-bar-fill{height:100%;background:var(--primary);border-radius:3px;transition:width .4s}
+.xp-pts{font-size:.6rem;color:var(--text-dim);white-space:nowrap}
+
+/* ── Badge panel ── */
+.badge-panel{position:fixed;inset:0;z-index:1600;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6)}
+.badge-panel-inner{background:var(--surf);border:1px solid var(--border-hi);border-radius:var(--r-xl);padding:22px;max-width:340px;width:100%;max-height:80vh;overflow-y:auto}
+.badge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.badge-item{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border-radius:var(--r-md);border:1px solid var(--border)}
+.badge-item.unlocked{border-color:var(--primary);background:rgba(196,166,255,.08)}
+.badge-item.locked{opacity:.35}
+.badge-emoji{font-size:1.6rem}
+.badge-name{font-size:.58rem;font-weight:700;text-align:center;color:var(--text-dim)}
+
+/* ── Virtual Portfolio ── */
+.vport-wrap{padding:0 16px 96px}
+.vport-cash{background:linear-gradient(135deg,rgba(196,166,255,.15),rgba(128,255,219,.1));border:1px solid var(--border-hi);border-radius:var(--r-xl);padding:18px;margin-bottom:14px;text-align:center}
+.vport-cash-label{font-size:.66rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em}
+.vport-cash-val{font-size:2rem;font-weight:900;color:var(--text);margin:4px 0}
+.vport-cash-sub{font-size:.72rem;color:var(--text-dim)}
+.vport-buy-row{display:flex;gap:8px;margin-bottom:14px}
+.vport-buy-row input{flex:1;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:9px 12px;color:var(--text);font-family:Inter,sans-serif;font-size:.82rem}
+.vport-buy-btn{background:var(--green);border:none;border-radius:var(--r-md);padding:9px 16px;color:#fff;font-weight:700;font-size:.8rem;cursor:pointer}
+.vport-sell-btn{background:var(--red);border:none;border-radius:var(--r-md);padding:9px 16px;color:#fff;font-weight:700;font-size:.8rem;cursor:pointer}
+.vport-pos-card{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-lg);padding:13px 15px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.vport-pos-ticker{font-weight:800;font-size:.9rem}
+.vport-pos-detail{font-size:.72rem;color:var(--text-dim)}
+.vport-pos-pl{font-size:.85rem;font-weight:700}
+
 /* ── Refresh pill ── */
 .refresh-pill{position:fixed;bottom:18px;right:18px;background:#fff;border:1px solid var(--border);border-radius:100px;padding:8px 15px;font-size:.74rem;color:var(--text-dim);display:flex;align-items:center;gap:6px;z-index:100;box-shadow:var(--shadow-md)}
 
@@ -938,6 +990,11 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     <button class="fx-toggle" id="fx-toggle" onclick="toggleFX()">$ USD</button>
     <button class="alert-btn" id="alert-btn" onclick="toggleAlertPanel()" title="Price Alerts">🔔<span class="alert-badge" id="alert-badge" style="display:none">0</span></button>
     <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Dark / Light">🌙</button>
+    <div class="xp-chip" id="xp-chip" onclick="showBadgePanel()" title="XP e Badge">
+      <span class="xp-level-badge" id="xp-level-badge">Lv1</span>
+      <div class="xp-bar-wrap"><div class="xp-bar-fill" id="xp-bar-fill" style="width:0%"></div></div>
+      <span class="xp-pts" id="xp-pts">0 XP</span>
+    </div>
     <div id="auth-widget" class="auth-widget"></div>
     <div class="live-badge">
       <div class="live-dot"></div>
@@ -984,6 +1041,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   <button class="tab-btn" data-tab="watchlist">⭐ Watchlist</button>
   <button class="tab-btn" data-tab="calendar">🗓 Calendario</button>
   <button class="tab-btn" data-tab="ai-chat">🤖 AI</button>
+  <button class="tab-btn" data-tab="game">🎮 Gioco</button>
 </div>
 
 <!-- ── History view (nascosta di default) ── -->
@@ -1199,6 +1257,36 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
   <div id="wl-grid" class="hgrid">
     <div class="history-empty"><span class="icon">⭐</span>Aggiungi azioni da monitorare.</div>
+  </div>
+</div>
+
+<!-- ── Game view ── -->
+<div id="game-view" style="display:none">
+  <div class="pview-head">
+    <h2 class="pview-title">🎮 Gioco — Portfolio Virtuale</h2>
+    <span class="pview-sub">Inizia con €10.000 virtuali · Compra e vendi senza rischi</span>
+  </div>
+  <div class="vport-wrap">
+    <!-- Cash + stats -->
+    <div class="vport-cash" id="vport-cash-card">
+      <div class="vport-cash-label">Capitale disponibile</div>
+      <div class="vport-cash-val" id="vport-cash-val">€10.000,00</div>
+      <div class="vport-cash-sub" id="vport-cash-sub">Portfolio valore totale: € — · P&L: —</div>
+    </div>
+    <!-- Buy form -->
+    <div class="vport-buy-row">
+      <input id="vport-ticker" type="text" placeholder="Ticker (es. NVDA)" maxlength="10" autocapitalize="characters" spellcheck="false"/>
+      <input id="vport-qty" type="number" placeholder="Qtà" min="1" step="1" style="max-width:70px"/>
+      <button class="vport-buy-btn" onclick="vportBuy()">📈 Compra</button>
+      <button class="vport-sell-btn" onclick="vportSell()">📉 Vendi</button>
+    </div>
+    <!-- Positions -->
+    <div id="vport-positions"></div>
+    <!-- Badges -->
+    <div style="margin-top:18px">
+      <div class="fund-hd" style="cursor:default">🏅 Badge sbloccati: <span id="vport-badge-count">0</span></div>
+      <div class="badge-grid" id="vport-badge-grid" style="margin-top:8px"></div>
+    </div>
   </div>
 </div>
 
@@ -1419,6 +1507,13 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     <div id="rsi-container" style="display:none"></div>
     <div id="macd-container" style="display:none"></div>
     <div class="detail-grid" id="m-details"></div>
+    <!-- Fondamentali -->
+    <div class="fund-section" id="m-fund-section" style="display:none">
+      <div class="fund-hd" onclick="document.getElementById('m-fund-grid').classList.toggle('open')">
+        📊 Dati Fondamentali <span>▾</span>
+      </div>
+      <div class="fund-grid" id="m-fund-grid"></div>
+    </div>
     <!-- Analyst targets + short interest -->
     <div id="m-targets-wrap" style="display:none;margin-top:12px">
       <div class="targets-card">
@@ -1979,6 +2074,8 @@ async function openModal(stock){
     ];
     document.getElementById('m-details').innerHTML=cells.map(([l,v])=>`<div class="detail-cell"><div class="detail-cell-label">${l}</div><div class="detail-cell-val">${v}</div></div>`).join('');
     document.getElementById('m-verdict').textContent=full.signals?.join(' · ')??'';
+    _renderFundamentals(full);
+    gainXP(0,'ai_analysis_check');  // non conta qui
   }catch(e){console.error('Modal data:',e);}
 
   // AI
@@ -2012,6 +2109,7 @@ async function openModal(stock){
       }
       document.getElementById('m-ai-loading').style.display='none';
       document.getElementById('m-ai-content').style.display='flex';
+      gainXP(5,'ai_analysis');
     }else{document.getElementById('m-ai-loading').textContent='⚠️ AI non disponibile.';}
   }catch(e){document.getElementById('m-ai-loading').textContent='⚠️ Errore analisi AI.';}
 
@@ -3068,7 +3166,7 @@ initAuth();
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab switching (5 tab)
 // ══════════════════════════════════════════════════════════════════════════════
-const _VIEWS = ['live','history','heatmap','portfolio','watchlist','calendar','ai-chat'];
+const _VIEWS = ['live','history','heatmap','portfolio','watchlist','calendar','ai-chat','game'];
 let _tabLoaded = {};
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -3174,8 +3272,11 @@ async function _loadNews(ticker){
     if(!items.length){el.innerHTML='<div class="news-empty">Nessuna notizia disponibile.</div>';return;}
     el.innerHTML=items.map(n=>{
       const ago=n.time?_newsAgo(n.time):'';
+      const s=n.sentiment||'NEUTRO';
+      const sCls=s==='POSITIVO'?'pos':s==='NEGATIVO'?'neg':'neu';
+      const sTxt=s==='POSITIVO'?'🟢 POS':s==='NEGATIVO'?'🔴 NEG':'⚪ NEU';
       return `<a class="news-item" href="${n.link||'#'}" target="_blank" rel="noopener">
-        <div class="news-title">${n.title}</div>
+        <div class="news-title">${n.title}<span class="news-sentiment ${sCls}">${sTxt}</span></div>
         <div class="news-meta">${n.publisher||''}${ago?' · '+ago:''}</div>
       </a>`;
     }).join('');
@@ -3333,6 +3434,263 @@ async function sendChat(){
 
 // Carica storico al boot
 (()=>{ _loadChatHistory(); })();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Toast notification
+// ══════════════════════════════════════════════════════════════════════════════
+function showToast(msg, dur=3500){
+  const t=document.createElement('div');
+  t.className='app-toast'; t.textContent=msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(()=>{ requestAnimationFrame(()=>t.classList.add('show')); });
+  setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),400); }, dur);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Alert polling (controlla ogni 60s se un alert è scattato)
+// ══════════════════════════════════════════════════════════════════════════════
+setInterval(async()=>{
+  if(!_alerts||!_alerts.length) return;
+  const untriggered=_alerts.filter(a=>!a.triggered);
+  if(!untriggered.length) return;
+  for(const a of untriggered){
+    try{
+      const d=await fetch('/api/stock/'+a.ticker).then(r=>r.ok?r.json():null);
+      if(!d||!d.current_price) continue;
+      const p=d.current_price;
+      if((a.dir==='above'&&p>=a.price)||(a.dir==='below'&&p<=a.price)){
+        a.triggered=true;
+        showToast(`🔔 Alert ${a.ticker}: prezzo ${a.dir==='above'?'sopra':'sotto'} $${a.price} → ora $${p.toFixed(2)}`);
+        _saveAlerts();
+      }
+    }catch(_){}
+  }
+}, 60000);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Dati fondamentali nel modal
+// ══════════════════════════════════════════════════════════════════════════════
+function _fmtRevenue(v){
+  if(!v) return '—';
+  if(v>=1e12) return (v/1e12).toFixed(2)+'T';
+  if(v>=1e9)  return (v/1e9).toFixed(2)+'B';
+  if(v>=1e6)  return (v/1e6).toFixed(1)+'M';
+  return v.toLocaleString();
+}
+function _renderFundamentals(full){
+  const section=document.getElementById('m-fund-section');
+  const grid=document.getElementById('m-fund-grid');
+  const cells=[
+    ['P/E Trailing', full.pe_ratio!=null?full.pe_ratio.toFixed(1)+'x':'—'],
+    ['P/E Forward',  full.forward_pe!=null?full.forward_pe.toFixed(1)+'x':'—'],
+    ['EPS',          full.eps!=null?'$'+full.eps.toFixed(2):'—'],
+    ['Revenue',      _fmtRevenue(full.revenue)],
+    ['Debt/Equity',  full.debt_equity!=null?full.debt_equity.toFixed(2):'—'],
+    ['Profit Margin',full.profit_margin!=null?(full.profit_margin*100).toFixed(1)+'%':'—'],
+    ['Dividend Yield',full.dividend_yield!=null?(full.dividend_yield*100).toFixed(2)+'%':'—'],
+    ['ROE',          full.roe!=null?(full.roe*100).toFixed(1)+'%':'—'],
+    ['Market Cap',   _fmtRevenue(full.market_cap)],
+    ['Beta',         full.beta!=null?full.beta.toFixed(2):'—'],
+  ];
+  const hasFundamentals=cells.some(([,v])=>v!=='—');
+  if(!hasFundamentals){section.style.display='none';return;}
+  section.style.display='block';
+  grid.className='fund-grid';  // closed by default
+  grid.innerHTML=cells.map(([l,v])=>`<div class="fund-cell"><div class="fund-cell-label">${l}</div><div class="fund-cell-val">${v}</div></div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// XP + Livelli + Badge
+// ══════════════════════════════════════════════════════════════════════════════
+const _XP_LEVELS=[
+  {min:0,   max:100,  label:'Lv1', name:'🟢 Principiante'},
+  {min:100, max:300,  label:'Lv2', name:'🔵 Analista'},
+  {min:300, max:700,  label:'Lv3', name:'🟣 Trader'},
+  {min:700, max:1500, label:'Lv4', name:'🔴 Master'},
+  {min:1500,max:99999,label:'Lv5', name:'⭐ Leggenda'},
+];
+const _ALL_BADGES=[
+  {id:'first_trade',  emoji:'🏆', name:'Primo Trade',    desc:'Primo acquisto virtuale'},
+  {id:'diversified',  emoji:'🌍', name:'Diversificato',  desc:'5+ posizioni diverse'},
+  {id:'profit_taker', emoji:'💰', name:'Profit Taker',   desc:'Chiudi una posizione in profitto'},
+  {id:'ai_user',      emoji:'🤖', name:'AI Master',      desc:'10 analisi AI'},
+  {id:'watchman',     emoji:'👁',  name:'Sentinella',    desc:'20 titoli in watchlist'},
+  {id:'hodler',       emoji:'💎', name:'HODLer',         desc:'100 XP accumulati'},
+  {id:'analyst',      emoji:'📊', name:'Analista',       desc:'Apri 20 modali'},
+  {id:'alerter',      emoji:'🔔', name:'Alert King',     desc:'Crea 5 alert'},
+];
+
+let _xpData = JSON.parse(localStorage.getItem('masker_xp')||'{"points":0,"actions":{}}');
+let _badges  = JSON.parse(localStorage.getItem('masker_badges')||'[]');
+
+function _saveXP(){ localStorage.setItem('masker_xp',JSON.stringify(_xpData)); localStorage.setItem('masker_badges',JSON.stringify(_badges)); }
+
+function _currentLevel(){
+  return _XP_LEVELS.reduce((best,l)=>_xpData.points>=l.min?l:best, _XP_LEVELS[0]);
+}
+
+function _updateXPChip(){
+  const lvl=_currentLevel();
+  const next=_XP_LEVELS[_XP_LEVELS.indexOf(lvl)+1];
+  const pct=next?Math.min(100,(_xpData.points-lvl.min)/(next.min-lvl.min)*100):100;
+  document.getElementById('xp-level-badge').textContent=lvl.label;
+  document.getElementById('xp-bar-fill').style.width=pct+'%';
+  document.getElementById('xp-pts').textContent=_xpData.points+' XP';
+}
+
+function gainXP(amount, action){
+  _xpData.points+=amount;
+  if(action) _xpData.actions[action]=(_xpData.actions[action]||0)+1;
+  _checkBadges();
+  _saveXP();
+  _updateXPChip();
+}
+
+function _checkBadges(){
+  const unlock=(id)=>{
+    if(_badges.includes(id)) return;
+    _badges.push(id);
+    const b=_ALL_BADGES.find(x=>x.id===id);
+    if(b) showToast(`🏅 Badge sbloccato: ${b.emoji} ${b.name}!`, 4000);
+  };
+  const acts=_xpData.actions;
+  if((acts.virtual_buy||0)>=1) unlock('first_trade');
+  if(_badges.includes('first_trade') && Object.keys(_getVPort().positions||{}).length>=5) unlock('diversified');
+  if((acts.profit_close||0)>=1) unlock('profit_taker');
+  if((acts.ai_analysis||0)>=10) unlock('ai_user');
+  if(Object.keys(JSON.parse(localStorage.getItem('masker_watchlist')||'{}')).length>=20) unlock('watchman');
+  if(_xpData.points>=100) unlock('hodler');
+  if((acts.open_modal||0)>=20) unlock('analyst');
+  if(_alerts.length>=5) unlock('alerter');
+}
+
+function showBadgePanel(){
+  const ov=document.createElement('div');
+  ov.className='badge-panel';
+  const lvl=_currentLevel();
+  ov.innerHTML=`<div class="badge-panel-inner">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-weight:800;font-size:1rem">${lvl.name}</div>
+      <button onclick="this.closest('.badge-panel').remove()" style="background:transparent;border:none;color:var(--text-dim);font-size:1.1rem;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:.75rem;color:var(--text-dim);margin-bottom:4px">${_xpData.points} XP totali · ${_badges.length}/${_ALL_BADGES.length} badge</div>
+    <div class="badge-grid">
+      ${_ALL_BADGES.map(b=>`<div class="badge-item ${_badges.includes(b.id)?'unlocked':'locked'}" title="${b.desc}">
+        <div class="badge-emoji">${b.emoji}</div>
+        <div class="badge-name">${b.name}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  document.body.appendChild(ov);
+}
+
+// Hook: guadagna XP quando si apre un modal
+const _origOpenModal=openModal;
+openModal=async function(stock){
+  gainXP(2,'open_modal');
+  return _origOpenModal(stock);
+};
+
+// Hook: guadagna XP quando viene mostrato il segnale AI
+const _origAIFetch=null;  // già integrato in openModal
+
+_updateXPChip();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Virtual Portfolio
+// ══════════════════════════════════════════════════════════════════════════════
+const _VPORT_KEY='masker_vport2';
+const _VPORT_START=10000;
+
+function _getVPort(){ try{return JSON.parse(localStorage.getItem(_VPORT_KEY)||'null')||{cash:_VPORT_START,positions:{}};}catch{return{cash:_VPORT_START,positions:{}};} }
+function _saveVPort(p){ localStorage.setItem(_VPORT_KEY,JSON.stringify(p)); }
+
+async function vportBuy(){
+  const ticker=(document.getElementById('vport-ticker').value.trim().toUpperCase()||'').replace(/[^A-Z0-9.]/g,'');
+  const qty=parseInt(document.getElementById('vport-qty').value)||1;
+  if(!ticker||qty<1){showToast('⚠️ Inserisci ticker e quantità');return;}
+  const vport=_getVPort();
+  try{
+    const d=await fetch('/api/stock/'+ticker).then(r=>r.ok?r.json():null);
+    if(!d||!d.current_price){showToast('⚠️ Ticker non trovato');return;}
+    const price=d.current_price, cost=price*qty;
+    if(cost>vport.cash){showToast(`⚠️ Capitale insufficiente (hai €${vport.cash.toFixed(0)})`);return;}
+    vport.cash-=cost;
+    if(!vport.positions[ticker]) vport.positions[ticker]={qty:0,avgPrice:0,name:d.name||ticker};
+    const pos=vport.positions[ticker];
+    pos.avgPrice=(pos.avgPrice*pos.qty+price*qty)/(pos.qty+qty);
+    pos.qty+=qty;
+    _saveVPort(vport);
+    gainXP(10,'virtual_buy');
+    showToast(`✅ Comprato ${qty}x ${ticker} a $${price.toFixed(2)}`);
+    renderVPort();
+  }catch(e){showToast('❌ Errore: '+e.message);}
+}
+
+async function vportSell(){
+  const ticker=(document.getElementById('vport-ticker').value.trim().toUpperCase()||'').replace(/[^A-Z0-9.]/g,'');
+  const qty=parseInt(document.getElementById('vport-qty').value)||1;
+  if(!ticker){showToast('⚠️ Inserisci ticker');return;}
+  const vport=_getVPort();
+  const pos=vport.positions[ticker];
+  if(!pos||pos.qty<qty){showToast(`⚠️ Non hai ${qty}x ${ticker}`);return;}
+  try{
+    const d=await fetch('/api/stock/'+ticker).then(r=>r.ok?r.json():null);
+    if(!d||!d.current_price){showToast('⚠️ Ticker non trovato');return;}
+    const price=d.current_price, revenue=price*qty;
+    const pl=(price-pos.avgPrice)*qty;
+    vport.cash+=revenue;
+    pos.qty-=qty;
+    if(pos.qty===0) delete vport.positions[ticker];
+    _saveVPort(vport);
+    if(pl>0) gainXP(20,'profit_close'); else gainXP(5,'virtual_sell');
+    showToast(`${pl>=0?'✅':'📉'} Venduto ${qty}x ${ticker}: P&L ${pl>=0?'+':''}€${pl.toFixed(2)}`);
+    renderVPort();
+  }catch(e){showToast('❌ Errore: '+e.message);}
+}
+
+async function renderVPort(){
+  if(!document.getElementById('vport-positions')) return;
+  const vport=_getVPort();
+  const positions=Object.entries(vport.positions);
+  // Aggiorna cash card
+  let totalVal=vport.cash, totalCost=0, totalPL=0;
+  const posData=[];
+  for(const [ticker,pos] of positions){
+    try{
+      const d=await fetch('/api/stock/'+ticker).then(r=>r.ok?r.json():null);
+      const currP=d?.current_price||pos.avgPrice;
+      const val=currP*pos.qty, cost=pos.avgPrice*pos.qty, pl=val-cost;
+      totalVal+=val; totalCost+=cost; totalPL+=pl;
+      posData.push({ticker,pos,currP,val,pl,plPct:cost>0?pl/cost*100:0});
+    }catch{}
+  }
+  document.getElementById('vport-cash-val').textContent='€'+vport.cash.toFixed(2);
+  const plColor=totalPL>=0?'var(--green)':'var(--red)';
+  document.getElementById('vport-cash-sub').innerHTML=`Totale: <b>€${totalVal.toFixed(2)}</b> · P&L: <b style="color:${plColor}">${totalPL>=0?'+':''}€${totalPL.toFixed(2)}</b>`;
+  const posEl=document.getElementById('vport-positions');
+  if(!posData.length){posEl.innerHTML='<div style="text-align:center;padding:24px;color:var(--text-dim);font-size:.8rem">Nessuna posizione aperta. Compra il tuo primo titolo! 🚀</div>';return;}
+  posEl.innerHTML=posData.map(({ticker,pos,currP,val,pl,plPct})=>`
+    <div class="vport-pos-card">
+      <div>
+        <div class="vport-pos-ticker">${ticker}</div>
+        <div class="vport-pos-detail">${pos.qty}x · avg $${pos.avgPrice.toFixed(2)} → $${currP.toFixed(2)}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="vport-pos-pl" style="color:${pl>=0?'var(--green)':'var(--red)'}">${pl>=0?'+':''}€${pl.toFixed(2)}</div>
+        <div style="font-size:.68rem;color:var(--text-dim)">${plPct>=0?'+':''}${plPct.toFixed(2)}%</div>
+      </div>
+    </div>`).join('');
+  // Badge grid
+  const badgeGrid=document.getElementById('vport-badge-grid');
+  document.getElementById('vport-badge-count').textContent=_badges.length;
+  badgeGrid.innerHTML=_ALL_BADGES.map(b=>`<div class="badge-item ${_badges.includes(b.id)?'unlocked':'locked'}" title="${b.desc}">
+    <div class="badge-emoji">${b.emoji}</div><div class="badge-name">${b.name}</div></div>`).join('');
+}
+
+// Carica virtual portfolio quando si apre il tab
+document.querySelector('[data-tab="game"]')?.addEventListener('click',()=>{ setTimeout(renderVPort,100); });
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Simulatore investimento

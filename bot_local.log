@@ -1,0 +1,190 @@
+2026-05-21 09:21:36,841 WARNING GROQ_API_KEY non trovata — funzioni AI disabilitate
+2026-05-21 09:21:37,807 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-05-21 09:21:37,807 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-05-21 09:21:37,810 INFO Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-05-21 09:21:37,810 INFO Bot avviato!
+2026-05-21 09:21:41,355 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getMe "HTTP/1.1 200 OK"
+2026-05-21 09:21:41,453 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/deleteWebhook "HTTP/1.1 200 OK"
+2026-05-21 09:21:41,465 INFO Added job "job_daily_report" to job store "default"
+2026-05-21 09:21:41,466 INFO Added job "job_evening_report" to job store "default"
+2026-05-21 09:21:41,466 INFO Added job "job_weekly_report" to job store "default"
+2026-05-21 09:21:41,466 INFO Scheduler started
+2026-05-21 09:21:41,467 INFO Application started
+2026-05-21 09:21:41,739 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:21:41,895 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/sendMessage "HTTP/1.1 200 OK"
+2026-05-21 09:21:51,821 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:22:01,914 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:22:06,948 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:22:07,186 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/sendMessage "HTTP/1.1 200 OK"
+2026-05-21 09:22:10,879 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:22:11,580 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-05-21 09:22:11,765 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/sendMessage "HTTP/1.1 200 OK"
+2026-05-21 09:22:20,908 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:22:21,561 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/sendMessage "HTTP/1.1 200 OK"
+2026-05-21 09:22:29,676 ERROR Failed to get ticker 'GOEV' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:29,725 ERROR Failed to get ticker 'PTRA' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:29,725 ERROR Failed to get ticker 'HYLN' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:29,733 ERROR Failed to get ticker 'CIFR' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:29,741 ERROR Failed to get ticker 'BE' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:29,746 ERROR Failed to get ticker 'IREN' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:29,781 ERROR Failed to get ticker 'ZEV' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:30,965 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:22:33,008 ERROR Failed to get ticker 'BB' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:35,143 ERROR Failed to get ticker 'CORZ' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:35,143 ERROR Failed to get ticker 'BLNK' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:35,149 ERROR Failed to get ticker 'BITF' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:35,149 ERROR Failed to get ticker 'RIOT' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:35,161 ERROR Failed to get ticker 'SNAP' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:35,191 ERROR Failed to get ticker 'LI' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:37,839 ERROR Failed to get ticker 'WULF' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:40,052 ERROR Failed to get ticker 'NKLA' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:41,038 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:22:41,299 ERROR Failed to get ticker 'RIVN' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:41,300 ERROR Failed to get ticker 'CLSK' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:41,310 ERROR Failed to get ticker 'KPLT' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:41,784 ERROR Failed to get ticker 'OPEN' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:41,792 ERROR Failed to get ticker 'GPRO' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:48,324 ERROR Failed to get ticker 'SUNW' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:48,373 ERROR Failed to get ticker 'AYRO' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:51,080 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:22:51,687 ERROR Failed to get ticker 'PLTR' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:51,711 ERROR Failed to get ticker 'PLUG' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:51,722 ERROR Failed to get ticker 'TIGR' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:52,323 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:22:53,750 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:22:55,176 ERROR Failed to get ticker 'F' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:55,188 ERROR Failed to get ticker 'WKHS' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:55,199 ERROR Failed to get ticker 'LCID' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:57,646 ERROR Failed to get ticker 'HUT' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:22:59,794 ERROR Failed to get ticker 'MARA' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:02,357 ERROR Failed to get ticker 'SOFI' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:02,374 ERROR Failed to get ticker 'SKLZ' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:02,441 ERROR Failed to get ticker 'XPEV' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:02,446 ERROR Failed to get ticker 'NIO' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:03,830 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:23:04,524 ERROR Failed to get ticker 'FLUX' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:04,531 ERROR Failed to get ticker 'GEVO' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:06,772 ERROR Failed to get ticker 'FCEL' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:06,827 ERROR Failed to get ticker 'SIRI' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:07,239 ERROR Failed to get ticker 'CHPT' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:09,317 ERROR Failed to get ticker 'FREYR' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:09,577 ERROR Failed to get ticker 'NOK' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:09,604 ERROR Failed to get ticker 'MVST' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:09,904 ERROR Failed to get ticker 'MVIS' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:10,133 ERROR Failed to get ticker 'HIVE' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:13,873 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:23:14,074 ERROR Failed to get ticker 'BTBT' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:14,174 ERROR Failed to get ticker 'SOLO' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:14,659 ERROR Failed to get ticker 'BARK' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:19,234 ERROR Failed to get ticker 'LUMN' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:19,243 ERROR Failed to get ticker 'GENI' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:23,909 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:23:24,266 ERROR 
+50 Failed downloads:
+2026-05-21 09:23:24,266 ERROR ['BE', 'CIFR', 'HYLN', 'GOEV', 'ZEV', 'IREN', 'BB', 'PTRA', 'BITF', 'SNAP', 'CORZ', 'BLNK', 'LI', 'RIOT', 'WULF', 'RIVN', 'CLSK', 'NKLA', 'GPRO', 'KPLT', 'OPEN', 'SUNW', 'AYRO', 'PLTR', 'TIGR', 'PLUG', 'LCID', 'F', 'WKHS', 'HUT', 'SOFI', 'MARA', 'SKLZ', 'XPEV', 'GEVO', 'FLUX', 'NIO', 'FCEL', 'SIRI', 'CHPT', 'FREYR', 'HIVE', 'NOK', 'MVST', 'MVIS', 'BTBT', 'SOLO', 'BARK', 'LUMN', 'GENI']: JSONDecodeError('Expecting value: line 1 column 1 (char 0)')
+2026-05-21 09:23:27,552 ERROR Failed to get ticker 'TLRY' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:27,575 ERROR Failed to get ticker 'AGEN' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:27,585 ERROR Failed to get ticker 'OTRK' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:27,585 ERROR Failed to get ticker 'OGI' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:27,595 ERROR Failed to get ticker 'SENS' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:27,600 ERROR Failed to get ticker 'GORO' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:27,607 ERROR Failed to get ticker 'SBSW' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:29,050 ERROR Failed to get ticker 'FFIE' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:33,984 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:23:34,791 ERROR Failed to get ticker 'BTG' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:34,812 ERROR Failed to get ticker 'EGO' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:34,843 ERROR Failed to get ticker 'OCGN' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:34,880 ERROR Failed to get ticker 'SNDL' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:36,232 ERROR Failed to get ticker 'CDE' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:38,910 ERROR Failed to get ticker 'HYMC' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:38,999 ERROR Failed to get ticker 'MAPS' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:42,183 ERROR Failed to get ticker 'RKT' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:42,183 ERROR Failed to get ticker 'CURO' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:42,193 ERROR Failed to get ticker 'JBLU' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:42,206 ERROR Failed to get ticker 'BBIG' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:44,039 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:23:49,221 ERROR Failed to get ticker 'MULN' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:50,494 ERROR Failed to get ticker 'FSM' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:50,546 ERROR Failed to get ticker 'ACB' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:50,557 ERROR Failed to get ticker 'DAVE' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:54,093 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:23:54,242 ERROR Failed to get ticker 'PBR' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:54,245 ERROR Failed to get ticker 'ACMR' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:54,259 ERROR Failed to get ticker 'CRON' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:55,946 ERROR Failed to get ticker 'VALE' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:55,976 ERROR Failed to get ticker 'UWMC' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:59,056 ERROR Failed to get ticker 'ITUB' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:59,094 ERROR Failed to get ticker 'NVAX' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:23:59,290 ERROR Failed to get ticker 'DRD' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:00,636 ERROR Failed to get ticker 'KOSS' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:00,636 ERROR Failed to get ticker 'GRWG' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:00,651 ERROR Failed to get ticker 'GFAI' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:00,660 ERROR Failed to get ticker 'HA' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:02,750 ERROR Failed to get ticker 'SID' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:04,476 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:24:07,354 ERROR Failed to get ticker 'NCLH' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:08,225 ERROR Failed to get ticker 'CCL' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:08,810 ERROR Failed to get ticker 'SAVA' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:12,298 ERROR Failed to get ticker 'PAAS' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:13,780 ERROR Failed to get ticker 'AUY' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:13,793 ERROR Failed to get ticker 'KGC' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:14,344 ERROR Failed to get ticker 'AAL' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:14,525 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:24:17,316 ERROR Failed to get ticker 'PAYO' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:17,684 ERROR Failed to get ticker 'CGC' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:17,835 ERROR Failed to get ticker 'SAVE' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:19,367 ERROR Failed to get ticker 'AG' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:19,431 ERROR Failed to get ticker 'NRDS' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:19,981 ERROR Failed to get ticker 'BBD' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:21,566 ERROR Failed to get ticker 'HL' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:24,566 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:24:25,864 ERROR 
+50 Failed downloads:
+2026-05-21 09:24:25,864 ERROR ['OTRK', 'OGI', 'AGEN', 'SENS', 'SBSW', 'FFIE', 'GORO', 'TLRY', 'EGO', 'OCGN', 'SNDL', 'BTG', 'HYMC', 'CDE', 'MAPS', 'CURO', 'RKT', 'BBIG', 'JBLU', 'FSM', 'MULN', 'ACB', 'DAVE', 'PBR', 'VALE', 'ACMR', 'CRON', 'UWMC', 'ITUB', 'NVAX', 'DRD', 'GRWG', 'KOSS', 'GFAI', 'HA', 'NCLH', 'SID', 'CCL', 'SAVA', 'PAAS', 'KGC', 'AAL', 'AUY', 'PAYO', 'AG', 'SAVE', 'CGC', 'BBD', 'HL', 'NRDS']: JSONDecodeError('Expecting value: line 1 column 1 (char 0)')
+2026-05-21 09:24:28,341 ERROR Failed to get ticker 'TBPH' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:28,408 ERROR Failed to get ticker 'NKTR' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:28,411 ERROR Failed to get ticker 'AMRN' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:28,443 ERROR Failed to get ticker 'IMMP' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:28,457 ERROR Failed to get ticker 'SPCE' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:28,459 ERROR Failed to get ticker 'BORR' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:28,502 ERROR Failed to get ticker 'CTRM' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:28,509 ERROR Failed to get ticker 'LXRX' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:34,874 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:24:43,757 ERROR Failed to get ticker 'ADMA' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:44,304 ERROR Failed to get ticker 'ASTR' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:44,724 ERROR Failed to get ticker 'CTIC' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:44,724 ERROR Failed to get ticker 'RXRX' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:44,743 ERROR Failed to get ticker 'BCAB' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:44,934 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:24:45,852 ERROR Failed to get ticker 'BHVN' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:45,870 ERROR Failed to get ticker 'AVXL' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:47,728 ERROR Failed to get ticker 'VKTX' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:54,341 ERROR Failed to get ticker 'USWS' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:54,373 ERROR Failed to get ticker 'GOGL' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:54,424 ERROR Failed to get ticker 'FREQ' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:54,860 ERROR Failed to get ticker 'CLOV' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:54,994 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:24:56,627 ERROR Failed to get ticker 'BATL' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:56,654 ERROR Failed to get ticker 'ARDX' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:56,740 ERROR Failed to get ticker 'SEER' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:24:56,772 ERROR Failed to get ticker 'TOPS' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:03,968 ERROR Failed to get ticker 'RDW' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:05,040 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:25:09,701 ERROR Failed to get ticker 'PHX' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:09,834 ERROR Failed to get ticker 'ALEC' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:09,834 ERROR Failed to get ticker 'TWST' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:10,416 ERROR Failed to get ticker 'HPK' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:11,790 ERROR Failed to get ticker 'BCRX' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:11,942 ERROR Failed to get ticker 'BLPH' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:11,945 ERROR Failed to get ticker 'RIG' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:15,102 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:25:18,824 ERROR Failed to get ticker 'EXPR' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:22,391 ERROR Failed to get ticker 'VAALCO' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:22,466 ERROR Failed to get ticker 'SWN' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:23,143 ERROR Failed to get ticker 'REI' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:24,077 ERROR Failed to get ticker 'INDO' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:25,226 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
+2026-05-21 09:25:29,286 ERROR Failed to get ticker 'XENE' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:29,334 ERROR Failed to get ticker 'TELL' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:29,349 ERROR Failed to get ticker 'NTLA' reason: Expecting value: line 1 column 1 (char 0)
+2026-05-21 09:25:35,348 INFO HTTP Request: POST https://api.telegram.org/bot8538458332:AAEjmH9yjx34nsUeaAeIrF-52CI4ER8hDaU/getUpdates "HTTP/1.1 200 OK"
