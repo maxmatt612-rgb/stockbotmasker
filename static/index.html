@@ -1041,7 +1041,6 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   <button class="tab-btn" data-tab="watchlist">⭐ Watchlist</button>
   <button class="tab-btn" data-tab="calendar">🗓 Calendario</button>
   <button class="tab-btn" data-tab="ai-chat">🤖 AI</button>
-  <button class="tab-btn" data-tab="game">🎮 Gioco</button>
 </div>
 
 <!-- ── History view (nascosta di default) ── -->
@@ -1257,36 +1256,6 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
   <div id="wl-grid" class="hgrid">
     <div class="history-empty"><span class="icon">⭐</span>Aggiungi azioni da monitorare.</div>
-  </div>
-</div>
-
-<!-- ── Game view ── -->
-<div id="game-view" style="display:none">
-  <div class="pview-head">
-    <h2 class="pview-title">🎮 Gioco — Portfolio Virtuale</h2>
-    <span class="pview-sub">Inizia con €10.000 virtuali · Compra e vendi senza rischi</span>
-  </div>
-  <div class="vport-wrap">
-    <!-- Cash + stats -->
-    <div class="vport-cash" id="vport-cash-card">
-      <div class="vport-cash-label">Capitale disponibile</div>
-      <div class="vport-cash-val" id="vport-cash-val">€10.000,00</div>
-      <div class="vport-cash-sub" id="vport-cash-sub">Portfolio valore totale: € — · P&L: —</div>
-    </div>
-    <!-- Buy form -->
-    <div class="vport-buy-row">
-      <input id="vport-ticker" type="text" placeholder="Ticker (es. NVDA)" maxlength="10" autocapitalize="characters" spellcheck="false"/>
-      <input id="vport-qty" type="number" placeholder="Qtà" min="1" step="1" style="max-width:70px"/>
-      <button class="vport-buy-btn" onclick="vportBuy()">📈 Compra</button>
-      <button class="vport-sell-btn" onclick="vportSell()">📉 Vendi</button>
-    </div>
-    <!-- Positions -->
-    <div id="vport-positions"></div>
-    <!-- Badges -->
-    <div style="margin-top:18px">
-      <div class="fund-hd" style="cursor:default">🏅 Badge sbloccati: <span id="vport-badge-count">0</span></div>
-      <div class="badge-grid" id="vport-badge-grid" style="margin-top:8px"></div>
-    </div>
   </div>
 </div>
 
@@ -3166,7 +3135,7 @@ initAuth();
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab switching (5 tab)
 // ══════════════════════════════════════════════════════════════════════════════
-const _VIEWS = ['live','history','heatmap','portfolio','watchlist','calendar','ai-chat','game'];
+const _VIEWS = ['live','history','heatmap','portfolio','watchlist','calendar','ai-chat'];
 let _tabLoaded = {};
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
