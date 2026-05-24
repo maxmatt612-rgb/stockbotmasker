@@ -2176,6 +2176,7 @@ function _buildMoverRows(rows, side){
 let _authToken = localStorage.getItem('masker_jwt') || '';
 let _authUser  = null;
 try { const _u=localStorage.getItem('masker_user'); if(_u) _authUser=JSON.parse(_u); } catch(_) {}
+function _authHeader(){ return _authToken ? {'Authorization':'Bearer '+_authToken} : {}; }
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Portfolio (localStorage + server sync quando loggato)
