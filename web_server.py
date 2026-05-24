@@ -927,6 +927,7 @@ _GRAFICO_PROMPTS = {
 class ChartAnalysisBody(BaseModel):
     image_b64: str
     level: Optional[str] = "intermedio"
+    question: Optional[str] = None
 
 
 @app.post("/api/analyze-chart")
@@ -935,6 +936,9 @@ async def api_analyze_chart(body: ChartAnalysisBody):
         return JSONResponse({"error": "GROQ_API_KEY non configurata"}, status_code=503)
     level = body.level if body.level in _GRAFICO_PROMPTS else "intermedio"
     prompt = _GRAFICO_PROMPTS[level]
+    # Se l'utente ha aggiunto una domanda specifica, appendila al prompt
+    if body.question:
+        prompt = f"{prompt}\n\nDomanda specifica dell'utente: {body.question}"
 
     # Assicura il prefisso data URL
     img = body.image_b64
@@ -951,7 +955,7 @@ async def api_analyze_chart(body: ChartAnalysisBody):
                     {"type": "image_url", "image_url": {"url": img}},
                 ],
             }],
-            max_tokens=700,
+            max_tokens=800,
             temperature=0.4,
         )
         return {"analysis": resp.choices[0].message.content.strip()}

@@ -560,9 +560,16 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .news-empty{text-align:center;padding:14px;color:var(--text-dim);font-size:.78rem}
 
 /* ── Chat AI tab ── */
-#ai-chat-view{display:flex;flex-direction:column;height:calc(100vh - 132px)}
-.chat-wrap{display:flex;flex-direction:column;height:100%;max-width:760px;margin:0 auto;width:100%;padding:0 20px}
-.chat-messages{flex:1;overflow-y:auto;padding:24px 0;display:flex;flex-direction:column;gap:14px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+#ai-chat-view{display:flex;flex-direction:column;height:calc(100dvh - 200px);min-height:400px;overflow:hidden}
+.chat-wrap{display:flex;flex-direction:column;flex:1;height:100%;max-width:760px;margin:0 auto;width:100%;padding:0 20px;overflow:hidden}
+.chat-messages{flex:1;overflow-y:auto;padding:24px 0;display:flex;flex-direction:column;gap:14px;scrollbar-width:thin;scrollbar-color:var(--border) transparent;min-height:0}
+.chat-attach-preview{display:none;align-items:center;gap:8px;padding:6px 0 4px;flex-shrink:0}
+.chat-attach-thumb{width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--border-hi)}
+.chat-attach-rm{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:.85rem;padding:2px 6px;border-radius:4px}
+.chat-attach-rm:hover{color:var(--red)}
+.chat-bubble-img{max-width:200px;border-radius:10px;margin-bottom:6px;border:1px solid var(--border);display:block}
+.chat-clear-btn{align-self:center;margin-top:8px;background:transparent;border:1px solid var(--border);color:var(--text-dim);border-radius:100px;padding:4px 14px;font-size:.72rem;cursor:pointer}
+.chat-clear-btn:hover{border-color:var(--red);color:var(--red)}
 .chat-welcome{text-align:center;padding:60px 24px;color:var(--text-dim)}
 .chat-welcome-icon{font-size:3rem;margin-bottom:12px}
 .chat-welcome-title{font-size:1.1rem;font-weight:800;color:var(--text);margin-bottom:8px}
@@ -996,10 +1003,16 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
         <div class="conf-text" id="conf-consiglio"></div>
       </div>
     </div>
+    <input type="file" id="chat-photo-input" accept="image/*" style="display:none" onchange="onChatPhotoSelected(this)">
+    <div class="chat-attach-preview" id="chat-attach-preview">
+      <img class="chat-attach-thumb" id="chat-attach-thumb" src="" alt="">
+      <span style="font-size:.75rem;color:var(--text-dim)">Foto allegata</span>
+      <button class="chat-attach-rm" onclick="clearChatAttach()">✕ Rimuovi</button>
+    </div>
     <div class="chat-input-wrap">
       <button class="conf-send-btn" style="flex-shrink:0;padding:0 12px;height:44px;border-radius:100px;font-size:.75rem" onclick="toggleConfessionale()" title="Confessionale finanziario">🧠</button>
-      <button class="conf-send-btn" style="flex-shrink:0;padding:0 12px;height:44px;border-radius:100px;font-size:.75rem" onclick="toggleChartUpload()" title="Analisi grafico con AI">📸</button>
-      <input class="chat-input" id="chat-input" type="text" placeholder="Chiedi qualcosa... es. Analizza il mio portafoglio" onkeydown="if(event.key==='Enter')sendChat()"/>
+      <button class="conf-send-btn" style="flex-shrink:0;padding:0 12px;height:44px;border-radius:100px;font-size:.75rem" onclick="document.getElementById('chat-photo-input').click()" title="Allega grafico">📸</button>
+      <input class="chat-input" id="chat-input" type="text" placeholder="Scrivi o allega un grafico 📸..." onkeydown="if(event.key==='Enter')sendChat()"/>
       <button class="chat-send-btn" onclick="sendChat()">▶</button>
     </div>
   </div>
@@ -2155,7 +2168,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     const tab = btn.dataset.tab;
     _VIEWS.forEach(v => {
       const el = document.getElementById(v+'-view');
-      if(el) el.style.display = v===tab ? '' : 'none';
+      if(!el) return;
+      if(v === tab) {
+        el.style.display = v === 'ai-chat' ? 'flex' : '';
+      } else {
+        el.style.display = 'none';
+      }
     });
     if(!_tabLoaded[tab]){
       _tabLoaded[tab]=true;
@@ -2260,39 +2278,150 @@ function _newsAgo(ts){
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Chat AI
+// Chat AI — con memoria localStorage + foto inline
 // ══════════════════════════════════════════════════════════════════════════════
-let _chatHistory=[];
-async function sendChat(){
-  const input=document.getElementById('chat-input');
-  const msg=input.value.trim();
-  if(!msg) return;
-  input.value=''; input.disabled=true;
-  const msgs=document.getElementById('chat-messages');
-  const welcome=msgs.querySelector('.chat-welcome');
-  if(welcome) welcome.remove();
-  const userDiv=document.createElement('div');
-  userDiv.className='chat-bubble user';
-  userDiv.textContent=msg;
-  msgs.appendChild(userDiv);
-  const loadDiv=document.createElement('div');
-  loadDiv.className='chat-bubble ai loading';
-  loadDiv.textContent='🤖 Elaborazione…';
-  msgs.appendChild(loadDiv);
-  msgs.scrollTop=msgs.scrollHeight;
-  const portfolio=loadPortfolioData();
-  const wl=Object.keys(JSON.parse(localStorage.getItem('masker_watchlist')||'{}'));
-  try{
-    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:msg,portfolio,watchlist:wl,history:_chatHistory,level:_level})}).then(r=>r.json());
-    loadDiv.classList.remove('loading');
-    loadDiv.textContent=res.reply||'Errore nella risposta.';
-    _chatHistory.push({role:'user',content:msg},{role:'assistant',content:res.reply});
-    if(_chatHistory.length>20) _chatHistory=_chatHistory.slice(-20);
-  }catch(_){loadDiv.classList.remove('loading');loadDiv.textContent='❌ Errore di connessione.';}
-  input.disabled=false; input.focus();
-  msgs.scrollTop=msgs.scrollHeight;
+let _chatHistory = [];
+let _attachedB64 = null;
+let _attachedMime = 'image/jpeg';
+
+function _saveChatHistory(){
+  try { localStorage.setItem('masker_chat_history', JSON.stringify(_chatHistory.slice(-30))); } catch(_){}
 }
+function _loadChatHistory(){
+  try {
+    const saved = JSON.parse(localStorage.getItem('masker_chat_history') || '[]');
+    if(!saved.length) return;
+    _chatHistory = saved;
+    const msgs = document.getElementById('chat-messages');
+    const welcome = msgs.querySelector('.chat-welcome');
+    if(welcome) welcome.remove();
+    saved.forEach(m => {
+      const d = document.createElement('div');
+      d.className = m.role==='user' ? 'chat-bubble user' : 'chat-bubble ai';
+      if(m.img) {
+        const img = document.createElement('img');
+        img.src = m.img; img.className = 'chat-bubble-img';
+        d.appendChild(img);
+      }
+      const t = document.createElement('span');
+      t.textContent = m.content || '';
+      d.appendChild(t);
+      msgs.appendChild(d);
+    });
+    // bottone clear
+    _appendClearBtn(msgs);
+    msgs.scrollTop = msgs.scrollHeight;
+  } catch(_){}
+}
+function _appendClearBtn(msgs){
+  if(msgs.querySelector('.chat-clear-btn')) return;
+  const btn = document.createElement('button');
+  btn.className = 'chat-clear-btn';
+  btn.textContent = '🗑 Cancella cronologia';
+  btn.onclick = clearChatHistory;
+  msgs.appendChild(btn);
+}
+function clearChatHistory(){
+  _chatHistory = [];
+  localStorage.removeItem('masker_chat_history');
+  const msgs = document.getElementById('chat-messages');
+  msgs.innerHTML = `<div class="chat-welcome">
+    <div class="chat-welcome-icon">🤖</div>
+    <div class="chat-welcome-title">Masker AI</div>
+    <div class="chat-welcome-sub">Chiedi analisi, confronti o info sui tuoi titoli.<br>Conosco il tuo portafoglio e watchlist.<br><span style="font-size:.75rem;opacity:.6">Puoi anche allegare 📸 uno screenshot di un grafico</span></div>
+  </div>`;
+}
+
+function onChatPhotoSelected(input){
+  const file = input.files[0];
+  if(!file) return;
+  _attachedMime = file.type || 'image/jpeg';
+  const reader = new FileReader();
+  reader.onload = e => {
+    _attachedB64 = e.target.result.split(',')[1];
+    document.getElementById('chat-attach-thumb').src = e.target.result;
+    document.getElementById('chat-attach-preview').style.display = 'flex';
+  };
+  reader.readAsDataURL(file);
+}
+function clearChatAttach(){
+  _attachedB64 = null;
+  document.getElementById('chat-photo-input').value = '';
+  document.getElementById('chat-attach-preview').style.display = 'none';
+  document.getElementById('chat-attach-thumb').src = '';
+}
+
+async function sendChat(){
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  const hasImg = !!_attachedB64;
+  if(!msg && !hasImg) return;
+
+  input.value = ''; input.disabled = true;
+  const msgs = document.getElementById('chat-messages');
+  const welcome = msgs.querySelector('.chat-welcome');
+  if(welcome) welcome.remove();
+
+  // Bolla utente
+  const userDiv = document.createElement('div');
+  userDiv.className = 'chat-bubble user';
+  if(hasImg){
+    const img = document.createElement('img');
+    img.src = 'data:'+_attachedMime+';base64,'+_attachedB64;
+    img.className = 'chat-bubble-img';
+    userDiv.appendChild(img);
+  }
+  if(msg){ const t=document.createElement('span'); t.textContent=msg; userDiv.appendChild(t); }
+  msgs.appendChild(userDiv);
+
+  // Bolla loading
+  const loadDiv = document.createElement('div');
+  loadDiv.className = 'chat-bubble ai loading';
+  loadDiv.textContent = '🤖 Elaborazione…';
+  msgs.appendChild(loadDiv);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  const portfolio = loadPortfolioData();
+  const wl = Object.keys(JSON.parse(localStorage.getItem('masker_watchlist')||'{}'));
+  const imgB64 = _attachedB64;
+  clearChatAttach();
+
+  try {
+    let reply = '';
+    if(imgB64){
+      // Analisi grafico con visione AI
+      const res = await fetch('/api/analyze-chart', {
+        method:'POST', headers:{'Content-Type':'application/json', ..._authHeader()},
+        body: JSON.stringify({image_b64: imgB64, level: _level, question: msg||null})
+      }).then(r=>r.json());
+      reply = res.analysis || res.error || 'Errore analisi immagine.';
+    } else {
+      // Chat testuale normale
+      const res = await fetch('/api/chat', {
+        method:'POST', headers:{'Content-Type':'application/json', ..._authHeader()},
+        body: JSON.stringify({message:msg, portfolio, watchlist:wl, history:_chatHistory, level:_level})
+      }).then(r=>r.json());
+      reply = res.reply || 'Errore nella risposta.';
+    }
+    loadDiv.classList.remove('loading');
+    loadDiv.innerHTML = reply.replace(/\n/g,'<br>');
+
+    const userEntry = {role:'user', content: msg || '[grafico allegato]'};
+    if(imgB64) userEntry.img = 'data:'+_attachedMime+';base64,'+imgB64;
+    _chatHistory.push(userEntry, {role:'assistant', content: reply});
+    if(_chatHistory.length > 30) _chatHistory = _chatHistory.slice(-30);
+    _saveChatHistory();
+    _appendClearBtn(msgs);
+  } catch(_){
+    loadDiv.classList.remove('loading');
+    loadDiv.textContent = '❌ Errore di connessione.';
+  }
+  input.disabled = false; input.focus();
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// Carica storico al boot
+(()=>{ _loadChatHistory(); })();
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Simulatore investimento
