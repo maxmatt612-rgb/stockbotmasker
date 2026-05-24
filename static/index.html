@@ -1396,23 +1396,6 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
       <div class="chart-result" id="chart-result"></div>
     </div>
 
-    <!-- Simulatore investimento -->
-    <div class="sim-wrap" id="sim-wrap" style="display:none">
-      <div class="sim-title">📊 Simulatore — Cosa sarebbe successo se…</div>
-      <div class="sim-row">
-        <input class="sim-input" id="sim-ticker" type="text" placeholder="Ticker (es. AAPL, NVDA, BTC-USD)" autocapitalize="characters" spellcheck="false" maxlength="15"/>
-        <input class="sim-input" id="sim-amount" type="number" placeholder="€ importo" min="1" step="100" style="max-width:100px"/>
-      </div>
-      <div class="sim-period-group" id="sim-period-group">
-        <button class="sim-period-btn active" data-period="1y" data-label="1 anno">1a</button>
-        <button class="sim-period-btn" data-period="3y" data-label="3 anni">3a</button>
-        <button class="sim-period-btn" data-period="5y" data-label="5 anni">5a</button>
-        <button class="sim-period-btn" data-period="10y" data-label="10 anni">10a</button>
-        <button class="conf-send-btn" style="margin-left:auto;padding:5px 16px;font-size:.78rem" onclick="runSimulator()">Simula</button>
-      </div>
-      <div class="sim-result" id="sim-result"></div>
-    </div>
-
     <!-- Confessionale finanziario -->
     <div class="confessionale-wrap" id="conf-wrap" style="display:none">
       <div class="conf-title">🧠 CONFESSIONALE FINANZIARIO — scrivi cosa stai pensando di fare</div>
@@ -3746,88 +3729,6 @@ function _renderFundamentals(full){
 
 // gainXP stub (rimosso sistema XP — mantenuto per compatibilità interna)
 function gainXP(){}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Simulatore investimento — "Cosa sarebbe successo se…"
-// ══════════════════════════════════════════════════════════════════════════════
-let _simPeriod = '1y';
-
-document.getElementById('sim-period-group').addEventListener('click', e=>{
-  const btn = e.target.closest('.sim-period-btn');
-  if(!btn) return;
-  document.querySelectorAll('.sim-period-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  _simPeriod = btn.dataset.period;
-});
-
-function toggleSimulator(){
-  const w = document.getElementById('sim-wrap');
-  const c = document.getElementById('conf-wrap');
-  const open = w.style.display === 'none' || w.style.display === '';
-  w.style.display = open ? '' : 'none';
-  if(open){ c.style.display='none'; document.getElementById('sim-ticker').focus(); }
-}
-
-async function runSimulator(){
-  const ticker = (document.getElementById('sim-ticker').value.trim().toUpperCase().replace(/[^A-Z0-9.\-]/g,''));
-  const amount = parseFloat(document.getElementById('sim-amount').value);
-  if(!ticker){ showToast('Inserisci un ticker'); return; }
-  if(!amount || amount<=0){ showToast('Inserisci un importo valido'); return; }
-
-  const res = document.getElementById('sim-result');
-  res.className='sim-result loaded';
-  res.innerHTML='<div style="padding:12px;font-size:.8rem;color:var(--text-dim);text-align:center">⏳ Calcolo in corso…</div>';
-
-  try{
-    // Mappa periodo → yfinance period string
-    const periodMap = {'1y':'1y','3y':'3y','5y':'5y','10y':'10y'};
-    const yPeriod = periodMap[_simPeriod]||'1y';
-    const labelMap = {'1y':'1 anno','3y':'3 anni','5y':'5 anni','10y':'10 anni'};
-
-    const ohlc = await fetch(`/api/stock/${ticker}/ohlc?period=${yPeriod}&interval=1mo`).then(r=>r.ok?r.json():[]);
-    if(!ohlc||ohlc.length<2){
-      res.innerHTML='<div style="padding:12px;font-size:.8rem;color:var(--red)">Dati non disponibili per questo ticker/periodo.</div>';
-      return;
-    }
-
-    const priceStart = ohlc[0].close;
-    const priceEnd   = ohlc[ohlc.length-1].close;
-    const ret        = (priceEnd - priceStart) / priceStart;
-    const retPct     = ret * 100;
-    const finalVal   = amount * (1 + ret);
-    const plAbs      = finalVal - amount;
-    const isPos      = ret >= 0;
-    const sym        = _fxSym, r = _fxRate;
-    const fmt        = v => sym+(Math.abs(v)*r).toFixed(2);
-
-    res.innerHTML = `
-      <div class="sim-result-head ${isPos?'pos':'neg'}">
-        <div>
-          <div class="sim-result-ticker">${ticker} · ${labelMap[_simPeriod]}</div>
-          <div style="font-size:.68rem;color:var(--text-dim);margin-top:2px">
-            ${priceStart.toFixed(2)} → ${priceEnd.toFixed(2)}
-          </div>
-        </div>
-        <div class="sim-result-ret ${isPos?'pos':'neg'}">${isPos?'+':''}${retPct.toFixed(1)}%</div>
-      </div>
-      <div class="sim-stats">
-        <div class="sim-stat">
-          <div class="sim-stat-label">Investito</div>
-          <div class="sim-stat-val">${fmt(amount)}</div>
-        </div>
-        <div class="sim-stat">
-          <div class="sim-stat-label">Valore finale</div>
-          <div class="sim-stat-val" style="color:${isPos?'var(--green)':'var(--red)'}">${fmt(finalVal)}</div>
-        </div>
-        <div class="sim-stat">
-          <div class="sim-stat-label">Guadagno netto</div>
-          <div class="sim-stat-val" style="color:${isPos?'var(--green)':'var(--red)'}">${isPos?'+':''}${fmt(plAbs)}</div>
-        </div>
-      </div>`;
-  }catch(e){
-    res.innerHTML=`<div style="padding:12px;font-size:.8rem;color:var(--red)">Errore: ${e.message}</div>`;
-  }
-}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Virtual Portfolio
