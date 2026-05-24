@@ -863,10 +863,15 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 <!-- ── Header ── -->
 <header>
-  <div class="logo">
+  <div class="logo" style="cursor:pointer" onclick="document.querySelector('.tab-btn[data-tab=\'live\']').click()">
     <div class="logo-icon">
       <svg width="80" height="55" viewBox="0 0 44 30" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
+          <!-- Split: sinistra verde, destra rossa -->
+          <linearGradient id="mg" x1="0" y1="0" x2="44" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="50%" stop-color="#10B981"/>
+            <stop offset="50%" stop-color="#EF4444"/>
+          </linearGradient>
           <clipPath id="logo-ml">
             <ellipse cx="13.5" cy="14" rx="7.5" ry="5.8"/>
           </clipPath>
@@ -874,23 +879,23 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
             <ellipse cx="30.5" cy="14" rx="7.5" ry="5.8"/>
           </clipPath>
         </defs>
-        <!-- Mask body with transparent eye holes -->
+        <!-- Maschera: metà verde (sinistra) metà rossa (destra), buchi occhi trasparenti -->
         <path fill-rule="evenodd" clip-rule="evenodd"
           d="M22 1C11 1 1 6.5 1 15C1 21 6 26 14 28L22 29.5L30 28C38 26 43 21 43 15C43 6.5 33 1 22 1Z M13.5 8.2C9.3 8.2 6 10.8 6 14C6 17.2 9.3 19.8 13.5 19.8C17.7 19.8 21 17.2 21 14C21 10.8 17.7 8.2 13.5 8.2Z M30.5 8.2C26.3 8.2 23 10.8 23 14C23 17.2 26.3 19.8 30.5 19.8C34.7 19.8 38 17.2 38 14C38 10.8 34.7 8.2 30.5 8.2Z"
-          fill="#000000"/>
-        <!-- Left eye: ascending chart bars (candlestick) -->
+          fill="url(#mg)"/>
+        <!-- Occhio sinistro: barre che SALGONO (verde) -->
         <g clip-path="url(#logo-ml)">
           <rect x="7"    y="17.5" width="2.3" height="2"   rx="0.4" fill="#10B981"/>
           <rect x="10.5" y="15"   width="2.3" height="4.5" rx="0.4" fill="#10B981"/>
           <rect x="14"   y="12"   width="2.3" height="7.5" rx="0.4" fill="#10B981"/>
           <rect x="17.5" y="9.5"  width="2.3" height="10"  rx="0.4" fill="#10B981"/>
         </g>
-        <!-- Right eye: ascending chart bars (candlestick) -->
+        <!-- Occhio destro: barre che SCENDONO (rosso) -->
         <g clip-path="url(#logo-mr)">
-          <rect x="24"   y="17.5" width="2.3" height="2"   rx="0.4" fill="#10B981"/>
-          <rect x="27.5" y="15"   width="2.3" height="4.5" rx="0.4" fill="#10B981"/>
-          <rect x="31"   y="12"   width="2.3" height="7.5" rx="0.4" fill="#10B981"/>
-          <rect x="34.5" y="9.5"  width="2.3" height="10"  rx="0.4" fill="#10B981"/>
+          <rect x="24"   y="9.5"  width="2.3" height="10"  rx="0.4" fill="#EF4444"/>
+          <rect x="27.5" y="12"   width="2.3" height="7.5" rx="0.4" fill="#EF4444"/>
+          <rect x="31"   y="15"   width="2.3" height="4.5" rx="0.4" fill="#EF4444"/>
+          <rect x="34.5" y="17.5" width="2.3" height="2"   rx="0.4" fill="#EF4444"/>
         </g>
       </svg>
     </div>
