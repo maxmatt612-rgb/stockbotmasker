@@ -978,26 +978,48 @@ async def api_confessionale(body: ConfessionaleBody):
         return JSONResponse({"error": "Testo troppo breve"}, status_code=400)
 
     level = body.level if body.level in _LEVEL_SYSTEM else "intermedio"
+
+    if level == "dilettante":
+        tone = (
+            "Parla come se spiegassi a un amico che non sa nulla di finanza. "
+            "Usa parole semplici, esempi concreti della vita quotidiana, nessun termine tecnico. "
+            "Sii rassicurante, incoraggiante e molto pratico. "
+            "Se menzioni un bias, spiega brevemente cosa significa con parole semplici."
+        )
+        depth = "ANALISI: [2-3 frasi semplici e rassicuranti su cosa sta provando emotivamente, con esempi concreti]\nCONSIGLIO: [1-2 azioni pratiche e immediate che può fare oggi, spiegate semplicemente]"
+    elif level == "esperto":
+        tone = (
+            "Parla con un investitore esperto che conosce la finanza comportamentale. "
+            "Usa terminologia accademica appropriata (Kahneman, Thaler, Prospect Theory, ecc. se pertinenti). "
+            "Sii diretto, analitico e sfidante — non rassicurare, ma analizzare con rigore. "
+            "Puoi menzionare meccanismi neurali, asimmetrie cognitive, effetti di framing."
+        )
+        depth = "ANALISI: [3-4 frasi di analisi approfondita con riferimenti teorici se pertinenti, identifica meccanismi psicologici specifici]\nCONSIGLIO: [2-3 strategie concrete basate su evidence (regole di decision-making, pre-commitment, checklist)]"
+    else:  # intermedio
+        tone = (
+            "Parla con un investitore con esperienza base-media. "
+            "Usa un linguaggio chiaro ma non evitare i termini tecnici — spiegali brevemente. "
+            "Sii empatico ma diretto."
+        )
+        depth = "ANALISI: [2-3 frasi che spiegano cosa sta succedendo psicologicamente]\nCONSIGLIO: [1-2 frasi concrete su come gestire questo momento emotivo]"
+
     sys_prompt = (
         "Sei uno psicologo comportamentale specializzato in finanza behaviorale. "
         "Analizza il testo dell'investitore e identifica i bias cognitivi presenti (FOMO, anchoring, loss aversion, "
-        "overconfidence, herding, recency bias, panic selling, ecc.). "
-        "Rispondi SEMPRE in italiano. Sii empatico ma diretto. "
-        + ("Usa un linguaggio semplice senza gergo." if level == "dilettante" else
-           "Usa terminologia behaviorale appropriata." if level == "esperto" else "")
+        "overconfidence, herding, recency bias, panic selling, status quo bias, mental accounting, ecc.). "
+        "Rispondi SEMPRE in italiano. " + tone
     )
     user_prompt = (
         f"L'investitore scrive:\n\"{body.text.strip()}\"\n\n"
-        "Rispondi in questo formato:\n"
-        "BIAS: [elenco bias rilevati, separati da virgola]\n"
-        "ANALISI: [2-3 frasi che spiegano cosa sta succedendo psicologicamente]\n"
-        "CONSIGLIO: [1-2 frasi concrete su come gestire questo momento emotivo]"
+        "Rispondi ESATTAMENTE in questo formato (niente altro):\n"
+        f"BIAS: [elenco bias rilevati, separati da virgola]\n{depth}"
     )
 
     try:
+        max_tok = 600 if level == "esperto" else 400
         resp = await groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
-            max_tokens=350,
+            max_tokens=max_tok,
             messages=[
                 {"role": "system", "content": sys_prompt},
                 {"role": "user", "content": user_prompt},
@@ -1007,10 +1029,10 @@ async def api_confessionale(body: ConfessionaleBody):
         bias = analisi = consiglio = ""
         for line in text.split("\n"):
             l = line.strip()
-            if l.upper().startswith("BIAS:"):     bias     = l[5:].strip()
-            elif l.upper().startswith("ANALISI:"): analisi  = l[8:].strip()
+            if l.upper().startswith("BIAS:"):       bias      = l[5:].strip()
+            elif l.upper().startswith("ANALISI:"):  analisi   = l[8:].strip()
             elif l.upper().startswith("CONSIGLIO:"): consiglio = l[10:].strip()
-        return {"bias": bias, "analisi": analisi, "consiglio": consiglio}
+        return {"bias": bias, "analisi": analisi, "consiglio": consiglio, "level": level}
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 

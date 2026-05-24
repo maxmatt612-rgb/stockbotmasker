@@ -293,6 +293,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .port-pie-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .port-pie-label{font-weight:700;color:var(--text);min-width:52px}
 .port-pie-pct{color:var(--text-dim);margin-left:auto;font-weight:600}
+.pie-center-pct{fill:var(--text)}
 .port-pie-val{color:var(--text-dim);font-size:.69rem}
 
 /* ── Risk Metrics ── */
@@ -771,7 +772,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .chart-result{margin-top:12px;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:16px;font-size:.82rem;line-height:1.8;white-space:pre-wrap;display:none}
 
 /* ── Confessionale ── */
-.confessionale-wrap{padding:16px 0;border-top:1px solid var(--border);margin-top:8px}
+.confessionale-wrap{padding:16px 0;border-top:1px solid var(--border);margin-top:8px;overflow-y:auto;max-height:calc(100vh - 260px);scrollbar-width:thin;scrollbar-color:var(--border) transparent}
 .conf-title{font-size:.72rem;font-weight:700;color:var(--text-dim);letter-spacing:.08em;margin-bottom:8px}
 .conf-textarea{width:100%;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;color:var(--text);font-family:'Inter',sans-serif;font-size:.83rem;resize:vertical;min-height:80px;outline:none;transition:border-color .2s;line-height:1.5}
 .conf-textarea:focus{border-color:var(--border-hi)}
@@ -1172,6 +1173,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
         <button class="conf-send-btn" style="background:transparent;border-color:var(--border);color:var(--text-dim)" onclick="toggleConfessionale()">Chiudi</button>
       </div>
       <div class="conf-result" id="conf-result">
+        <div id="conf-level-badge" style="font-size:.65rem;font-weight:700;letter-spacing:.06em;margin-bottom:8px;opacity:.7"></div>
         <div class="conf-bias-chips" id="conf-bias-chips"></div>
         <div class="conf-section-label">COSA STA SUCCEDENDO</div>
         <div class="conf-text" id="conf-analisi"></div>
@@ -2310,18 +2312,14 @@ function _renderPieChart(positions, totalVal){
     legend.appendChild(item);
   });
 
-  // Centro donut: totale
+  // Centro donut: 100%
   const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
-  txt.setAttribute('x',cx);txt.setAttribute('y',cy-6);
-  txt.setAttribute('text-anchor','middle');txt.setAttribute('font-size','11');
-  txt.setAttribute('font-weight','700');txt.setAttribute('fill','#0F172A');
-  txt.textContent=_fxSym+(total*_fxRate).toFixed(0);
+  txt.setAttribute('x',cx);txt.setAttribute('y',cy+5);
+  txt.setAttribute('text-anchor','middle');txt.setAttribute('font-size','14');
+  txt.setAttribute('font-weight','800');txt.setAttribute('fill','currentColor');
+  txt.setAttribute('class','pie-center-pct');
+  txt.textContent='100%';
   svg.appendChild(txt);
-  const lbl=document.createElementNS('http://www.w3.org/2000/svg','text');
-  lbl.setAttribute('x',cx);lbl.setAttribute('y',cy+10);
-  lbl.setAttribute('text-anchor','middle');lbl.setAttribute('font-size','8');
-  lbl.setAttribute('fill','#64748B');lbl.textContent='Totale';
-  svg.appendChild(lbl);
 }
 
 // ── Sector Pie Chart ──────────────────────────────────────────────────────────
@@ -3690,6 +3688,8 @@ async function runConfessionale() {
     document.getElementById('conf-bias-chips').innerHTML = chips.map(b=>`<span class="conf-bias-chip">${b}</span>`).join('');
     document.getElementById('conf-analisi').textContent = data.analisi || '—';
     document.getElementById('conf-consiglio').textContent = data.consiglio || '—';
+    const lvlMap = {dilettante:'🟢 ANALISI BASE', intermedio:'🟡 ANALISI PRO', esperto:'🔴 ANALISI EXPERT'};
+    document.getElementById('conf-level-badge').textContent = lvlMap[data.level||_level] || '';
   } catch(_) { document.getElementById('conf-bias-chips').textContent = '❌ Errore di connessione.'; }
 }
 
