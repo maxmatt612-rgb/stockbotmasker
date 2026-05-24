@@ -364,6 +364,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .ind-btn{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-sm);padding:4px 10px;font-size:.68rem;font-weight:600;color:var(--text-dim);cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s}
 .ind-btn.active{background:var(--primary-dim);border-color:var(--primary);color:var(--primary)}
 #rsi-container{height:80px;margin-top:4px;border-top:1px solid var(--border)}
+#macd-container{height:80px;margin-top:4px;border-top:1px solid var(--border)}
 
 /* ── Economic Calendar Tab ── */
 .eco-wrap{padding:14px 28px 96px;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
@@ -420,6 +421,17 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   display:flex;flex-direction:column;justify-content:center;gap:4px;
 }
 .hm-cell:hover{transform:translateY(-2px);opacity:.85}
+/* ── Heatmap grid nuova ── */
+.hm-view-btns{display:flex;gap:8px;padding:0 16px 14px}
+.hm-view-btn{background:var(--surf);border:1px solid var(--border);border-radius:var(--r-md);padding:6px 14px;font-size:.76rem;font-weight:600;color:var(--text-dim);cursor:pointer;transition:all .15s}
+.hm-view-btn.active{background:var(--primary);border-color:var(--primary);color:#fff}
+.hm-region-block{padding:12px 16px}
+.hm-region-lbl{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);margin-bottom:8px}
+.hm-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:3px}
+.hm-tile{border-radius:5px;padding:7px 5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:2px;transition:opacity .15s;min-height:52px}
+.hm-tile:hover{opacity:.78}
+.hm-tile-tk{font-size:.65rem;font-weight:800;color:#fff}
+.hm-tile-chg{font-size:.7rem;font-weight:700;color:rgba(255,255,255,.9)}
 .hm-ticker{font-size:.8rem;font-weight:800;letter-spacing:-.01em}
 .hm-price{font-size:.66rem;color:rgba(255,255,255,.7)}
 .hm-chg{font-size:.78rem;font-weight:700}
@@ -990,14 +1002,21 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 </div>
 
 
-<!-- ── Mercati view (Top/Flop 5 per regione) ── -->
+<!-- ── Mercati view (Top/Flop + Heatmap grid) ── -->
 <div id="heatmap-view" style="display:none">
   <div class="pview-head">
-    <h2 class="pview-title">📈 Mercati — Top &amp; Flop</h2>
-    <span class="pview-sub">Migliori e peggiori per area geografica · <span id="movers-ts">—</span></span>
+    <h2 class="pview-title">📈 Mercati</h2>
+    <span class="pview-sub">Dati di oggi · <span id="movers-ts">—</span></span>
+  </div>
+  <div class="hm-view-btns">
+    <button class="hm-view-btn active" id="hm-btn-topflop" onclick="_hmSetView('topflop')">📋 Top / Flop</button>
+    <button class="hm-view-btn" id="hm-btn-grid" onclick="_hmSetView('grid')">🟥 Heatmap</button>
   </div>
   <div id="movers-wrap" class="movers-wrap">
     <div class="movers-loading">⏳ Caricamento dati mercato…</div>
+  </div>
+  <div id="hm-grid-wrap" style="display:none">
+    <div id="hm-grid-content"></div>
   </div>
 </div>
 
@@ -1393,10 +1412,12 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
       <div class="indicator-group" id="indicator-group">
         <button class="ind-btn" id="ind-bb" onclick="toggleIndicator('bb')">BB</button>
         <button class="ind-btn" id="ind-rsi" onclick="toggleIndicator('rsi')">RSI</button>
+        <button class="ind-btn" id="ind-macd" onclick="toggleIndicator('macd')">MACD</button>
       </div>
     </div>
     <div class="chart-wrap" id="chart-container"></div>
     <div id="rsi-container" style="display:none"></div>
+    <div id="macd-container" style="display:none"></div>
     <div class="detail-grid" id="m-details"></div>
     <!-- Analyst targets + short interest -->
     <div id="m-targets-wrap" style="display:none;margin-top:12px">
@@ -2192,11 +2213,64 @@ async function loadHeatmap(){   // mantiene il nome per compatibilità con il ta
       frag.appendChild(regionDiv);
     });
     wrap.appendChild(frag);
+    _hmData=data;  // salva per la heatmap grid
 
     // Auto-refresh ogni 60s se il tab è ancora visibile
     setTimeout(()=>{if(_tabLoaded.heatmap)loadHeatmap();},60000);
 
   }catch(e){wrap.innerHTML='<div class="movers-loading" style="color:var(--red)">Errore caricamento dati mercato</div>';}
+}
+
+// ── Heatmap grid toggle & render ──────────────────────────────────────────────
+let _hmView='topflop', _hmData=null;
+
+function _hmSetView(v){
+  _hmView=v;
+  document.getElementById('hm-btn-topflop').classList.toggle('active',v==='topflop');
+  document.getElementById('hm-btn-grid').classList.toggle('active',v==='grid');
+  document.getElementById('movers-wrap').style.display=v==='topflop'?'':'none';
+  document.getElementById('hm-grid-wrap').style.display=v==='grid'?'':'none';
+  if(v==='grid') _renderHmGrid(_hmData);
+}
+
+function _hmTileColor(chg){
+  // Scala colore: verde(+3%), verde chiaro(+1%), giallo(0%), rosso(-1%), rosso scuro(-3%)
+  if(chg>=3)   return '#0a9157';
+  if(chg>=1.5) return '#16a34a';
+  if(chg>=0.3) return '#2ecc71';
+  if(chg>=-0.3)return '#6b7280';
+  if(chg>=-1.5)return '#dc2626';
+  if(chg>=-3)  return '#b91c1c';
+  return '#7f1d1d';
+}
+
+function _renderHmGrid(data){
+  const el=document.getElementById('hm-grid-content');
+  if(!data){el.innerHTML='<div class="movers-loading">⏳ Caricamento…</div>';return;}
+  const regionLabels={usa:'🇺🇸 USA',europa:'🌍 Europa',asia:'🌏 Asia & International'};
+  let html='';
+  ['usa','europa','asia'].forEach(region=>{
+    const d=data[region]; if(!d||!d.all||!d.all.length) return;
+    html+=`<div class="hm-region-block">
+      <div class="hm-region-lbl">${regionLabels[region]||region} — ${d.all.length} titoli</div>
+      <div class="hm-tiles">`;
+    d.all.forEach(r=>{
+      const bg=_hmTileColor(r.chg);
+      const sign=r.chg>=0?'+':'';
+      html+=`<div class="hm-tile" style="background:${bg}" title="${r.ticker} — ${fmtP(r.price)}" data-ticker="${r.ticker}" data-price="${r.price}" data-chg="${r.chg}">
+        <div class="hm-tile-tk">${r.ticker}</div>
+        <div class="hm-tile-chg">${sign}${r.chg.toFixed(2)}%</div>
+      </div>`;
+    });
+    html+='</div></div>';
+  });
+  el.innerHTML=html||'<div class="movers-loading">⚠️ Nessun dato</div>';
+  // click su tile → apre modal
+  el.querySelectorAll('.hm-tile').forEach(tile=>{
+    tile.addEventListener('click',()=>{
+      openModal({ticker:tile.dataset.ticker,current_price:parseFloat(tile.dataset.price),day_change_pct:parseFloat(tile.dataset.chg),name:tile.dataset.ticker,score_10:5});
+    });
+  });
 }
 
 function _buildMoverRows(rows, side){
@@ -2550,9 +2624,10 @@ function calcRebalancing(){
   });
 }
 
-// ── Technical Indicators (RSI + Bollinger) ────────────────────────────────────
-let _activeIndicators={bb:false,rsi:false};
+// ── Technical Indicators (RSI + Bollinger + MACD) ─────────────────────────────
+let _activeIndicators={bb:false,rsi:false,macd:false};
 let _lwRsiChart=null, _lwBbUpper=null, _lwBbLower=null, _lwBbMiddle=null;
+let _lwMacdChart=null;
 let _lastOhlcData=[];
 
 function calcRSI(closes,period=14){
@@ -2573,6 +2648,19 @@ function calcRSI(closes,period=14){
     rsi.push(losses===0?100:(100-100/(1+gains/losses)));
   }
   return rsi;
+}
+
+function calcEMA(closes,period){
+  const k=2/(period+1), ema=[closes[0]];
+  for(let i=1;i<closes.length;i++) ema.push(closes[i]*k+ema[i-1]*(1-k));
+  return ema;
+}
+function calcMACD(closes,fast=12,slow=26,signal=9){
+  const emaFast=calcEMA(closes,fast), emaSlow=calcEMA(closes,slow);
+  const macdLine=emaFast.map((v,i)=>v-emaSlow[i]);
+  const signalLine=calcEMA(macdLine,signal);
+  const hist=macdLine.map((v,i)=>v-signalLine[i]);
+  return {macdLine,signalLine,hist};
 }
 
 function calcBollinger(closes,period=20,mult=2){
@@ -2597,7 +2685,9 @@ function _applyIndicators(){
   if(_lwBbLower){try{_lwChart.removeSeries(_lwBbLower);}catch(_){} _lwBbLower=null;}
   if(_lwBbMiddle){try{_lwChart.removeSeries(_lwBbMiddle);}catch(_){} _lwBbMiddle=null;}
   if(_lwRsiChart){try{_lwRsiChart.remove();}catch(_){} _lwRsiChart=null;}
+  if(_lwMacdChart){try{_lwMacdChart.remove();}catch(_){} _lwMacdChart=null;}
   const rsiEl=document.getElementById('rsi-container');
+  const macdEl=document.getElementById('macd-container');
 
   const closes=_lastOhlcData.map(d=>d.close);
   const times=_lastOhlcData.map(d=>d.time);
@@ -2642,13 +2732,42 @@ function _applyIndicators(){
   } else if(rsiEl){
     rsiEl.style.display='none';
   }
+
+  // MACD (terzo grafico)
+  if(_activeIndicators.macd && macdEl){
+    macdEl.style.display='block';
+    macdEl.innerHTML='';
+    const {macdLine,signalLine,hist}=calcMACD(closes);
+    const macdChart=LightweightCharts.createChart(macdEl,{
+      width:macdEl.offsetWidth,height:80,
+      layout:{background:{type:'solid',color:'transparent'},textColor:'#64748B'},
+      grid:{vertLines:{color:'transparent'},horzLines:{color:'rgba(255,255,255,.03)'}},
+      rightPriceScale:{borderColor:'transparent',scaleMargins:{top:.1,bottom:.1}},
+      timeScale:{borderColor:'transparent',visible:false},
+      crosshair:{mode:1},handleScroll:false,handleScale:false,
+    });
+    _lwMacdChart=macdChart;
+    // Histogram verde/rosso
+    const histSeries=macdChart.addHistogramSeries({priceLineVisible:false,lastValueVisible:false});
+    histSeries.setData(hist.map((v,i)=>({time:times[i],value:v,color:v>=0?'rgba(16,185,129,.7)':'rgba(239,68,68,.7)'})));
+    // MACD line
+    const macdSeries=macdChart.addLineSeries({color:'#C4A6FF',lineWidth:1.5,lastValueVisible:true,priceLineVisible:false,crosshairMarkerVisible:false});
+    macdSeries.setData(macdLine.map((v,i)=>({time:times[i],value:v})));
+    // Signal line
+    const sigSeries=macdChart.addLineSeries({color:'#FFB86C',lineWidth:1,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
+    sigSeries.setData(signalLine.map((v,i)=>({time:times[i],value:v})));
+    macdChart.timeScale().fitContent();
+  } else if(macdEl){
+    macdEl.style.display='none';
+  }
 }
 
 // Override _renderChart per salvare dati e applicare indicatori
 const _origRenderChart = _renderChart;
 async function _renderChartWithIndicators(ticker,period,interval,type){
-  _lwRsiChart=null; _lwBbUpper=null; _lwBbLower=null; _lwBbMiddle=null;
+  _lwRsiChart=null; _lwBbUpper=null; _lwBbLower=null; _lwBbMiddle=null; _lwMacdChart=null;
   document.getElementById('rsi-container').style.display='none';
+  document.getElementById('macd-container').style.display='none';
   await _origRenderChart(ticker,period,interval,type);
   // Carica OHLC per indicatori
   try{

@@ -581,6 +581,7 @@ async def api_market_movers():
                     "label": labels.get(region, region),
                     "top":    rows[:5],
                     "bottom": list(reversed(rows[-5:])) if len(rows) >= 5 else list(reversed(rows)),
+                    "all":    rows,   # tutti i titoli ordinati per performance, usati dalla heatmap
                     "total":  len(rows),
                 }
             return result
