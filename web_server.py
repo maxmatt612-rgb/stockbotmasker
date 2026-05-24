@@ -1339,6 +1339,124 @@ async def api_targets(ticker: str):
     return data
 
 
+# ─── Earnings calendar ────────────────────────────────────────────────────────
+
+@app.get("/api/earnings")
+async def api_earnings(tickers: str = ""):
+    ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()][:20]
+    if not ticker_list:
+        return []
+    key = f"earnings:{'_'.join(sorted(ticker_list))}"
+    if (c := _cached(key, 3600)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        result = []
+        for t in ticker_list:
+            try:
+                cal = yf.Ticker(t).calendar
+                if not cal:
+                    continue
+                # yfinance calendar può essere dict o DataFrame
+                if isinstance(cal, dict):
+                    ed = cal.get("Earnings Date") or cal.get("earningsDate")
+                else:
+                    try:
+                        ed = cal.index.tolist() if hasattr(cal, 'index') else []
+                    except Exception:
+                        ed = []
+                if not ed:
+                    continue
+                if isinstance(ed, (list, tuple)) and len(ed) > 0:
+                    date_val = str(ed[0])[:10]
+                elif isinstance(ed, str):
+                    date_val = ed[:10]
+                else:
+                    date_val = str(ed)[:10]
+                eps_est = None
+                rev_est = None
+                if isinstance(cal, dict):
+                    eps_est = cal.get("EPS Estimate") or cal.get("epsEstimate")
+                    rev_est = cal.get("Revenue Estimate") or cal.get("revenueEstimate")
+                result.append({"ticker": t, "date": date_val, "eps_est": eps_est, "rev_est": rev_est})
+            except Exception:
+                pass
+        result.sort(key=lambda x: x["date"])
+        return result
+
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return data
+
+
+# ─── Risk metrics portafoglio ──────────────────────────────────────────────────
+
+@app.get("/api/portfolio/risk")
+async def api_portfolio_risk(tickers: str = "", weights: str = ""):
+    ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    weight_list = [float(w) for w in weights.split(",") if w.strip()]
+    if not ticker_list or not weight_list or len(ticker_list) != len(weight_list):
+        return JSONResponse({"error": "Parametri non validi"}, status_code=400)
+    key = f"risk:{'_'.join(sorted(ticker_list))}"
+    if (c := _cached(key, 3600)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        import math
+        all_t = list(set(ticker_list + ["SPY"]))
+        raw = yf.download(all_t, period="1y", interval="1d", auto_adjust=True, progress=False)
+        if isinstance(raw.columns, object) and hasattr(raw.columns, 'get_level_values'):
+            closes = raw["Close"] if "Close" in raw.columns.get_level_values(0) else raw
+        else:
+            closes = raw
+        if len(all_t) == 1:
+            closes = closes.to_frame(name=all_t[0])
+        returns = closes.pct_change().dropna()
+
+        # Portfolio returns (weighted)
+        port_ret = sum(
+            w * returns[t] for t, w in zip(ticker_list, weight_list)
+            if t in returns.columns
+        )
+        spy_ret = returns["SPY"] if "SPY" in returns.columns else port_ret
+
+        days = len(port_ret)
+        if days < 30:
+            return {"error": "Storico insufficiente"}
+
+        vol = float(port_ret.std() * math.sqrt(252)) * 100
+        rf_daily = 0.045 / 252
+        sharpe = float((port_ret.mean() - rf_daily) / port_ret.std() * math.sqrt(252)) if port_ret.std() > 0 else 0
+
+        cov = float(port_ret.cov(spy_ret))
+        var_spy = float(spy_ret.var())
+        beta = round(cov / var_spy, 2) if var_spy > 0 else 1.0
+
+        cum = (1 + port_ret).cumprod()
+        rolling_max = cum.cummax()
+        max_dd = float(((cum - rolling_max) / rolling_max).min()) * 100
+
+        total_ret = float((cum.iloc[-1] - 1) * 100)
+
+        return {
+            "volatility": round(vol, 1),
+            "sharpe": round(sharpe, 2),
+            "beta": round(beta, 2),
+            "max_drawdown": round(max_dd, 1),
+            "total_return": round(total_ret, 1),
+            "days": days,
+        }
+
+    try:
+        data = await asyncio.to_thread(_get)
+        _store(key, data)
+        return data
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 # ─── Chat AI ──────────────────────────────────────────────────────────────────
 
 class ChatBody(BaseModel):

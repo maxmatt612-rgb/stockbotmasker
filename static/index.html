@@ -284,7 +284,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .chart-tf-btn:hover{color:var(--text);border-color:var(--border-hi)}
 .chart-tf-btn.active{background:var(--primary-dim);border-color:rgba(196,166,255,.35);color:var(--primary)}
 
-/* ── Portfolio Pie Chart ── */
+/* ── Portfolio Pie Charts ── */
 .port-pie-card{background:#fff;border:1px solid var(--border);border-radius:var(--r-xl);padding:20px 24px;box-shadow:var(--shadow-sm)}
 .port-pie-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);margin-bottom:16px}
 .port-pie-body{display:flex;align-items:center;gap:28px;flex-wrap:wrap}
@@ -294,6 +294,71 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .port-pie-label{font-weight:700;color:var(--text);min-width:52px}
 .port-pie-pct{color:var(--text-dim);margin-left:auto;font-weight:600}
 .port-pie-val{color:var(--text-dim);font-size:.69rem}
+
+/* ── Risk Metrics ── */
+.risk-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 28px 14px;max-width:1180px;margin:0 auto}
+.risk-card{background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px;box-shadow:var(--shadow-sm);text-align:center}
+.risk-label{font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text-dim);margin-bottom:6px}
+.risk-value{font-size:1.25rem;font-weight:800;letter-spacing:-.02em}
+.risk-sub{font-size:.66rem;color:var(--text-dim);margin-top:2px}
+@media(max-width:600px){.risk-grid{grid-template-columns:1fr 1fr}}
+
+/* ── Earnings Calendar ── */
+.earnings-section{padding:0 28px 18px;max-width:1180px;margin:0 auto}
+.earnings-hd{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);margin-bottom:12px}
+.earnings-list{display:flex;flex-direction:column;gap:8px}
+.earnings-item{background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:12px 16px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm)}
+.earnings-date{font-size:.8rem;font-weight:700;color:var(--primary);min-width:80px}
+.earnings-ticker{font-size:.9rem;font-weight:800}
+.earnings-detail{font-size:.72rem;color:var(--text-dim);margin-left:auto}
+.earnings-soon{background:rgba(99,102,241,.06);border-color:rgba(99,102,241,.2)}
+
+/* ── Rebalancing Tool ── */
+.rebal-section{padding:0 28px 28px;max-width:1180px;margin:0 auto}
+.rebal-hd-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.rebal-hd{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim)}
+.rebal-table{width:100%;border-collapse:collapse;font-size:.79rem;background:#fff;border-radius:var(--r-md);overflow:hidden;box-shadow:var(--shadow-sm)}
+.rebal-table th{padding:10px 14px;text-align:left;font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text-dim);border-bottom:1px solid var(--border);background:var(--surf-v);font-weight:600}
+.rebal-table td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+.rebal-input{width:64px;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-sm);padding:4px 8px;font-family:'Inter',sans-serif;font-size:.8rem;text-align:center;color:var(--text);outline:none}
+.rebal-input:focus{border-color:var(--primary)}
+.rebal-diff-pos{color:var(--green);font-weight:700}
+.rebal-diff-neg{color:var(--red);font-weight:700}
+.rebal-diff-ok{color:var(--text-dim)}
+
+/* ── Price Alerts ── */
+.alert-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--surf-v);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;position:relative;flex-shrink:0}
+.alert-badge{position:absolute;top:-3px;right:-3px;width:16px;height:16px;background:var(--red);border-radius:50%;font-size:.6rem;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center}
+.alert-panel{position:fixed;top:110px;right:16px;width:300px;background:#fff;border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-lg);z-index:400;display:none;overflow:hidden}
+.alert-panel.open{display:block}
+.alert-panel-hd{padding:14px 16px;border-bottom:1px solid var(--border);font-size:.8rem;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.alert-panel-list{max-height:260px;overflow-y:auto}
+.alert-item{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);font-size:.78rem}
+.alert-item-ticker{font-weight:800;min-width:48px}
+.alert-item-info{flex:1;color:var(--text-dim)}
+.alert-del{background:none;border:none;color:var(--red);cursor:pointer;padding:0 4px;font-size:.85rem}
+.alert-add-row{padding:12px 16px;display:flex;gap:6px}
+.alert-add-input{flex:1;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-sm);padding:6px 10px;font-size:.78rem;color:var(--text);font-family:'Inter',sans-serif;outline:none}
+.alert-add-btn{background:var(--primary);border:none;color:#fff;border-radius:var(--r-sm);padding:6px 12px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif}
+
+/* ── Indicatori tecnici (modal) ── */
+.indicator-group{display:flex;gap:4px}
+.ind-btn{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-sm);padding:4px 10px;font-size:.68rem;font-weight:600;color:var(--text-dim);cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s}
+.ind-btn.active{background:var(--primary-dim);border-color:var(--primary);color:var(--primary)}
+#rsi-container{height:80px;margin-top:4px;border-top:1px solid var(--border)}
+
+/* ── Economic Calendar Tab ── */
+.eco-wrap{padding:14px 28px 96px;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.eco-section-hd{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);margin-bottom:10px}
+.eco-list{display:flex;flex-direction:column;gap:8px}
+.eco-item{background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:13px 16px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-sm)}
+.eco-date{font-size:.78rem;font-weight:700;color:var(--primary);min-width:88px}
+.eco-event{font-size:.84rem;font-weight:700}
+.eco-detail{font-size:.72rem;color:var(--text-dim);margin-top:2px}
+.eco-impact{padding:2px 8px;border-radius:100px;font-size:.65rem;font-weight:700;margin-left:auto}
+.eco-high{background:rgba(239,68,68,.1);color:var(--red)}
+.eco-med{background:rgba(245,158,11,.1);color:var(--gold)}
+.eco-low{background:rgba(16,185,129,.1);color:var(--green)}
 
 /* ── Generic view header ── */
 .pview-head{padding:22px 28px 10px;max-width:1180px;margin:0 auto}
@@ -814,6 +879,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
       <button class="level-btn" id="lvl-esp" onclick="setLevel('esperto')">🔴 Expert</button>
     </div>
     <button class="fx-toggle" id="fx-toggle" onclick="toggleFX()">$ USD</button>
+    <button class="alert-btn" id="alert-btn" onclick="toggleAlertPanel()" title="Price Alerts">🔔<span class="alert-badge" id="alert-badge" style="display:none">0</span></button>
     <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Dark / Light">🌙</button>
     <div id="auth-widget" class="auth-widget"></div>
     <div class="live-badge">
@@ -859,6 +925,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   <button class="tab-btn" data-tab="heatmap">📈 Mercati</button>
   <button class="tab-btn" data-tab="portfolio">💼 Portafoglio</button>
   <button class="tab-btn" data-tab="watchlist">⭐ Watchlist</button>
+  <button class="tab-btn" data-tab="calendar">🗓 Calendario</button>
   <button class="tab-btn" data-tab="ai-chat">🤖 AI</button>
 </div>
 
@@ -911,14 +978,33 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     <div class="port-stat"><div class="port-stat-label">P&amp;L totale</div><div class="port-stat-val" id="ps-pl">—</div></div>
   </div>
 
-  <!-- Pie chart allocazione -->
-  <div id="port-pie-wrap" style="display:none;padding:0 28px 18px;max-width:1180px;margin:0 auto">
-    <div class="port-pie-card">
-      <div class="port-pie-title">Allocazione portafoglio</div>
-      <div class="port-pie-body">
-        <svg id="port-pie-svg" viewBox="0 0 200 200" width="180" height="180"></svg>
-        <div id="port-pie-legend" class="port-pie-legend"></div>
+  <!-- Pie charts: allocazione + settore -->
+  <div id="port-pie-wrap" style="display:none;padding:0 28px 18px;max-width:1180px;margin:0 auto;display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="port-pie-card">
+        <div class="port-pie-title">Allocazione per titolo</div>
+        <div class="port-pie-body">
+          <svg id="port-pie-svg" viewBox="0 0 200 200" width="160" height="160"></svg>
+          <div id="port-pie-legend" class="port-pie-legend"></div>
+        </div>
       </div>
+      <div class="port-pie-card">
+        <div class="port-pie-title">Allocazione per settore</div>
+        <div class="port-pie-body">
+          <svg id="port-sector-svg" viewBox="0 0 200 200" width="160" height="160"></svg>
+          <div id="port-sector-legend" class="port-pie-legend"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Risk Metrics -->
+  <div id="port-risk-wrap" style="display:none">
+    <div class="risk-grid">
+      <div class="risk-card"><div class="risk-label">Volatilità annua</div><div class="risk-value" id="risk-vol">—</div><div class="risk-sub">Deviazione std</div></div>
+      <div class="risk-card"><div class="risk-label">Sharpe Ratio</div><div class="risk-value" id="risk-sharpe">—</div><div class="risk-sub">>1 buono</div></div>
+      <div class="risk-card"><div class="risk-label">Beta vs SPY</div><div class="risk-value" id="risk-beta">—</div><div class="risk-sub">&lt;1 difensivo</div></div>
+      <div class="risk-card"><div class="risk-label">Max Drawdown</div><div class="risk-value" id="risk-dd">—</div><div class="risk-sub">Peggior calo</div></div>
     </div>
   </div>
 
@@ -958,6 +1044,25 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   <div class="port-table-wrap" id="port-table-wrap">
     <div class="history-empty"><span class="icon">💼</span>Aggiungi la tua prima posizione sopra.</div>
   </div>
+  <!-- Earnings prossimi -->
+  <div id="port-earnings-wrap" style="display:none" class="earnings-section">
+    <div class="earnings-hd">📅 Prossimi bilanci</div>
+    <div class="earnings-list" id="port-earnings-list"></div>
+  </div>
+
+  <!-- Rebalancing tool -->
+  <div id="port-rebal-wrap" style="display:none" class="rebal-section">
+    <div class="rebal-hd-row">
+      <span class="rebal-hd">⚖️ Rebalancing</span>
+      <button class="port-add-btn" onclick="calcRebalancing()" style="padding:6px 14px;font-size:.76rem">Calcola</button>
+    </div>
+    <table class="rebal-table">
+      <thead><tr><th>Azione</th><th>Attuale %</th><th>Target %</th><th>Differenza</th><th>Azione consigliata</th></tr></thead>
+      <tbody id="rebal-tbody"></tbody>
+    </table>
+    <div style="font-size:.68rem;color:var(--text-dim);margin-top:8px">Imposta il % target per ogni posizione e clicca Calcola.</div>
+  </div>
+
   <!-- Leaderboard -->
   <div id="port-leaderboard" style="display:none"></div>
 
@@ -1089,6 +1194,35 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   </div>
 </div>
 
+<!-- ── Alert panel (overlay) ── -->
+<div class="alert-panel" id="alert-panel">
+  <div class="alert-panel-hd">
+    <span>🔔 Price Alerts</span>
+    <button onclick="toggleAlertPanel()" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:1.1rem">✕</button>
+  </div>
+  <div class="alert-panel-list" id="alert-list"></div>
+  <div class="alert-add-row">
+    <input class="alert-add-input" id="alert-ticker-inp" placeholder="Ticker (es. AAPL)" autocapitalize="characters" spellcheck="false">
+    <input class="alert-add-input" id="alert-price-inp" placeholder="$ Target" type="number" step="0.01" min="0" style="width:80px;flex:none">
+    <select class="alert-add-input" id="alert-dir-inp" style="flex:none;width:60px"><option value="above">↑</option><option value="below">↓</option></select>
+    <button class="alert-add-btn" onclick="addAlert()">+</button>
+  </div>
+</div>
+
+<!-- ── Calendar view ── -->
+<div id="calendar-view" style="display:none">
+  <div class="eco-wrap">
+    <div>
+      <div class="eco-section-hd">📊 Prossimi bilanci (portfolio &amp; watchlist)</div>
+      <div class="eco-list" id="eco-earnings-list"><div style="color:var(--text-dim);font-size:.8rem">Caricamento…</div></div>
+    </div>
+    <div>
+      <div class="eco-section-hd">🌐 Calendario macro 2025–2026</div>
+      <div class="eco-list" id="eco-macro-list"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Live view ── -->
 <div id="live-view">
 
@@ -1210,8 +1344,13 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
         <button class="chart-tf-btn active" data-type="line">📈 Linea</button>
         <button class="chart-tf-btn" data-type="candle">🕯️ Candele</button>
       </div>
+      <div class="indicator-group" id="indicator-group">
+        <button class="ind-btn" id="ind-bb" onclick="toggleIndicator('bb')">BB</button>
+        <button class="ind-btn" id="ind-rsi" onclick="toggleIndicator('rsi')">RSI</button>
+      </div>
     </div>
     <div class="chart-wrap" id="chart-container"></div>
+    <div id="rsi-container" style="display:none"></div>
     <div class="detail-grid" id="m-details"></div>
     <!-- Analyst targets + short interest -->
     <div id="m-targets-wrap" style="display:none;margin-top:12px">
@@ -1711,14 +1850,14 @@ document.getElementById('chart-tf-group').addEventListener('click',e=>{
   document.querySelectorAll('#chart-tf-group .chart-tf-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   _chartPeriod=btn.dataset.p;_chartInterval=btn.dataset.i;
-  if(_modalTicker)_renderChart(_modalTicker,_chartPeriod,_chartInterval,_chartType);
+  if(_modalTicker)_renderChartWithIndicators(_modalTicker,_chartPeriod,_chartInterval,_chartType);
 });
 document.getElementById('chart-type-group').addEventListener('click',e=>{
   const btn=e.target.closest('.chart-tf-btn');if(!btn)return;
   document.querySelectorAll('#chart-type-group .chart-tf-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   _chartType=btn.dataset.type;
-  if(_modalTicker)_renderChart(_modalTicker,_chartPeriod,_chartInterval,_chartType);
+  if(_modalTicker)_renderChartWithIndicators(_modalTicker,_chartPeriod,_chartInterval,_chartType);
 });
 
 async function openModal(stock){
@@ -1738,8 +1877,8 @@ async function openModal(stock){
   document.getElementById('m-details').innerHTML='';
   document.getElementById('m-verdict').textContent='';
 
-  // Chart
-  _renderChart(stock.ticker,_chartPeriod,_chartInterval,_chartType);
+  // Chart (con indicatori tecnici RSI / Bollinger)
+  _renderChartWithIndicators(stock.ticker,_chartPeriod,_chartInterval,_chartType);
   // Analyst targets + short interest
   document.getElementById('m-targets-wrap').style.display='none';
   loadTargets(stock.ticker, stock.current_price);
@@ -2091,8 +2230,20 @@ async function renderPortfolio(){
   // Portfolio chart (andamento ultimi 30gg, tutte le posizioni)
   _renderPortfolioChart(port, tickers, chartWrap);
 
-  // Pie chart allocazione
+  // Pie chart allocazione (per ticker)
   _renderPieChart(_lbPositions, totalVal);
+
+  // Pie chart per settore
+  _renderSectorChart(_lbPositions);
+
+  // Risk metrics (Volatilità, Sharpe, Beta, Max Drawdown)
+  _loadRiskMetrics(_lbPositions, totalVal);
+
+  // Prossimi earnings delle posizioni
+  _loadPortfolioEarnings(tickers);
+
+  // Tool di ribilanciamento
+  _initRebalancing(_lbPositions, totalVal);
 
   // Leaderboard migliori/peggiori
   _renderLeaderboard(_lbPositions);
@@ -2171,6 +2322,385 @@ function _renderPieChart(positions, totalVal){
   lbl.setAttribute('text-anchor','middle');lbl.setAttribute('font-size','8');
   lbl.setAttribute('fill','#64748B');lbl.textContent='Totale';
   svg.appendChild(lbl);
+}
+
+// ── Sector Pie Chart ──────────────────────────────────────────────────────────
+async function _renderSectorChart(positions){
+  const svg = document.getElementById('port-sector-svg');
+  const legend = document.getElementById('port-sector-legend');
+  if(!svg||!legend) return;
+  // Fetch sectors in parallel
+  const sectorsMap = {};
+  await Promise.all(positions.map(async p=>{
+    try{
+      const d = await fetch(`/api/stock/${p.t}/targets`).then(r=>r.ok?r.json():null);
+      sectorsMap[p.t] = (d && d.sector) ? d.sector : 'Altro';
+    }catch(_){ sectorsMap[p.t]='Altro'; }
+  }));
+  // Group by sector
+  const byS = {};
+  positions.forEach(p=>{
+    const s = sectorsMap[p.t]||'Altro';
+    const val = p.val>0?p.val:p.inv;
+    byS[s] = (byS[s]||0)+val;
+  });
+  const entries = Object.entries(byS).sort((a,b)=>b[1]-a[1]);
+  const total = entries.reduce((s,[,v])=>s+v,0);
+  const COLORS=['#6366F1','#10B981','#F59E0B','#EF4444','#3B82F6','#EC4899','#8B5CF6','#14B8A6','#F97316','#06B6D4'];
+  const cx=100,cy=100,r=80,ri=52;
+  let startAngle=-Math.PI/2;
+  svg.innerHTML=''; legend.innerHTML='';
+  entries.forEach(([sector,val],i)=>{
+    const pct=total>0?(val/total*100):0;
+    const slice=(val/total)*Math.PI*2;
+    const endAngle=startAngle+slice;
+    const color=COLORS[i%COLORS.length];
+    if(entries.length===1){
+      const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx',cx);c.setAttribute('cy',cy);c.setAttribute('r',(r+ri)/2);
+      c.setAttribute('fill','none');c.setAttribute('stroke',color);c.setAttribute('stroke-width',r-ri);
+      svg.appendChild(c);
+    } else {
+      const x1=cx+r*Math.cos(startAngle),y1=cy+r*Math.sin(startAngle);
+      const x2=cx+r*Math.cos(endAngle),y2=cy+r*Math.sin(endAngle);
+      const x3=cx+ri*Math.cos(endAngle),y3=cy+ri*Math.sin(endAngle);
+      const x4=cx+ri*Math.cos(startAngle),y4=cy+ri*Math.sin(startAngle);
+      const large=slice>Math.PI?1:0;
+      const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('d',`M${x1},${y1} A${r},${r},0,${large},1,${x2},${y2} L${x3},${y3} A${ri},${ri},0,${large},0,${x4},${y4} Z`);
+      path.setAttribute('fill',color);
+      svg.appendChild(path);
+    }
+    startAngle=endAngle;
+    const item=document.createElement('div');
+    item.className='port-pie-item';
+    item.innerHTML=`<span class="port-pie-dot" style="background:${color}"></span><span class="port-pie-label" style="font-size:.7rem">${sector}</span><span class="port-pie-pct">${pct.toFixed(1)}%</span>`;
+    legend.appendChild(item);
+  });
+  const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
+  txt.setAttribute('x',cx);txt.setAttribute('y',cy+4);txt.setAttribute('text-anchor','middle');
+  txt.setAttribute('font-size','9');txt.setAttribute('font-weight','700');txt.setAttribute('fill','#0F172A');
+  txt.textContent=Object.keys(byS).length+' settori';
+  svg.appendChild(txt);
+}
+
+// ── Risk Metrics ──────────────────────────────────────────────────────────────
+async function _loadRiskMetrics(positions, totalVal){
+  const wrap = document.getElementById('port-risk-wrap');
+  if(!wrap || positions.length<2) return;
+  wrap.style.display='block';
+  ['risk-vol','risk-sharpe','risk-beta','risk-dd'].forEach(id=>document.getElementById(id).textContent='…');
+  try{
+    const tickers = positions.map(p=>p.t).join(',');
+    const weights = positions.map(p=>{
+      const val=p.val>0?p.val:p.inv;
+      return totalVal>0?(val/totalVal):0;
+    }).join(',');
+    const d = await fetch(`/api/portfolio/risk?tickers=${tickers}&weights=${weights}`).then(r=>r.ok?r.json():null);
+    if(!d||d.error){wrap.style.display='none';return;}
+    const volEl=document.getElementById('risk-vol');
+    volEl.textContent=d.volatility+'%';
+    volEl.style.color=d.volatility>20?'var(--red)':d.volatility>12?'var(--gold)':'var(--green)';
+    const shEl=document.getElementById('risk-sharpe');
+    shEl.textContent=d.sharpe;
+    shEl.style.color=d.sharpe>1?'var(--green)':d.sharpe>0?'var(--gold)':'var(--red)';
+    const beEl=document.getElementById('risk-beta');
+    beEl.textContent=d.beta;
+    beEl.style.color=d.beta>1.3?'var(--red)':d.beta<0.7?'var(--green)':'var(--text)';
+    const ddEl=document.getElementById('risk-dd');
+    ddEl.textContent=d.max_drawdown+'%';
+    ddEl.style.color=d.max_drawdown<-20?'var(--red)':d.max_drawdown<-10?'var(--gold)':'var(--green)';
+  }catch(_){wrap.style.display='none';}
+}
+
+// ── Earnings nel portfolio ────────────────────────────────────────────────────
+async function _loadPortfolioEarnings(tickers){
+  const wrap=document.getElementById('port-earnings-wrap');
+  const list=document.getElementById('port-earnings-list');
+  if(!wrap||!list||!tickers.length) return;
+  try{
+    const data=await fetch(`/api/earnings?tickers=${tickers.join(',')}`).then(r=>r.ok?r.json():[]);
+    if(!data.length){wrap.style.display='none';return;}
+    const today=new Date().toISOString().slice(0,10);
+    const upcoming=data.filter(e=>e.date>=today).slice(0,6);
+    if(!upcoming.length){wrap.style.display='none';return;}
+    wrap.style.display='block';
+    list.innerHTML=upcoming.map(e=>{
+      const daysLeft=Math.round((new Date(e.date)-new Date(today))/(86400000));
+      const soon=daysLeft<=7;
+      return `<div class="earnings-item${soon?' earnings-soon':''}">
+        <span class="earnings-date">${e.date}</span>
+        <span class="earnings-ticker">${e.ticker}</span>
+        ${e.eps_est!=null?`<span style="font-size:.72rem;color:var(--text-dim)">EPS est: $${parseFloat(e.eps_est).toFixed(2)}</span>`:''}
+        <span class="earnings-detail">${daysLeft===0?'OGGI':daysLeft===1?'Domani':'tra '+daysLeft+'gg'}</span>
+      </div>`;
+    }).join('');
+  }catch(_){wrap.style.display='none';}
+}
+
+// ── Rebalancing Tool ──────────────────────────────────────────────────────────
+let _rebalPositions = [];
+function _initRebalancing(positions, totalVal){
+  _rebalPositions = positions;
+  const wrap=document.getElementById('port-rebal-wrap');
+  const tbody=document.getElementById('rebal-tbody');
+  if(!wrap||!tbody||!positions.length){if(wrap)wrap.style.display='none';return;}
+  wrap.style.display='block';
+  tbody.innerHTML=positions.map((p,i)=>{
+    const val=p.val>0?p.val:p.inv;
+    const currPct=totalVal>0?((val/totalVal)*100).toFixed(1):0;
+    return `<tr>
+      <td><b>${p.t}</b></td>
+      <td>${currPct}%</td>
+      <td><input class="rebal-input" type="number" id="rebal-tgt-${i}" value="${currPct}" min="0" max="100" step="0.1"></td>
+      <td id="rebal-diff-${i}" class="rebal-diff-ok">—</td>
+      <td id="rebal-action-${i}" style="font-size:.72rem;color:var(--text-dim)">—</td>
+    </tr>`;
+  }).join('');
+}
+function calcRebalancing(){
+  const totalVal=_rebalPositions.reduce((s,p)=>s+(p.val>0?p.val:p.inv),0);
+  _rebalPositions.forEach((p,i)=>{
+    const val=p.val>0?p.val:p.inv;
+    const currPct=totalVal>0?((val/totalVal)*100):0;
+    const tgtPct=parseFloat(document.getElementById(`rebal-tgt-${i}`)?.value)||0;
+    const diff=tgtPct-currPct;
+    const diffEl=document.getElementById(`rebal-diff-${i}`);
+    const actEl=document.getElementById(`rebal-action-${i}`);
+    if(!diffEl||!actEl) return;
+    diffEl.textContent=(diff>=0?'+':'')+diff.toFixed(1)+'%';
+    diffEl.className=diff>0.5?'rebal-diff-pos':diff<-0.5?'rebal-diff-neg':'rebal-diff-ok';
+    const tgtVal=(tgtPct/100)*totalVal;
+    const currVal=val;
+    const diffVal=tgtVal-currVal;
+    const price=p.currP||p.buyP;
+    if(Math.abs(diff)<0.5){actEl.textContent='✓ Ok';return;}
+    if(price>0){
+      const shares=Math.abs(diffVal/price).toFixed(1);
+      actEl.textContent=diffVal>0?`Compra ${shares} azioni`:`Vendi ${shares} azioni`;
+      actEl.style.color=diffVal>0?'var(--green)':'var(--red)';
+    }
+  });
+}
+
+// ── Technical Indicators (RSI + Bollinger) ────────────────────────────────────
+let _activeIndicators={bb:false,rsi:false};
+let _lwRsiChart=null, _lwBbUpper=null, _lwBbLower=null, _lwBbMiddle=null;
+let _lastOhlcData=[];
+
+function calcRSI(closes,period=14){
+  const rsi=[];
+  if(closes.length<period+1) return closes.map(()=>50);
+  let gains=0,losses=0;
+  for(let i=1;i<=period;i++){
+    const d=closes[i]-closes[i-1];
+    if(d>0)gains+=d; else losses-=d;
+  }
+  gains/=period; losses/=period;
+  rsi.push(...Array(period).fill(null));
+  rsi.push(losses===0?100:(100-100/(1+gains/losses)));
+  for(let i=period+1;i<closes.length;i++){
+    const d=closes[i]-closes[i-1];
+    gains=(gains*(period-1)+(d>0?d:0))/period;
+    losses=(losses*(period-1)+(d<0?-d:0))/period;
+    rsi.push(losses===0?100:(100-100/(1+gains/losses)));
+  }
+  return rsi;
+}
+
+function calcBollinger(closes,period=20,mult=2){
+  return closes.map((_,i)=>{
+    if(i<period-1) return {upper:null,middle:null,lower:null};
+    const slice=closes.slice(i-period+1,i+1);
+    const mean=slice.reduce((a,b)=>a+b,0)/period;
+    const std=Math.sqrt(slice.reduce((a,b)=>a+(b-mean)**2,0)/period);
+    return {upper:mean+mult*std,middle:mean,lower:mean-mult*std};
+  });
+}
+
+function toggleIndicator(type){
+  _activeIndicators[type]=!_activeIndicators[type];
+  document.getElementById(`ind-${type}`)?.classList.toggle('active',_activeIndicators[type]);
+  if(_lastOhlcData.length && _lwChart) _applyIndicators();
+}
+
+function _applyIndicators(){
+  // Rimuovi indicatori precedenti
+  if(_lwBbUpper){try{_lwChart.removeSeries(_lwBbUpper);}catch(_){} _lwBbUpper=null;}
+  if(_lwBbLower){try{_lwChart.removeSeries(_lwBbLower);}catch(_){} _lwBbLower=null;}
+  if(_lwBbMiddle){try{_lwChart.removeSeries(_lwBbMiddle);}catch(_){} _lwBbMiddle=null;}
+  if(_lwRsiChart){try{_lwRsiChart.remove();}catch(_){} _lwRsiChart=null;}
+  const rsiEl=document.getElementById('rsi-container');
+
+  const closes=_lastOhlcData.map(d=>d.close);
+  const times=_lastOhlcData.map(d=>d.time);
+
+  // Bollinger Bands
+  if(_activeIndicators.bb && _lwChart){
+    const bb=calcBollinger(closes);
+    const makeData=(key)=>bb.map((v,i)=>v[key]!=null?{time:times[i],value:v[key]}:null).filter(Boolean);
+    const bOpts={lineWidth:1,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false};
+    _lwBbUpper=_lwChart.addLineSeries({...bOpts,color:'rgba(99,102,241,.5)'});
+    _lwBbUpper.setData(makeData('upper'));
+    _lwBbLower=_lwChart.addLineSeries({...bOpts,color:'rgba(99,102,241,.5)'});
+    _lwBbLower.setData(makeData('lower'));
+    _lwBbMiddle=_lwChart.addLineSeries({...bOpts,color:'rgba(99,102,241,.3)',lineStyle:2});
+    _lwBbMiddle.setData(makeData('middle'));
+  }
+
+  // RSI (secondo grafico)
+  if(_activeIndicators.rsi && rsiEl){
+    rsiEl.style.display='block';
+    rsiEl.innerHTML='';
+    const rsiData=calcRSI(closes);
+    const rsiChart=LightweightCharts.createChart(rsiEl,{
+      width:rsiEl.offsetWidth,height:80,
+      layout:{background:{type:'Solid',color:'transparent'},textColor:'#64748B'},
+      grid:{vertLines:{color:'transparent'},horzLines:{color:'rgba(15,23,42,.06)'}},
+      rightPriceScale:{borderColor:'transparent',scaleMargins:{top:.1,bottom:.1}},
+      timeScale:{borderColor:'transparent',visible:false},
+      crosshair:{mode:1},
+      handleScroll:false,handleScale:false,
+    });
+    _lwRsiChart=rsiChart;
+    const rsiSeries=rsiChart.addLineSeries({color:'#6366F1',lineWidth:1.5,lastValueVisible:true,priceLineVisible:false});
+    // Linee 70/30
+    const ob=rsiChart.addLineSeries({color:'rgba(239,68,68,.4)',lineWidth:1,lineStyle:2,lastValueVisible:false,priceLineVisible:false});
+    const os=rsiChart.addLineSeries({color:'rgba(16,185,129,.4)',lineWidth:1,lineStyle:2,lastValueVisible:false,priceLineVisible:false});
+    const validRsi=rsiData.map((v,i)=>v!=null?{time:times[i],value:v}:null).filter(Boolean);
+    rsiSeries.setData(validRsi);
+    ob.setData([{time:times[0],value:70},{time:times[times.length-1],value:70}]);
+    os.setData([{time:times[0],value:30},{time:times[times.length-1],value:30}]);
+    rsiChart.timeScale().fitContent();
+  } else if(rsiEl){
+    rsiEl.style.display='none';
+  }
+}
+
+// Override _renderChart per salvare dati e applicare indicatori
+const _origRenderChart = _renderChart;
+async function _renderChartWithIndicators(ticker,period,interval,type){
+  _lwRsiChart=null; _lwBbUpper=null; _lwBbLower=null; _lwBbMiddle=null;
+  document.getElementById('rsi-container').style.display='none';
+  await _origRenderChart(ticker,period,interval,type);
+  // Carica OHLC per indicatori
+  try{
+    const ohlc=await fetch(`/api/stock/${ticker}/ohlc?period=${period}&interval=${interval}`).then(r=>r.ok?r.json():[]);
+    _lastOhlcData=ohlc;
+    if(Object.values(_activeIndicators).some(Boolean)) _applyIndicators();
+  }catch(_){}
+}
+
+// ── Price Alerts ──────────────────────────────────────────────────────────────
+let _alerts = JSON.parse(localStorage.getItem('masker_alerts')||'[]');
+function _saveAlerts(){localStorage.setItem('masker_alerts',JSON.stringify(_alerts));}
+function toggleAlertPanel(){
+  const panel=document.getElementById('alert-panel');
+  panel.classList.toggle('open');
+  if(panel.classList.contains('open')) _renderAlertList();
+}
+function _renderAlertList(){
+  const list=document.getElementById('alert-list');
+  if(!list) return;
+  if(!_alerts.length){list.innerHTML='<div style="padding:14px 16px;font-size:.78rem;color:var(--text-dim)">Nessun alert impostato.</div>';return;}
+  list.innerHTML=_alerts.map((a,i)=>`
+    <div class="alert-item">
+      <span class="alert-item-ticker">${a.ticker}</span>
+      <span class="alert-item-info">${a.dir==='above'?'↑ sopra':'↓ sotto'} $${a.price}</span>
+      <button class="alert-del" onclick="deleteAlert(${i})">✕</button>
+    </div>`).join('');
+  const badge=document.getElementById('alert-badge');
+  badge.textContent=_alerts.length;
+  badge.style.display=_alerts.length?'flex':'none';
+}
+function addAlert(){
+  const t=(document.getElementById('alert-ticker-inp').value.trim().toUpperCase());
+  const p=parseFloat(document.getElementById('alert-price-inp').value);
+  const dir=document.getElementById('alert-dir-inp').value;
+  if(!t||!p||isNaN(p)) return;
+  _alerts.push({ticker:t,price:p,dir,triggered:false});
+  _saveAlerts();
+  document.getElementById('alert-ticker-inp').value='';
+  document.getElementById('alert-price-inp').value='';
+  _renderAlertList();
+}
+function deleteAlert(i){_alerts.splice(i,1);_saveAlerts();_renderAlertList();}
+async function _checkAlerts(){
+  if(!_alerts.length) return;
+  const tickers=[...new Set(_alerts.map(a=>a.ticker))].join(',');
+  try{
+    const quotes=await fetch('/api/batch_quotes?tickers='+tickers).then(r=>r.json());
+    _alerts.forEach(a=>{
+      if(a.triggered) return;
+      const q=quotes[a.ticker]; if(!q) return;
+      const triggered=(a.dir==='above'&&q.price>=a.price)||(a.dir==='below'&&q.price<=a.price);
+      if(triggered){
+        a.triggered=true;
+        if(Notification.permission==='granted'){
+          new Notification(`🔔 Alert ${a.ticker}`,{body:`Prezzo ${q.price>=a.price?'sopra':'sotto'} $${a.price} → ora $${q.price.toFixed(2)}`});
+        }
+      }
+    });
+    _alerts=_alerts.filter(a=>!a.triggered);
+    _saveAlerts(); _renderAlertList();
+  }catch(_){}
+}
+// Richiedi permesso notifiche
+if(Notification.permission==='default') Notification.requestPermission();
+setInterval(_checkAlerts,60000);
+_renderAlertList();
+
+// ── Economic / Earnings Calendar ──────────────────────────────────────────────
+const _MACRO_EVENTS=[
+  {date:'2025-07-29',event:'Fed FOMC',detail:'Decisione tassi USA',impact:'high'},
+  {date:'2025-08-13',event:'CPI USA Luglio',detail:'Inflazione al consumo',impact:'high'},
+  {date:'2025-09-16',event:'Fed FOMC',detail:'Decisione tassi USA',impact:'high'},
+  {date:'2025-09-12',event:'BCE',detail:'Decisione tassi Eurozona',impact:'high'},
+  {date:'2025-10-01',event:'NFP Settembre',detail:'Occupazione USA',impact:'high'},
+  {date:'2025-10-28',event:'Fed FOMC',detail:'Decisione tassi USA',impact:'high'},
+  {date:'2025-11-13',event:'CPI USA Ottobre',detail:'Inflazione al consumo',impact:'high'},
+  {date:'2025-12-10',event:'BCE',detail:'Decisione tassi Eurozona',impact:'high'},
+  {date:'2025-12-16',event:'Fed FOMC',detail:'Decisione tassi USA',impact:'high'},
+  {date:'2026-01-28',event:'Fed FOMC',detail:'Decisione tassi USA',impact:'high'},
+  {date:'2026-03-18',event:'Fed FOMC',detail:'Decisione tassi USA',impact:'high'},
+];
+
+async function loadCalendar(){
+  // Macro events
+  const macroEl=document.getElementById('eco-macro-list');
+  if(macroEl){
+    const today=new Date().toISOString().slice(0,10);
+    const upcoming=_MACRO_EVENTS.filter(e=>e.date>=today);
+    macroEl.innerHTML=upcoming.map(e=>`
+      <div class="eco-item">
+        <span class="eco-date">${e.date}</span>
+        <div style="flex:1"><div class="eco-event">${e.event}</div><div class="eco-detail">${e.detail}</div></div>
+        <span class="eco-impact eco-${e.impact}">${e.impact==='high'?'Alta':'Media'}</span>
+      </div>`).join('') || '<div style="color:var(--text-dim);font-size:.8rem">Nessun evento imminente.</div>';
+  }
+  // Earnings da portfolio + watchlist
+  const port=Object.keys(loadPortfolioData());
+  const wl=Object.keys(JSON.parse(localStorage.getItem('masker_watchlist')||'{}'));
+  const tickers=[...new Set([...port,...wl])].slice(0,20);
+  const earningsEl=document.getElementById('eco-earnings-list');
+  if(earningsEl && tickers.length){
+    earningsEl.innerHTML='<div style="color:var(--text-dim);font-size:.8rem">Caricamento…</div>';
+    try{
+      const data=await fetch(`/api/earnings?tickers=${tickers.join(',')}`).then(r=>r.ok?r.json():[]);
+      const today=new Date().toISOString().slice(0,10);
+      const upcoming=data.filter(e=>e.date>=today);
+      earningsEl.innerHTML=upcoming.length?upcoming.map(e=>{
+        const daysLeft=Math.round((new Date(e.date)-new Date(today))/86400000);
+        return `<div class="eco-item">
+          <span class="eco-date">${e.date}</span>
+          <div style="flex:1"><div class="eco-event">${e.ticker}</div>${e.eps_est!=null?`<div class="eco-detail">EPS est: $${parseFloat(e.eps_est).toFixed(2)}</div>`:''}</div>
+          <span class="eco-impact eco-${daysLeft<=7?'high':'med'}">${daysLeft===0?'OGGI':daysLeft+'gg'}</span>
+        </div>`;
+      }).join('') : '<div style="color:var(--text-dim);font-size:.8rem">Nessuna data di bilancio trovata.</div>';
+    }catch(_){earningsEl.innerHTML='<div style="color:var(--text-dim);font-size:.8rem">Errore caricamento.</div>';}
+  } else if(earningsEl){
+    earningsEl.innerHTML='<div style="color:var(--text-dim);font-size:.8rem">Aggiungi titoli al portafoglio o watchlist.</div>';
+  }
 }
 
 async function _renderPortfolioChart(port, tickers, chartWrap){
@@ -2352,7 +2882,7 @@ initAuth();
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab switching (5 tab)
 // ══════════════════════════════════════════════════════════════════════════════
-const _VIEWS = ['live','history','heatmap','portfolio','watchlist','ai-chat'];
+const _VIEWS = ['live','history','heatmap','portfolio','watchlist','calendar','ai-chat'];
 let _tabLoaded = {};
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -2375,6 +2905,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       if(tab==='heatmap')  loadHeatmap();
       if(tab==='portfolio') renderPortfolio();
       if(tab==='watchlist') renderWatchlist();
+      if(tab==='calendar')  loadCalendar();
     }
   });
 });
