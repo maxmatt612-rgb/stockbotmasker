@@ -117,30 +117,48 @@ header{
 
 /* ── Indices tape ── */
 .indices-tape{
-  display:flex;align-items:center;
-  padding:0 24px;
-  background:#fff;
+  display:flex;align-items:center;gap:0;
+  background:var(--tape-bg);
   border-bottom:1px solid var(--border);
   position:sticky;top:60px;z-index:290;
-  overflow-x:auto;scrollbar-width:none;white-space:nowrap;
+  overflow:hidden;height:42px;
 }
-.indices-tape::-webkit-scrollbar{display:none}
-.mkt-status{
-  display:flex;align-items:center;gap:6px;
-  padding:9px 16px 9px 0;border-right:1px solid var(--border);
-  margin-right:4px;flex-shrink:0;
+/* ── Market status pills ── */
+.mkt-pills{display:flex;align-items:center;gap:0;flex-shrink:0;border-right:1px solid var(--border)}
+.mkt-pill{
+  display:flex;align-items:center;gap:4px;
+  padding:0 10px;height:42px;
+  border-right:1px solid var(--border);
+  cursor:default;flex-shrink:0;
 }
-.status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.status-label{font-size:.72rem;font-weight:700;letter-spacing:.06em}
-.status-time{font-size:.68rem;color:var(--text-dim);margin-left:4px}
-.idx-item{
-  display:flex;align-items:center;gap:9px;
-  padding:9px 16px;border-right:1px solid var(--border);
-  flex-shrink:0;font-size:.78rem;
+.mkt-pill:last-child{border-right:none}
+.mkt-pill-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;transition:background .3s}
+.mkt-pill-flag{font-size:.82rem;line-height:1}
+.mkt-pill-info{display:flex;flex-direction:column;gap:0}
+.mkt-pill-label{font-size:.65rem;font-weight:800;letter-spacing:.05em;line-height:1.2}
+.mkt-pill-time{font-size:.6rem;color:var(--text-dim);line-height:1.2;font-variant-numeric:tabular-nums}
+/* ── Infinite scroll ticker ── */
+.tape-scroll-wrap{flex:1;overflow:hidden;position:relative;height:42px}
+.tape-scroll-wrap::before,.tape-scroll-wrap::after{
+  content:'';position:absolute;top:0;bottom:0;width:32px;z-index:2;pointer-events:none;
 }
-.idx-name{color:var(--text-dim);font-size:.7rem;min-width:52px}
-.idx-price{font-weight:700}
-.idx-chg{font-size:.72rem;font-weight:600}
+.tape-scroll-wrap::before{left:0;background:linear-gradient(90deg,var(--tape-bg),transparent)}
+.tape-scroll-wrap::after{right:0;background:linear-gradient(-90deg,var(--tape-bg),transparent)}
+.tape-track{display:flex;align-items:center;height:42px;width:max-content;will-change:transform}
+.tape-track.running{animation:tape-scroll 40s linear infinite}
+@keyframes tape-scroll{
+  0%{transform:translateX(0)}
+  100%{transform:translateX(-50%)}
+}
+.tape-item{
+  display:flex;align-items:center;gap:8px;
+  padding:0 18px;height:42px;
+  border-right:1px solid var(--border);
+  flex-shrink:0;white-space:nowrap;
+}
+.tape-name{font-size:.67rem;color:var(--text-dim);font-weight:600}
+.tape-price{font-size:.8rem;font-weight:800;color:var(--text)}
+.tape-chg{font-size:.7rem;font-weight:700}
 .pos{color:var(--green)}.neg{color:var(--red)}
 
 /* ── Hero ── */
@@ -1078,30 +1096,36 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 <!-- ── Indices tape ── -->
 <div class="indices-tape">
-  <div class="mkt-status">
-    <div class="status-dot" id="status-dot"></div>
-    <span class="status-label" id="status-label">—</span>
-    <span class="status-time" id="status-time"></span>
+  <!-- 3 market status pills: US / EU / ASIA -->
+  <div class="mkt-pills">
+    <div class="mkt-pill" title="New York Stock Exchange">
+      <div class="mkt-pill-dot" id="dot-us"></div>
+      <span class="mkt-pill-flag">🇺🇸</span>
+      <div class="mkt-pill-info">
+        <span class="mkt-pill-label" id="lbl-us">NYSE</span>
+        <span class="mkt-pill-time" id="time-us">—</span>
+      </div>
+    </div>
+    <div class="mkt-pill" title="Borse europee (Francoforte / Milano)">
+      <div class="mkt-pill-dot" id="dot-eu"></div>
+      <span class="mkt-pill-flag">🇪🇺</span>
+      <div class="mkt-pill-info">
+        <span class="mkt-pill-label" id="lbl-eu">EU</span>
+        <span class="mkt-pill-time" id="time-eu">—</span>
+      </div>
+    </div>
+    <div class="mkt-pill" title="Borse asiatiche (Tokyo / Hong Kong)">
+      <div class="mkt-pill-dot" id="dot-asia"></div>
+      <span class="mkt-pill-flag">🌏</span>
+      <div class="mkt-pill-info">
+        <span class="mkt-pill-label" id="lbl-asia">ASIA</span>
+        <span class="mkt-pill-time" id="time-asia">—</span>
+      </div>
+    </div>
   </div>
-  <div class="idx-item" id="idx-SP500">
-    <span class="idx-name">S&amp;P 500</span>
-    <span class="idx-price">—</span>
-    <span class="idx-chg">—</span>
-  </div>
-  <div class="idx-item" id="idx-NASDAQ">
-    <span class="idx-name">NASDAQ</span>
-    <span class="idx-price">—</span>
-    <span class="idx-chg">—</span>
-  </div>
-  <div class="idx-item" id="idx-DOW">
-    <span class="idx-name">DOW</span>
-    <span class="idx-price">—</span>
-    <span class="idx-chg">—</span>
-  </div>
-  <div class="idx-item" id="idx-VIX">
-    <span class="idx-name">VIX</span>
-    <span class="idx-price">—</span>
-    <span class="idx-chg">—</span>
+  <!-- Infinite scroll ticker -->
+  <div class="tape-scroll-wrap">
+    <div class="tape-track" id="tape-track"><!-- populated by JS --></div>
   </div>
 </div>
 
@@ -1876,40 +1900,96 @@ const now  = () => { const d=new Date(); return d.getHours().toString().padStart
 // ══════════════════════════════════════════════════════════════════════════════
 // Market status
 // ══════════════════════════════════════════════════════════════════════════════
-function updateMarketStatus(){
-  const et = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
-  const day=et.getDay(), h=et.getHours(), m=et.getMinutes(), t=h*60+m;
-  const timeStr = h.toString().padStart(2,'0')+':'+m.toString().padStart(2,'0');
-
+// ══════════════════════════════════════════════════════════════════════════════
+// Market status — US / EU / ASIA  (aggiornato ogni secondo)
+// ══════════════════════════════════════════════════════════════════════════════
+function _mktStatus(tz, openH, openM, closeH, closeM, preH, preM, afterH, afterM){
+  const d = new Date(new Date().toLocaleString('en-US',{timeZone:tz}));
+  const day=d.getDay(), h=d.getHours(), m=d.getMinutes(), t=h*60+m;
+  const ts=h.toString().padStart(2,'0')+':'+m.toString().padStart(2,'0');
+  const openT=openH*60+openM, closeT=closeH*60+closeM;
+  const preT=(preH!==null)?preH*60+preM:null;
+  const afterT=(afterH!==null)?afterH*60+afterM:null;
   let label,color;
-  if(day===0||day===6){label='CHIUSO';color='var(--red)';}
-  else if(t>=9*60+30&&t<16*60){label='APERTO';color='var(--green)';}
-  else if(t>=4*60&&t<9*60+30){label='PRE-MARKET';color='var(--gold)';}
-  else if(t>=16*60&&t<20*60){label='AFTER-HOURS';color='var(--gold)';}
-  else{label='CHIUSO';color='var(--red)';}
-
-  document.getElementById('status-dot').style.background=color;
-  document.getElementById('status-label').style.color=color;
-  document.getElementById('status-label').textContent=label;
-  document.getElementById('status-time').textContent='NYSE '+timeStr;
+  if(day===0||day===6){label='CHIUSO';color='#FF6B6B';}
+  else if(t>=openT&&t<closeT){label='APERTO';color='#72EFA0';}
+  else if(preT!==null&&t>=preT&&t<openT){label='PRE';color='#FFB86C';}
+  else if(afterT!==null&&t>=closeT&&t<afterT){label='AFTER';color='#FFB86C';}
+  else{label='CHIUSO';color='#FF6B6B';}
+  return {label,color,ts};
 }
 
+function updateMarketStatus(){
+  // 🇺🇸 NYSE (America/New_York) — 09:30–16:00, pre 04:00, after 20:00
+  const us=_mktStatus('America/New_York',9,30,16,0,4,0,20,0);
+  document.getElementById('dot-us').style.background=us.color;
+  document.getElementById('lbl-us').style.color=us.color;
+  document.getElementById('lbl-us').textContent='NYSE · '+us.label;
+  document.getElementById('time-us').textContent=us.ts+' NY';
+
+  // 🇪🇺 EU Xetra/Milano (Europe/Rome) — 09:00–17:30, nessun pre/after
+  const eu=_mktStatus('Europe/Rome',9,0,17,30,null,null,null,null);
+  document.getElementById('dot-eu').style.background=eu.color;
+  document.getElementById('lbl-eu').style.color=eu.color;
+  document.getElementById('lbl-eu').textContent='EU · '+eu.label;
+  document.getElementById('time-eu').textContent=eu.ts+' CET';
+
+  // 🌏 ASIA Tokyo (Asia/Tokyo) — 09:00–15:30 (pausa 11:30–12:30 ignorata)
+  const as=_mktStatus('Asia/Tokyo',9,0,15,30,null,null,null,null);
+  document.getElementById('dot-asia').style.background=as.color;
+  document.getElementById('lbl-asia').style.color=as.color;
+  document.getElementById('lbl-asia').textContent='ASIA · '+as.label;
+  document.getElementById('time-asia').textContent=as.ts+' TKY';
+
+  // backward-compat (usato da alcuni check interni)
+  const _dot=document.getElementById('status-dot');
+  const _lbl=document.getElementById('status-label');
+  const _tim=document.getElementById('status-time');
+  if(_dot){_dot.style.background=us.color;}
+  if(_lbl){_lbl.style.color=us.color;_lbl.textContent=us.label;}
+  if(_tim){_tim.textContent='NYSE '+us.ts;}
+}
+setInterval(updateMarketStatus, 1000); // ogni secondo per l'orologio live
+
 // ══════════════════════════════════════════════════════════════════════════════
-// Indices
+// Infinite scroll ticker tape
 // ══════════════════════════════════════════════════════════════════════════════
+let _tapeData = {};
+
+function _buildTapeHtml(data){
+  const order=['SP500','NASDAQ','DOW','VIX','DAX','MIB','CAC','NIKKEI','HSI','STI','BTC','GOLD','OIL'];
+  let html='';
+  order.forEach(k=>{
+    const it=data[k]; if(!it||it.price===0) return;
+    const isVix=k==='VIX';
+    const priceStr=it.price>=1000
+      ? it.price.toLocaleString('it-IT',{minimumFractionDigits:0,maximumFractionDigits:0})
+      : it.price.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const chgStr=(it.chg>=0?'+':'')+it.chg.toFixed(2)+'%';
+    const chgCls=isVix?'':(it.chg>=0?'pos':'neg');
+    html+=`<div class="tape-item">
+      <span class="tape-name">${it.label||k}</span>
+      <span class="tape-price">${priceStr}</span>
+      <span class="tape-chg ${chgCls}">${chgStr}</span>
+    </div>`;
+  });
+  return html;
+}
+
 async function loadIndices(){
   try{
     const d=await fetch('/api/market/indices').then(r=>r.json());
-    const map={SP500:'S&P 500',NASDAQ:'NASDAQ',DOW:'DOW',VIX:'VIX'};
-    Object.keys(map).forEach(k=>{
-      const el=document.getElementById('idx-'+k);
-      if(!el||!d[k])return;
-      const {price,chg}=d[k];
-      el.querySelector('.idx-price').textContent=price.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});
-      const ce=el.querySelector('.idx-chg');
-      ce.textContent=(chg>=0?'+':'')+chg.toFixed(2)+'%';
-      ce.className='idx-chg '+(chg>=0?'pos':'neg');
-    });
+    _tapeData=d;
+    const track=document.getElementById('tape-track');
+    if(!track) return;
+    const inner=_buildTapeHtml(d);
+    if(!inner) return;
+    // Duplica per loop seamless
+    track.innerHTML=inner+inner;
+    track.classList.add('running');
+    // Velocità basata su quanti item ci sono
+    const count=Object.values(d).filter(v=>v.price>0).length;
+    track.style.animationDuration=(count*4)+'s';
   }catch(_){}
 }
 
