@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Masker — Stock Intelligence</title>
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#C4A6FF">
+<meta name="theme-color" content="#6366F1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="/icon.svg">
@@ -14,28 +14,32 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#06061A;--surf:#0D0D26;--surf-v:#131336;--surf-hi:#1C1C4A;
-  --primary:#C4A6FF;--primary-dim:rgba(196,166,255,.12);
-  --secondary:#80FFDB;--gold:#FFB86C;--green:#72EFA0;--red:#FF6B6B;
-  --text:#E6E1EF;--text-dim:#8E8A9E;
-  --border:rgba(196,166,255,.1);--border-hi:rgba(196,166,255,.35);
-  --r-xl:28px;--r-lg:18px;--r-md:12px;--r-sm:8px;
+  --bg:#F5F7FB;--surf:#FFFFFF;--surf-v:#EEF1F8;--surf-hi:#E4E9F4;
+  --primary:#6366F1;--primary-dim:rgba(99,102,241,.08);
+  --secondary:#10B981;--gold:#F59E0B;--green:#10B981;--red:#EF4444;
+  --text:#0F172A;--text-dim:#64748B;
+  --border:rgba(15,23,42,.08);--border-hi:rgba(15,23,42,.16);
+  --shadow-sm:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 16px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.04);
+  --shadow-lg:0 20px 48px rgba(0,0,0,.1),0 8px 16px rgba(0,0,0,.06);
+  --r-xl:20px;--r-lg:16px;--r-md:10px;--r-sm:6px;
 }
 html{scroll-behavior:smooth}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
-#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+#bg-canvas{display:none}
 .app{position:relative;z-index:1}
 
 /* ── Header ── */
 header{
   display:flex;align-items:center;gap:14px;
   padding:10px 20px;
-  background:rgba(6,6,26,.88);backdrop-filter:blur(28px);
+  background:#fff;
   border-bottom:1px solid var(--border);
+  box-shadow:var(--shadow-sm);
   position:sticky;top:0;z-index:300;height:60px;
 }
 .logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:1.05rem;letter-spacing:-.025em;flex-shrink:0}
-.logo-icon{width:36px;height:36px;border-radius:9px;background:#050510;border:1px solid rgba(196,166,255,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo-icon{width:36px;height:36px;border-radius:9px;background:var(--primary);border:none;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 /* search inside header */
 .header-search{
   flex:1;max-width:420px;margin:0 auto;
@@ -59,7 +63,7 @@ header{
 .indices-tape{
   display:flex;align-items:center;
   padding:0 24px;
-  background:rgba(13,13,38,.92);backdrop-filter:blur(20px);
+  background:#fff;
   border-bottom:1px solid var(--border);
   position:sticky;top:60px;z-index:290;
   overflow-x:auto;scrollbar-width:none;white-space:nowrap;
@@ -84,15 +88,15 @@ header{
 .pos{color:var(--green)}.neg{color:var(--red)}
 
 /* ── Hero ── */
-.hero{text-align:center;padding:56px 24px 36px}
+.hero{text-align:center;padding:40px 24px 28px}
 .hero h1{
-  font-size:clamp(2rem,6vw,4.2rem);font-weight:900;
-  letter-spacing:-.045em;line-height:1.05;
-  background:linear-gradient(135deg,var(--primary) 0%,var(--secondary) 55%,var(--gold) 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-  margin-bottom:12px;
+  font-size:clamp(1.6rem,4vw,2.8rem);font-weight:900;
+  letter-spacing:-.04em;line-height:1.1;
+  color:var(--text);
+  margin-bottom:8px;
 }
-.hero p{color:var(--text-dim);font-size:.9rem}
+.hero h1 span{color:var(--primary)}
+.hero p{color:var(--text-dim);font-size:.88rem}
 
 
 /* ── Controls ── */
@@ -125,20 +129,20 @@ header{
 
 /* ── Card ── */
 .card{
-  background:linear-gradient(145deg,rgba(196,166,255,.055),rgba(128,255,219,.025));
+  background:#fff;
   border:1px solid var(--border);border-radius:var(--r-xl);
-  padding:22px 22px 18px;cursor:pointer;
-  transition:border-color .2s,box-shadow .2s;
-  transform-style:preserve-3d;will-change:transform;
-  animation:fadeUp .5s ease both;
+  padding:20px 20px 16px;cursor:pointer;
+  transition:border-color .2s,box-shadow .2s,transform .2s;
+  box-shadow:var(--shadow-sm);
+  animation:fadeUp .4s ease both;
 }
-.card:nth-child(1){animation-delay:.04s}.card:nth-child(2){animation-delay:.09s}
-.card:nth-child(3){animation-delay:.14s}.card:nth-child(4){animation-delay:.19s}
-.card:nth-child(5){animation-delay:.24s}.card:nth-child(6){animation-delay:.29s}
-.card:nth-child(7){animation-delay:.34s}.card:nth-child(8){animation-delay:.39s}
-.card:nth-child(9){animation-delay:.44s}.card:nth-child(10){animation-delay:.49s}
-@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-.card:hover{border-color:var(--border-hi);box-shadow:0 0 0 1px rgba(196,166,255,.1),0 20px 50px rgba(0,0,0,.45),0 0 35px rgba(196,166,255,.1)}
+.card:nth-child(1){animation-delay:.04s}.card:nth-child(2){animation-delay:.08s}
+.card:nth-child(3){animation-delay:.12s}.card:nth-child(4){animation-delay:.16s}
+.card:nth-child(5){animation-delay:.20s}.card:nth-child(6){animation-delay:.24s}
+.card:nth-child(7){animation-delay:.28s}.card:nth-child(8){animation-delay:.32s}
+.card:nth-child(9){animation-delay:.36s}.card:nth-child(10){animation-delay:.40s}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.card:hover{border-color:var(--primary);box-shadow:var(--shadow-md);transform:translateY(-2px)}
 .card-rank{font-size:.68rem;font-weight:700;letter-spacing:.1em;color:var(--primary);text-transform:uppercase;margin-bottom:5px;opacity:.8}
 .card-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
 .card-ticker{font-size:1.6rem;font-weight:900;letter-spacing:-.035em;line-height:1}
@@ -152,13 +156,13 @@ header{
 /* Score */
 .score-wrap{display:flex;align-items:center;gap:9px;margin-bottom:12px}
 .score-label{font-size:.7rem;color:var(--text-dim);min-width:38px}
-.score-track{flex:1;height:5px;background:rgba(255,255,255,.07);border-radius:100px;overflow:hidden}
+.score-track{flex:1;height:5px;background:rgba(15,23,42,.07);border-radius:100px;overflow:hidden}
 .score-bar{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--primary),var(--secondary));width:0;transition:width .85s cubic-bezier(.4,0,.2,1)}
 .score-num{font-size:.74rem;font-weight:700;color:var(--primary);min-width:34px;text-align:right}
 
 /* Chips */
 .chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
-.chip{font-size:.68rem;padding:2px 8px;border-radius:100px;border:1px solid var(--border);color:var(--text-dim);background:rgba(255,255,255,.025)}
+.chip{font-size:.68rem;padding:2px 8px;border-radius:100px;border:1px solid var(--border);color:var(--text-dim);background:var(--surf-v)}
 
 /* Sparkline */
 .sparkline-wrap{height:42px;margin:4px -2px 0}
@@ -169,8 +173,8 @@ header{
 .verdict.show{opacity:1}
 
 /* ── Skeleton ── */
-.skel-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r-xl);padding:22px;animation:shimmer 1.8s infinite}
-@keyframes shimmer{0%,100%{opacity:.3}50%{opacity:.65}}
+.skel-card{background:#fff;border:1px solid var(--border);border-radius:var(--r-xl);padding:22px;box-shadow:var(--shadow-sm);animation:shimmer 1.8s infinite}
+@keyframes shimmer{0%,100%{opacity:.5}50%{opacity:.9}}
 .skel-line{background:var(--surf-v);border-radius:6px;margin-bottom:10px}
 
 /* ── Empty state ── */
@@ -179,16 +183,16 @@ header{
 
 /* ── Modal ── */
 .modal-overlay{
-  position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(14px);
+  position:fixed;inset:0;background:rgba(15,23,42,.4);backdrop-filter:blur(8px);
   z-index:500;display:flex;align-items:center;justify-content:center;padding:16px;
   opacity:0;pointer-events:none;transition:opacity .2s;
 }
 .modal-overlay.open{opacity:1;pointer-events:all}
 .modal-sheet{
-  background:var(--surf);border:1px solid var(--border-hi);border-radius:var(--r-xl);
+  background:#fff;border:1px solid var(--border);border-radius:var(--r-xl);
   width:100%;max-width:580px;max-height:92vh;overflow-y:auto;padding:26px;
-  transform:scale(.93) translateY(22px);transition:transform .25s cubic-bezier(.4,0,.2,1);
-  box-shadow:0 40px 80px rgba(0,0,0,.6),0 0 50px rgba(196,166,255,.07);
+  transform:scale(.96) translateY(16px);transition:transform .25s cubic-bezier(.4,0,.2,1);
+  box-shadow:var(--shadow-lg);
 }
 .modal-overlay.open .modal-sheet{transform:scale(1) translateY(0)}
 .modal-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
@@ -200,7 +204,7 @@ header{
 .modal-price{font-size:2.1rem;font-weight:900;letter-spacing:-.04em}
 .chart-wrap{position:relative;height:195px;margin:18px 0}
 .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
-.detail-cell{background:var(--surf-v);border-radius:var(--r-md);padding:13px}
+.detail-cell{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:13px}
 .detail-cell-label{font-size:.66rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
 .detail-cell-val{font-size:.92rem;font-weight:700}
 .modal-verdict{margin-top:14px;font-size:.8rem;line-height:1.6;color:var(--text-dim);border-left:3px solid rgba(196,166,255,.3);padding-left:11px}
@@ -222,7 +226,7 @@ header{
 .ai-loading{text-align:center;padding:18px;font-size:.8rem;color:var(--text-dim);animation:shimmer 1.8s infinite}
 
 /* ── Refresh pill ── */
-.refresh-pill{position:fixed;bottom:18px;right:18px;background:rgba(13,13,38,.92);border:1px solid var(--border);border-radius:100px;padding:8px 15px;font-size:.74rem;color:var(--text-dim);display:flex;align-items:center;gap:6px;z-index:100;backdrop-filter:blur(16px)}
+.refresh-pill{position:fixed;bottom:18px;right:18px;background:#fff;border:1px solid var(--border);border-radius:100px;padding:8px 15px;font-size:.74rem;color:var(--text-dim);display:flex;align-items:center;gap:6px;z-index:100;box-shadow:var(--shadow-md)}
 
 /* ── Footer ── */
 footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72rem;border-top:1px solid var(--border)}
@@ -238,6 +242,17 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .chart-tf-btn:hover{color:var(--text);border-color:var(--border-hi)}
 .chart-tf-btn.active{background:var(--primary-dim);border-color:rgba(196,166,255,.35);color:var(--primary)}
 
+/* ── Portfolio Pie Chart ── */
+.port-pie-card{background:#fff;border:1px solid var(--border);border-radius:var(--r-xl);padding:20px 24px;box-shadow:var(--shadow-sm)}
+.port-pie-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);margin-bottom:16px}
+.port-pie-body{display:flex;align-items:center;gap:28px;flex-wrap:wrap}
+.port-pie-legend{display:flex;flex-direction:column;gap:8px;flex:1;min-width:160px}
+.port-pie-item{display:flex;align-items:center;gap:8px;font-size:.76rem}
+.port-pie-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.port-pie-label{font-weight:700;color:var(--text);min-width:52px}
+.port-pie-pct{color:var(--text-dim);margin-left:auto;font-weight:600}
+.port-pie-val{color:var(--text-dim);font-size:.69rem}
+
 /* ── Generic view header ── */
 .pview-head{padding:22px 28px 10px;max-width:1180px;margin:0 auto}
 .pview-title{font-size:1.1rem;font-weight:800;letter-spacing:-.02em;margin-bottom:3px}
@@ -245,7 +260,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 /* ── Mercati Top/Flop (ex Heatmap) ── */
 .movers-wrap{display:flex;flex-direction:column;gap:14px;padding:14px 28px 96px;max-width:1180px;margin:0 auto}
-.movers-region{background:linear-gradient(145deg,rgba(196,166,255,.04),rgba(128,255,219,.02));border:1px solid var(--border);border-radius:var(--r-xl);overflow:hidden}
+.movers-region{background:#fff;border:1px solid var(--border);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-sm)}
 .movers-region-hd{display:flex;align-items:center;gap:10px;padding:13px 20px;border-bottom:1px solid var(--border)}
 .movers-region-name{font-size:.9rem;font-weight:800;letter-spacing:-.015em}
 .movers-region-cnt{margin-left:auto;font-size:.68rem;color:var(--text-dim);background:var(--surf-v);padding:2px 9px;border-radius:100px}
@@ -256,7 +271,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .movers-col-top .movers-col-hd{color:var(--green)}
 .movers-col-bot .movers-col-hd{color:var(--red)}
 .mover-row{display:flex;align-items:center;gap:8px;padding:7px 18px;cursor:pointer;transition:background .12s}
-.mover-row:hover{background:rgba(255,255,255,.03)}
+.mover-row:hover{background:var(--surf-v)}
 .mover-rank{font-size:.62rem;color:var(--text-dim);min-width:13px;text-align:right;flex-shrink:0}
 .mover-ticker{font-size:.84rem;font-weight:800;min-width:48px;letter-spacing:-.01em}
 .mover-price{font-size:.71rem;color:var(--text-dim);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -281,7 +296,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 }
 .hm-cell:hover{transform:translateY(-2px);opacity:.85}
 .hm-ticker{font-size:.8rem;font-weight:800;letter-spacing:-.01em}
-.hm-price{font-size:.66rem;color:rgba(255,255,255,.5)}
+.hm-price{font-size:.66rem;color:rgba(255,255,255,.7)}
 .hm-chg{font-size:.78rem;font-weight:700}
 .hm-pp{background:rgba(114,239,160,.28);color:#72EFA0}
 .hm-p{background:rgba(114,239,160,.13);color:#72EFA0}
@@ -305,19 +320,19 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .port-input{flex:2;min-width:120px}
 .port-input.port-input-sm{flex:1;min-width:90px}
 .port-add-btn{
-  background:var(--primary-dim);border:1px solid rgba(196,166,255,.35);
+  background:var(--primary);border:1px solid var(--primary);
   border-radius:var(--r-md);padding:9px 18px;
-  color:var(--primary);font-family:'Inter',sans-serif;font-size:.82rem;font-weight:700;
+  color:#fff;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:700;
   cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0;
 }
-.port-add-btn:hover{background:rgba(196,166,255,.2);border-color:var(--primary)}
+.port-add-btn:hover{background:#4F46E5;border-color:#4F46E5}
 
 /* Portfolio summary */
 .port-summary{
   display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
   padding:0 28px 14px;max-width:1180px;margin:0 auto;
 }
-.port-stat{background:var(--surf);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px}
+.port-stat{background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px;box-shadow:var(--shadow-sm)}
 .port-stat-label{font-size:.66rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px}
 .port-stat-val{font-size:1.1rem;font-weight:800;letter-spacing:-.02em}
 
@@ -325,8 +340,8 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .port-table-wrap{padding:0 28px 96px;max-width:1180px;margin:0 auto;overflow-x:auto}
 .port-table{width:100%;border-collapse:collapse;font-size:.79rem}
 .port-table th{text-align:left;padding:8px 10px;color:var(--text-dim);font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);font-weight:600}
-.port-table td{padding:11px 10px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
-.port-table tr:hover td{background:rgba(255,255,255,.02)}
+.port-table td{padding:11px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.port-table tr:hover td{background:var(--surf-v)}
 .port-ticker-cell{font-weight:800;font-size:.88rem}
 .port-name-cell{color:var(--text-dim);font-size:.72rem;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .port-pl-pos{color:var(--green);font-weight:700}
@@ -338,7 +353,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 /* ── Disclaimer banner (sempre visibile) ── */
 .disc-banner{
-  background:rgba(255,184,108,.06);border-top:1px solid rgba(255,184,108,.15);
+  background:#FFFBEB;border-top:1px solid rgba(245,158,11,.2);
   padding:9px 28px;text-align:center;font-size:.7rem;color:var(--text-dim);line-height:1.6;
 }
 .disc-banner b{color:var(--gold)}
@@ -348,6 +363,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   display:flex;gap:6px;
   padding:12px 28px 0;max-width:1180px;margin:0 auto;
   border-bottom:1px solid var(--border);
+  background:#fff;
 }
 .tab-btn{
   background:transparent;border:none;cursor:pointer;
@@ -576,14 +592,14 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .chat-welcome-title{font-size:1.1rem;font-weight:800;color:var(--text);margin-bottom:8px}
 .chat-welcome-sub{font-size:.82rem;line-height:1.7}
 .chat-bubble{max-width:82%;padding:12px 16px;border-radius:16px;font-size:.84rem;line-height:1.65;white-space:pre-wrap}
-.chat-bubble.user{align-self:flex-end;background:var(--primary-dim);border:1px solid rgba(196,166,255,.3);border-bottom-right-radius:4px}
-.chat-bubble.ai{align-self:flex-start;background:var(--surf-v);border:1px solid var(--border);border-bottom-left-radius:4px}
+.chat-bubble.user{align-self:flex-end;background:var(--primary);color:#fff;border-bottom-right-radius:4px}
+.chat-bubble.ai{align-self:flex-start;background:#fff;border:1px solid var(--border);border-bottom-left-radius:4px;box-shadow:var(--shadow-sm)}
 .chat-bubble.loading{color:var(--text-dim);font-style:italic}
 .chat-input-wrap{padding:12px 0 18px;display:flex;gap:8px;border-top:1px solid var(--border);flex-shrink:0}
 .chat-input{flex:1;background:var(--surf-v);border:1px solid var(--border);border-radius:100px;padding:11px 18px;color:var(--text);font-family:'Inter',sans-serif;font-size:.85rem;outline:none;transition:border-color .2s}
 .chat-input:focus{border-color:var(--border-hi)}
-.chat-send-btn{width:44px;height:44px;border-radius:50%;background:var(--primary-dim);border:1px solid var(--primary);color:var(--primary);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
-.chat-send-btn:hover{background:rgba(196,166,255,.25)}
+.chat-send-btn{width:44px;height:44px;border-radius:50%;background:var(--primary);border:none;color:#fff;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+.chat-send-btn:hover{background:#4F46E5}
 
 
 /* ── Livello esperienza ── */
@@ -852,6 +868,17 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     <div class="port-stat"><div class="port-stat-label">P&amp;L totale</div><div class="port-stat-val" id="ps-pl">—</div></div>
   </div>
 
+  <!-- Pie chart allocazione -->
+  <div id="port-pie-wrap" style="display:none;padding:0 28px 18px;max-width:1180px;margin:0 auto">
+    <div class="port-pie-card">
+      <div class="port-pie-title">Allocazione portafoglio</div>
+      <div class="port-pie-body">
+        <svg id="port-pie-svg" viewBox="0 0 200 200" width="180" height="180"></svg>
+        <div id="port-pie-legend" class="port-pie-legend"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Chart -->
   <div id="port-chart-wrap" style="display:none;padding:0 28px;max-width:1180px;margin:0 auto 18px">
     <div id="port-chart-container" style="height:200px;border-radius:var(--r-md);overflow:hidden"></div>
@@ -859,7 +886,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
   <!-- Valuta button -->
   <div style="padding:0 28px 14px;max-width:1180px;margin:0 auto;display:none" id="port-valuta-row">
-    <button class="port-add-btn" id="port-valuta-btn" style="background:linear-gradient(135deg,rgba(196,166,255,.18),rgba(128,255,219,.1));border-color:rgba(196,166,255,.4);color:var(--primary);font-size:.84rem;padding:10px 22px;width:100%">
+    <button class="port-add-btn" id="port-valuta-btn" style="font-size:.84rem;padding:10px 22px;width:100%">
       🤖 Valuta Portafoglio con AI
     </button>
   </div>
@@ -1030,8 +1057,8 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 <!-- ── Hero ── -->
 <section class="hero">
-  <h1>Masker<br>Intelligence</h1>
-  <p>Stock scanner AI &nbsp;·&nbsp; Candele + timeframe &nbsp;·&nbsp; Portafoglio &nbsp;·&nbsp; Heatmap &nbsp;·&nbsp; Aggiornamento ogni 60 s</p>
+  <h1>Masker <span>Intelligence</span></h1>
+  <p>Scanner AI · Grafici · Portafoglio · Mercati · Aggiornamento ogni 60s</p>
 </section>
 
 
@@ -1972,12 +1999,86 @@ async function renderPortfolio(){
   // Portfolio chart (andamento ultimi 30gg, tutte le posizioni)
   _renderPortfolioChart(port, tickers, chartWrap);
 
+  // Pie chart allocazione
+  _renderPieChart(_lbPositions, totalVal);
+
   // Leaderboard migliori/peggiori
   _renderLeaderboard(_lbPositions);
 
   // Sfida vs S&P500 + Correlazione (asincroni, non bloccano il render)
   if (tickers.length >= 1) loadVsMarket();
   if (tickers.length >= 2) loadCorrelation();
+}
+
+function _renderPieChart(positions, totalVal){
+  const wrap = document.getElementById('port-pie-wrap');
+  const svg = document.getElementById('port-pie-svg');
+  const legend = document.getElementById('port-pie-legend');
+  if(!wrap||!svg||!legend) return;
+  const valid = positions.filter(p => p.val > 0 || p.inv > 0);
+  if(!valid.length){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+
+  const COLORS = ['#6366F1','#10B981','#F59E0B','#EF4444','#3B82F6','#EC4899','#8B5CF6','#14B8A6','#F97316','#06B6D4'];
+  const cx=100, cy=100, r=80, ri=52;
+  let startAngle = -Math.PI/2;
+  const total = valid.reduce((s,p)=>(s + (p.val>0?p.val:p.inv)),0);
+
+  svg.innerHTML='';
+  legend.innerHTML='';
+
+  valid.forEach((p,i)=>{
+    const val = p.val>0?p.val:p.inv;
+    const pct = total>0?(val/total*100):0;
+    const slice = (val/total)*Math.PI*2;
+    const endAngle = startAngle+slice;
+    const color = COLORS[i%COLORS.length];
+
+    // SVG arc path
+    if(valid.length===1){
+      const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      circle.setAttribute('cx',cx);circle.setAttribute('cy',cy);
+      circle.setAttribute('r',(r+ri)/2);circle.setAttribute('fill','none');
+      circle.setAttribute('stroke',color);circle.setAttribute('stroke-width',r-ri);
+      svg.appendChild(circle);
+    } else {
+      const x1=cx+r*Math.cos(startAngle), y1=cy+r*Math.sin(startAngle);
+      const x2=cx+r*Math.cos(endAngle),   y2=cy+r*Math.sin(endAngle);
+      const x3=cx+ri*Math.cos(endAngle),  y3=cy+ri*Math.sin(endAngle);
+      const x4=cx+ri*Math.cos(startAngle),y4=cy+ri*Math.sin(startAngle);
+      const large=slice>Math.PI?1:0;
+      const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('d',`M${x1},${y1} A${r},${r},0,${large},1,${x2},${y2} L${x3},${y3} A${ri},${ri},0,${large},0,${x4},${y4} Z`);
+      path.setAttribute('fill',color);
+      path.style.cursor='pointer';
+      path.addEventListener('mouseenter',()=>path.setAttribute('opacity','0.85'));
+      path.addEventListener('mouseleave',()=>path.setAttribute('opacity','1'));
+      svg.appendChild(path);
+    }
+    startAngle=endAngle;
+
+    // Legend item
+    const item=document.createElement('div');
+    item.className='port-pie-item';
+    item.innerHTML=`<span class="port-pie-dot" style="background:${color}"></span>
+      <span class="port-pie-label">${p.t}</span>
+      <span class="port-pie-val">${_fxSym+(val*_fxRate).toFixed(0)}</span>
+      <span class="port-pie-pct">${pct.toFixed(1)}%</span>`;
+    legend.appendChild(item);
+  });
+
+  // Centro donut: totale
+  const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
+  txt.setAttribute('x',cx);txt.setAttribute('y',cy-6);
+  txt.setAttribute('text-anchor','middle');txt.setAttribute('font-size','11');
+  txt.setAttribute('font-weight','700');txt.setAttribute('fill','#0F172A');
+  txt.textContent=_fxSym+(total*_fxRate).toFixed(0);
+  svg.appendChild(txt);
+  const lbl=document.createElementNS('http://www.w3.org/2000/svg','text');
+  lbl.setAttribute('x',cx);lbl.setAttribute('y',cy+10);
+  lbl.setAttribute('text-anchor','middle');lbl.setAttribute('font-size','8');
+  lbl.setAttribute('fill','#64748B');lbl.textContent='Totale';
+  svg.appendChild(lbl);
 }
 
 async function _renderPortfolioChart(port, tickers, chartWrap){
