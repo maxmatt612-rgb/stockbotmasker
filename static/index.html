@@ -884,12 +884,6 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 
 /* ── Livello esperienza ── */
-.level-badge{display:flex;align-items:center;gap:0;border-radius:100px;border:1px solid var(--border);overflow:hidden;flex-shrink:0}
-.level-btn{background:transparent;border:none;padding:5px 11px;font-family:'Inter',sans-serif;font-size:.7rem;font-weight:700;cursor:pointer;color:var(--text-dim);letter-spacing:.04em;transition:all .15s;white-space:nowrap}
-.level-btn.active-dil{background:rgba(114,239,160,.18);color:var(--green)}
-.level-btn.active-int{background:rgba(255,184,108,.18);color:var(--gold)}
-.level-btn.active-esp{background:rgba(196,166,255,.2);color:var(--primary)}
-.level-indicator{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--surf);border:1px solid var(--border-hi);border-radius:100px;padding:7px 18px;font-size:.75rem;font-weight:700;z-index:400;opacity:0;pointer-events:none;transition:opacity .3s;white-space:nowrap}
 
 /* ── Orario migliore ── */
 .bh-wrap{margin:14px 0 0;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:14px}
@@ -1025,7 +1019,6 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 
 <canvas id="bg-canvas"></canvas>
-<div class="level-indicator" id="level-indicator"></div>
 
 <div class="app">
 
@@ -1075,11 +1068,6 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     <div class="search-dropdown" id="search-dropdown"></div>
   </div>
   <div class="header-right">
-    <div class="level-badge" id="level-badge">
-      <button class="level-btn" id="lvl-dil" onclick="setLevel('dilettante')">🟢 Base</button>
-      <button class="level-btn" id="lvl-int" onclick="setLevel('intermedio')">🟡 Pro</button>
-      <button class="level-btn" id="lvl-esp" onclick="setLevel('esperto')">🔴 Expert</button>
-    </div>
     <button class="fx-toggle" id="fx-toggle" onclick="toggleFX()">$ USD</button>
     <button class="alert-btn" id="alert-btn" onclick="toggleAlertPanel()" title="Price Alerts">🔔<span class="alert-badge" id="alert-badge" style="display:none">0</span></button>
     <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Dark / Light">🌙</button>
@@ -4239,30 +4227,7 @@ function buildHistoryCard(s, idx, date) {
 // ══════════════════════════════════════════════════════════════════════════════
 // Livello esperienza
 // ══════════════════════════════════════════════════════════════════════════════
-let _level = localStorage.getItem('masker_level') || 'intermedio';
-
-function setLevel(l) {
-  _level = l;
-  localStorage.setItem('masker_level', l);
-  _applyLevel();
-  // Toast
-  const ind = document.getElementById('level-indicator');
-  const labels = {dilettante:'🟢 Base', intermedio:'🟡 Pro', esperto:'🔴 Expert'};
-  ind.textContent = labels[l] || l;
-  ind.style.opacity = '1';
-  setTimeout(() => ind.style.opacity = '0', 1800);
-}
-
-function _applyLevel() {
-  const btns = {dilettante:'lvl-dil', intermedio:'lvl-int', esperto:'lvl-esp'};
-  const activeClass = {dilettante:'active-dil', intermedio:'active-int', esperto:'active-esp'};
-  Object.entries(btns).forEach(([k,id]) => {
-    const el = document.getElementById(id);
-    el.className = 'level-btn' + (_level === k ? ' ' + activeClass[k] : '');
-  });
-}
-
-_applyLevel();
+const _level = 'esperto'; // livello fisso — UI rimossa
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════════════════
