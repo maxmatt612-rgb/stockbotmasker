@@ -559,10 +559,11 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .news-meta{font-size:.65rem;color:var(--text-dim)}
 .news-empty{text-align:center;padding:14px;color:var(--text-dim);font-size:.78rem}
 
-/* ── Chat AI tab ── */
-#ai-chat-view{display:block;padding:16px 0 24px}
-.chat-wrap{max-width:760px;margin:0 auto;width:100%;padding:0 20px}
-.chat-messages{overflow-y:auto;display:flex;flex-direction:column;gap:14px;scrollbar-width:thin;scrollbar-color:var(--border) transparent;min-height:320px;height:58vh;max-height:640px;background:var(--surf);border-radius:18px;padding:20px;margin-bottom:12px}
+/* ── Chat AI tab — fixed overlay ── */
+#ai-chat-view{position:fixed;top:148px;left:0;right:0;bottom:0;z-index:200;background:var(--bg);display:none;flex-direction:column;padding:0}
+#ai-chat-view.active{display:flex}
+.chat-wrap{flex:1;display:flex;flex-direction:column;max-width:760px;margin:0 auto;width:100%;padding:12px 16px 0;min-height:0}
+.chat-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:12px;scrollbar-width:thin;scrollbar-color:var(--border) transparent;padding:12px 0;min-height:0}
 .chat-attach-preview{display:none;align-items:center;gap:8px;padding:6px 0 4px;flex-shrink:0}
 .chat-attach-thumb{width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--border-hi)}
 .chat-attach-rm{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:.85rem;padding:2px 6px;border-radius:4px}
@@ -2169,7 +2170,11 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     _VIEWS.forEach(v => {
       const el = document.getElementById(v+'-view');
       if(!el) return;
-      el.style.display = v === tab ? 'block' : 'none';
+      if(v === 'ai-chat'){
+        el.classList.toggle('active', v === tab);
+      } else {
+        el.style.display = v === tab ? '' : 'none';
+      }
     });
     if(!_tabLoaded[tab]){
       _tabLoaded[tab]=true;
