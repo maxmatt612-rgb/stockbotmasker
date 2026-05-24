@@ -1495,33 +1495,124 @@ async def api_chat(body: ChatBody):
         return JSONResponse({"error": "GROQ_API_KEY non configurata"}, status_code=503)
 
     level = body.level if body.level in _LEVEL_SYSTEM else "intermedio"
+
+    # ── Fetch prezzi real-time per portfolio + watchlist ──────────────────────
+    all_tickers = list(dict.fromkeys(
+        list(body.portfolio.keys()) +
+        [t for t in (body.watchlist or []) if isinstance(t, str)]
+    ))[:25]
+
+    prices: dict = {}
+    if all_tickers:
+        def _fetch_rt():
+            import yfinance as yf
+            tkrs = " ".join(all_tickers)
+            raw = yf.download(tkrs, period="2d", interval="1d",
+                              progress=False, auto_adjust=True)
+            if raw.empty:
+                return {}
+            out: dict = {}
+            if len(all_tickers) == 1:
+                cl = raw["Close"]
+                if len(cl) >= 2:
+                    out[all_tickers[0]] = {
+                        "p": round(float(cl.iloc[-1]), 2),
+                        "c": round(float((cl.iloc[-1] - cl.iloc[-2]) / cl.iloc[-2] * 100), 2),
+                    }
+            else:
+                cl = raw["Close"]
+                for t in all_tickers:
+                    if t in cl.columns:
+                        s = cl[t].dropna()
+                        if len(s) >= 2:
+                            out[t] = {
+                                "p": round(float(s.iloc[-1]), 2),
+                                "c": round(float((s.iloc[-1] - s.iloc[-2]) / s.iloc[-2] * 100), 2),
+                            }
+            return out
+        try:
+            prices = await asyncio.to_thread(_fetch_rt)
+        except Exception:
+            prices = {}
+
+    # ── Contesto mercato real-time ─────────────────────────────────────────────
+    market_ctx = ""
+    if prices:
+        market_ctx = "\n\n📊 PREZZI AGGIORNATI (mercato real-time):\n"
+        for t, d in prices.items():
+            sign = "+" if d["c"] >= 0 else ""
+            market_ctx += f"  {t}: ${d['p']:.2f} ({sign}{d['c']:.2f}%)\n"
+
+    # ── Contesto portafoglio con P&L corrente ─────────────────────────────────
     port_ctx = ""
     if body.portfolio:
-        port_ctx = "\nPortafoglio utente:\n"
+        port_ctx = "\n\n💼 PORTAFOGLIO UTENTE:\n"
         for t, p in body.portfolio.items():
-            port_ctx += f"  - {t}: {p.get('qty', 0)} azioni, prezzo acquisto ${p.get('buyPrice', 0):.2f}\n"
+            qty = p.get("qty", 0)
+            buy = p.get("buyPrice", 0)
+            curr = prices.get(t, {}).get("p", 0)
+            if curr and buy:
+                pl = (curr - buy) / buy * 100
+                sign = "+" if pl >= 0 else ""
+                port_ctx += (
+                    f"  {t}: {qty} az. | acquisto ${buy:.2f} | ora ${curr:.2f} "
+                    f"| P&L {sign}{pl:.1f}%\n"
+                )
+            else:
+                port_ctx += f"  {t}: {qty} azioni | acquisto ${buy:.2f}\n"
 
+    # ── Watchlist ─────────────────────────────────────────────────────────────
     wl_ctx = ""
     if body.watchlist:
-        wl_ctx = f"\nWatchlist: {', '.join(str(x) for x in body.watchlist)}"
+        wl_ctx = "\n📌 WATCHLIST: " + ", ".join(str(x) for x in body.watchlist)
 
-    messages = [{"role": "system", "content": (
-        "Sei Masker AI, assistente finanziario di una piattaforma italiana di analisi azioni. "
-        "Le informazioni sono solo indicative e non costituiscono consulenza finanziaria. "
-        + _LEVEL_SYSTEM[level] + port_ctx + wl_ctx
-    )}]
+    # ── Stile risposta per livello ─────────────────────────────────────────────
+    level_style = {
+        "dilettante": (
+            "Rispondi in modo semplice, usa analogie quotidiane, zero gergo tecnico. "
+            "Sii rassicurante e didattico. Massimo 4-5 frasi chiare."
+        ),
+        "intermedio": (
+            "Usa terminologia tecnica (RSI, supporti, beta, P/E) ma spiega brevemente. "
+            "Bilancia dettaglio e leggibilità. Puoi usare punti elenco."
+        ),
+        "esperto": (
+            "Usa terminologia avanzata: Greeks, correlazioni, Sharpe, alpha, flow, "
+            "mean reversion, momentum, regime di mercato. Sii denso e diretto, "
+            "niente spiegazioni base. Dati prima, opinione dopo."
+        ),
+    }.get(level, "Rispondi in modo chiaro e professionale.")
 
-    for msg in (body.history or [])[-10:]:
+    sys_prompt = (
+        "Sei Marco, trader e analista finanziario con 20 anni di esperienza "
+        "tra Goldman Sachs, Point72 e hedge fund europei. "
+        "Hai una conoscenza enciclopedica di analisi tecnica, fondamentale, macro, "
+        "opzioni, ETF, settori, earnings, Federal Reserve e BCE. "
+        "Hai accesso ai dati di mercato in tempo reale mostrati qui sotto. "
+        "\n\nREGOLE FONDAMENTALI:"
+        "\n- Rispondi SOLO alle domande finanziarie che ti vengono poste."
+        "\n- NON fare analisi spontanee o riepiloghi non richiesti."
+        "\n- Sii diretto, concreto, dai opinioni nette quando richiesto."
+        "\n- Se l'utente chiede di un titolo specifico, usa i dati real-time e il portafoglio."
+        "\n- DISCLAIMER: le tue risposte sono puramente informative."
+        "\n- Rispondi SEMPRE in italiano."
+        f"\n\n{level_style}"
+        + market_ctx + port_ctx + wl_ctx
+    )
+
+    messages = [{"role": "system", "content": sys_prompt}]
+    for msg in (body.history or [])[-12:]:
         if isinstance(msg, dict) and msg.get("role") in ("user", "assistant"):
             messages.append({"role": msg["role"], "content": msg["content"]})
     messages.append({"role": "user", "content": body.message})
 
     try:
+        max_tok = 900 if level == "esperto" else 700
         resp = await groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=messages,
-            max_tokens=600,
-            temperature=0.7,
+            max_tokens=max_tok,
+            temperature=0.55,
         )
         return {"reply": resp.choices[0].message.content.strip()}
     except Exception as e:
