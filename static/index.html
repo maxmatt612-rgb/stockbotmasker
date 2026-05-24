@@ -2171,9 +2171,9 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       const el = document.getElementById(v+'-view');
       if(!el) return;
       if(v === 'ai-chat'){
-        el.classList.toggle('active', v === tab);
+        el.style.display = (v === tab) ? 'flex' : 'none';
       } else {
-        el.style.display = v === tab ? '' : 'none';
+        el.style.display = (v === tab) ? '' : 'none';
       }
     });
     if(!_tabLoaded[tab]){
