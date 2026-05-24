@@ -236,7 +236,7 @@ async def api_ai(ticker: str):
     data = _clean(data)
 
     prompt = (
-        f"Analisi dell'azione {data['ticker']} ({data.get('name', data['ticker'])}) per un investitore retail:\n"
+        f"Analisi trading di {data['ticker']} ({data.get('name', data['ticker'])}):\n"
         f"- Prezzo: ${data['current_price']:.2f}, oggi {data['day_change_pct']:+.1f}%\n"
         f"- RSI: {data.get('rsi', 50):.0f}, Rischio: {data.get('risk_level', 'N/D')}, "
         f"Volatilità: {data.get('volatility', 0):.0f}%\n"
@@ -244,11 +244,15 @@ async def api_ai(ticker: str):
         f"Mese: {(data.get('month_return') or 0):+.1f}%\n"
         f"- Notizie: {data.get('news_sentiment_label', 'Neutre')}\n"
         f"- Prossimi earnings: {data.get('next_earnings_str', 'N/D')}\n\n"
-        "Rispondi SOLO con questo formato esatto (italiano, conciso, max 2 righe per sezione):\n"
-        "PERCHE_SI: [2-3 motivi concreti per cui potrebbe valere la pena investire]\n"
-        "RISCHI: [2-3 rischi specifici e reali da considerare]\n"
-        "CONCLUSIONE: [1-2 frasi dirette — concludi con consiglio chiaro]\n"
-        "VERDICT: SI oppure NO oppure NEUTRO"
+        "Rispondi SOLO con questo formato esatto (italiano, max 2 righe a sezione):\n"
+        "PERCHE_SI: [2-3 motivi tecnici/fondamentali concreti]\n"
+        "RISCHI: [2-3 rischi specifici e reali]\n"
+        "CONCLUSIONE: [1-2 frasi DIRETTE senza ambiguità]\n"
+        "MOTIVO: [1 frase secca — es: 'RSI oversold + momentum positivo + earnings beat']\n"
+        "CONFIDENZA: [numero intero da 50 a 95]\n"
+        "VERDICT: COMPRA oppure VENDI oppure ASPETTA\n\n"
+        "REGOLA: devi scegliere ESATTAMENTE una delle tre opzioni. "
+        "Vietato scrivere 'valuta', 'dipende', 'potrebbe'. Sii netto."
     )
 
     try:
@@ -256,34 +260,43 @@ async def api_ai(ticker: str):
             model="llama-3.3-70b-versatile",
             max_tokens=350,
             messages=[
-                {"role": "system", "content": "Sei un analista finanziario. Rispondi in italiano, diretto e sintetico. Non dare mai consigli finanziari definitivi."},
+                {"role": "system", "content": "Sei un analista finanziario AI che dà segnali di trading NETTI. Devi sempre dare una raccomandazione precisa: COMPRA, VENDI, o ASPETTA. Non usare mai 'valuta con cautela', 'dipende', 'potrebbe'. Analizza i dati tecnici e fondamentali e dai una decisione chiara. Rispondi in italiano."},
                 {"role": "user",   "content": prompt},
             ],
         )
         text = resp.choices[0].message.content.strip()
 
-        perche_si = rischi = conclusione = verdict = ""
+        perche_si = rischi = conclusione = motivo = verdict = ""
+        confidenza = 70
         for line in text.split("\n"):
             l = line.strip()
             if l.upper().startswith("PERCHE_SI:"):     perche_si   = l[10:].strip()
             elif l.upper().startswith("RISCHI:"):      rischi      = l[7:].strip()
             elif l.upper().startswith("CONCLUSIONE:"): conclusione = l[12:].strip()
+            elif l.upper().startswith("MOTIVO:"):      motivo      = l[7:].strip()
+            elif l.upper().startswith("CONFIDENZA:"):
+                try:
+                    confidenza = int("".join(c for c in l[11:] if c.isdigit())[:2] or "70")
+                except Exception:
+                    confidenza = 70
             elif l.upper().startswith("VERDICT:"):     verdict     = l[8:].strip().upper()
 
-        if not verdict:
-            low = conclusione.lower()
-            if any(w in low for w in ["sì", "si ", "consiglio", "opportunità", "interessante", "acquistare"]):
-                verdict = "SI"
-            elif any(w in low for w in ["no ", "evitare", "non consiglio", "troppo rischios"]):
-                verdict = "NO"
+        if verdict not in ("COMPRA", "VENDI", "ASPETTA"):
+            low = (conclusione + " " + motivo).lower()
+            if any(w in low for w in ["compra", "acquista", "sì", "si ", "opportunità", "interessante"]):
+                verdict = "COMPRA"
+            elif any(w in low for w in ["vendi", "evitare", "non consiglio", "troppo rischios", "ribassista"]):
+                verdict = "VENDI"
             else:
-                verdict = "NEUTRO"
+                verdict = "ASPETTA"
 
         result = {
             "perche_si":  perche_si  or "Dati insufficienti.",
             "rischi":     rischi     or "Dati insufficienti.",
             "conclusione": conclusione or text,
-            "verdict":    verdict if verdict in ("SI", "NO", "NEUTRO") else "NEUTRO",
+            "motivo":     motivo     or "",
+            "confidenza": max(50, min(95, confidenza)),
+            "verdict":    verdict,
         }
         _store(key, result)
         return result

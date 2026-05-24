@@ -269,6 +269,18 @@ header{
 .verdict-badge{display:inline-flex;align-items:center;gap:5px;margin-top:9px;padding:4px 13px;border-radius:100px;font-size:.77rem;font-weight:800;letter-spacing:.04em}
 .badge-si{background:rgba(114,239,160,.2);color:var(--green)}
 .badge-no{background:rgba(255,107,107,.2);color:var(--red)}
+/* ── Segnale AI banner ── */
+.ai-segnale{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:var(--r-lg);padding:18px 14px 14px;text-align:center;gap:3px}
+.ai-segnale.compra{background:rgba(114,239,160,.12);border:2px solid var(--green)}
+.ai-segnale.vendi{background:rgba(255,107,107,.12);border:2px solid var(--red)}
+.ai-segnale.aspetta{background:rgba(255,184,108,.1);border:2px solid var(--gold)}
+.ai-segnale-emoji{font-size:2rem;line-height:1}
+.ai-segnale-label{font-size:1.7rem;font-weight:900;letter-spacing:.06em;line-height:1.1;margin-top:2px}
+.ai-segnale.compra .ai-segnale-label{color:var(--green)}
+.ai-segnale.vendi .ai-segnale-label{color:var(--red)}
+.ai-segnale.aspetta .ai-segnale-label{color:var(--gold)}
+.ai-segnale-conf{font-size:.72rem;color:var(--text-dim);margin-top:4px}
+.ai-segnale-motivo{font-size:.76rem;line-height:1.4;margin-top:6px;padding:6px 10px;border-radius:var(--r-md);background:rgba(255,255,255,.05);max-width:100%}
 .badge-neutro{background:rgba(255,184,108,.15);color:var(--gold)}
 .ai-loading{text-align:center;padding:18px;font-size:.8rem;color:var(--text-dim);animation:shimmer 1.8s infinite}
 
@@ -1422,6 +1434,13 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     <div class="ai-section" id="m-ai-section">
       <div class="ai-loading" id="m-ai-loading">🤖 &nbsp;Analisi AI in corso...</div>
       <div id="m-ai-content" style="display:none;flex-direction:column;gap:9px">
+        <!-- Segnale grande -->
+        <div class="ai-segnale" id="m-ai-segnale">
+          <div class="ai-segnale-emoji" id="m-ai-segnale-emoji"></div>
+          <div class="ai-segnale-label" id="m-ai-segnale-label"></div>
+          <div class="ai-segnale-conf" id="m-ai-segnale-conf"></div>
+          <div class="ai-segnale-motivo" id="m-ai-segnale-motivo"></div>
+        </div>
         <div class="ai-card ai-green">
           <div class="ai-card-title" style="color:var(--green)">✅ Perché investirci</div>
           <div class="ai-card-text" id="m-ai-perche-text"></div>
@@ -1949,10 +1968,27 @@ async function openModal(stock){
       document.getElementById('m-ai-rischi-text').textContent=ai.rischi??'';
       document.getElementById('m-ai-conc-text').textContent=ai.conclusione??'';
       const cc=document.getElementById('m-ai-conclusione'),badge=document.getElementById('m-ai-badge');
-      const v=(ai.verdict??'NEUTRO').toUpperCase();
-      if(v==='SI'){cc.className='ai-card ai-si';badge.innerHTML='<span class="verdict-badge badge-si">📊 Segnali prevalentemente positivi</span>';}
-      else if(v==='NO'){cc.className='ai-card ai-no';badge.innerHTML='<span class="verdict-badge badge-no">📊 Segnali prevalentemente negativi</span>';}
-      else{cc.className='ai-card ai-neutro';badge.innerHTML='<span class="verdict-badge badge-neutro">📊 Segnali misti — valuta con cautela</span>';}
+      const v=(ai.verdict??'ASPETTA').toUpperCase();
+      const segnale=document.getElementById('m-ai-segnale');
+      const conf=ai.confidenza??70;
+      document.getElementById('m-ai-segnale-conf').textContent=`Confidenza AI: ${conf}%`;
+      document.getElementById('m-ai-segnale-motivo').textContent=ai.motivo||ai.conclusione||'';
+      if(v==='COMPRA'){
+        segnale.className='ai-segnale compra';
+        document.getElementById('m-ai-segnale-emoji').textContent='📈';
+        document.getElementById('m-ai-segnale-label').textContent='COMPRA';
+        cc.className='ai-card ai-si';badge.innerHTML='<span class="verdict-badge badge-si">📈 Segnale positivo</span>';
+      }else if(v==='VENDI'){
+        segnale.className='ai-segnale vendi';
+        document.getElementById('m-ai-segnale-emoji').textContent='📉';
+        document.getElementById('m-ai-segnale-label').textContent='VENDI';
+        cc.className='ai-card ai-no';badge.innerHTML='<span class="verdict-badge badge-no">📉 Segnale negativo</span>';
+      }else{
+        segnale.className='ai-segnale aspetta';
+        document.getElementById('m-ai-segnale-emoji').textContent='⏳';
+        document.getElementById('m-ai-segnale-label').textContent='ASPETTA';
+        cc.className='ai-card ai-neutro';badge.innerHTML='<span class="verdict-badge badge-neutro">⏳ Momento neutro</span>';
+      }
       document.getElementById('m-ai-loading').style.display='none';
       document.getElementById('m-ai-content').style.display='flex';
     }else{document.getElementById('m-ai-loading').textContent='⚠️ AI non disponibile.';}
