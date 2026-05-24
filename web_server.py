@@ -1310,6 +1310,35 @@ async def api_news(ticker: str):
     return data
 
 
+# ─── Price target + short interest ───────────────────────────────────────────
+
+@app.get("/api/stock/{ticker}/targets")
+async def api_targets(ticker: str):
+    t = ticker.upper()
+    key = f"targets:{t}"
+    if (c := _cached(key, 3600)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        info = yf.Ticker(t).info or {}
+        return {
+            "targetMean":   info.get("targetMeanPrice"),
+            "targetHigh":   info.get("targetHighPrice"),
+            "targetLow":    info.get("targetLowPrice"),
+            "recommendation": info.get("recommendationKey", ""),
+            "numAnalysts":  info.get("numberOfAnalystOpinions"),
+            "shortFloat":   info.get("shortPercentOfFloat"),
+            "shortRatio":   info.get("shortRatio"),
+            "sector":       info.get("sector", ""),
+            "industry":     info.get("industry", ""),
+        }
+
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return data
+
+
 # ─── Chat AI ──────────────────────────────────────────────────────────────────
 
 class ChatBody(BaseModel):

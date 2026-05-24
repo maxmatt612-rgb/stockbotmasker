@@ -23,11 +23,42 @@
   --shadow-md:0 4px 16px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.04);
   --shadow-lg:0 20px 48px rgba(0,0,0,.1),0 8px 16px rgba(0,0,0,.06);
   --r-xl:20px;--r-lg:16px;--r-md:10px;--r-sm:6px;
+  --header-bg:#fff;--tape-bg:#fff;
 }
 html{scroll-behavior:smooth}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;transition:background .25s,color .25s}
 #bg-canvas{display:none}
 .app{position:relative;z-index:1}
+
+/* ── Dark mode ── */
+body.dark{
+  --bg:#06061A;--surf:#0D0D26;--surf-v:#131336;--surf-hi:#1C1C4A;
+  --primary:#818CF8;--primary-dim:rgba(129,140,248,.12);
+  --text:#E6E1EF;--text-dim:#8E8A9E;
+  --border:rgba(255,255,255,.08);--border-hi:rgba(255,255,255,.18);
+  --shadow-sm:0 1px 4px rgba(0,0,0,.4);
+  --shadow-md:0 4px 20px rgba(0,0,0,.5);
+  --shadow-lg:0 20px 60px rgba(0,0,0,.7);
+  --header-bg:#0D0D26;--tape-bg:#0D0D26;
+}
+body.dark header{background:var(--header-bg)}
+body.dark .indices-tape{background:var(--tape-bg)}
+body.dark .tab-nav{background:var(--surf)}
+body.dark .card{background:var(--surf);box-shadow:none}
+body.dark .port-stat{background:var(--surf);box-shadow:none}
+body.dark .port-pie-card{background:var(--surf);box-shadow:none}
+body.dark .movers-region{background:var(--surf);box-shadow:none}
+body.dark .modal-sheet{background:var(--surf)}
+body.dark .refresh-pill{background:var(--surf)}
+body.dark .detail-cell{background:var(--surf-v)}
+body.dark .skel-card{background:var(--surf)}
+body.dark .chat-bubble.ai{background:var(--surf)}
+body.dark .disc-banner{background:rgba(245,158,11,.05);border-color:rgba(245,158,11,.12)}
+body.dark #ai-chat-view{background:var(--bg)}
+
+/* ── Dark toggle button ── */
+.theme-toggle{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--surf-v);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;transition:all .2s;flex-shrink:0}
+.theme-toggle:hover{border-color:var(--primary);color:var(--primary)}
 
 /* ── Header ── */
 header{
@@ -208,6 +239,17 @@ header{
 .detail-cell-label{font-size:.66rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
 .detail-cell-val{font-size:.92rem;font-weight:700}
 .modal-verdict{margin-top:14px;font-size:.8rem;line-height:1.6;color:var(--text-dim);border-left:3px solid rgba(196,166,255,.3);padding-left:11px}
+
+/* Analyst targets */
+.targets-card{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px}
+.targets-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}
+.targets-item{}
+.targets-consensus{font-size:.88rem;font-weight:800;text-transform:capitalize}
+.targets-bar-track{position:relative;height:6px;background:var(--border);border-radius:100px;margin:4px 0}
+.targets-bar-fill{height:100%;background:linear-gradient(90deg,var(--red),var(--gold),var(--green));border-radius:100px;width:50%}
+.targets-bar-price{position:absolute;top:-4px;width:14px;height:14px;background:var(--primary);border-radius:50%;border:2px solid #fff;transform:translateX(-50%)}
+.targets-bar-labels{display:flex;justify-content:space-between;font-size:.66rem;color:var(--text-dim);font-weight:600}
+@media(max-width:480px){.targets-row{grid-template-columns:1fr 1fr}}
 
 /* AI section */
 .ai-section{margin-top:18px;display:flex;flex-direction:column;gap:9px}
@@ -772,6 +814,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
       <button class="level-btn" id="lvl-esp" onclick="setLevel('esperto')">🔴 Expert</button>
     </div>
     <button class="fx-toggle" id="fx-toggle" onclick="toggleFX()">$ USD</button>
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Dark / Light">🌙</button>
     <div id="auth-widget" class="auth-widget"></div>
     <div class="live-badge">
       <div class="live-dot"></div>
@@ -1170,6 +1213,38 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     </div>
     <div class="chart-wrap" id="chart-container"></div>
     <div class="detail-grid" id="m-details"></div>
+    <!-- Analyst targets + short interest -->
+    <div id="m-targets-wrap" style="display:none;margin-top:12px">
+      <div class="targets-card">
+        <div class="targets-row">
+          <div class="targets-item">
+            <div class="detail-cell-label">Target analisti</div>
+            <div class="targets-consensus" id="m-target-consensus">—</div>
+          </div>
+          <div class="targets-item">
+            <div class="detail-cell-label">Range target</div>
+            <div style="font-size:.82rem;font-weight:700" id="m-target-range">—</div>
+          </div>
+          <div class="targets-item">
+            <div class="detail-cell-label">Short interest</div>
+            <div style="font-size:.82rem;font-weight:700" id="m-short-float">—</div>
+          </div>
+          <div class="targets-item">
+            <div class="detail-cell-label">Days to cover</div>
+            <div style="font-size:.82rem;font-weight:700" id="m-short-ratio">—</div>
+          </div>
+        </div>
+        <div class="targets-bar-wrap" id="m-targets-bar-wrap" style="display:none">
+          <div class="targets-bar-track">
+            <div class="targets-bar-fill" id="m-targets-bar"></div>
+            <div class="targets-bar-price" id="m-targets-bar-price"></div>
+          </div>
+          <div class="targets-bar-labels">
+            <span id="m-tgt-low">—</span><span id="m-tgt-mean">▲ Mean</span><span id="m-tgt-high">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="modal-verdict" id="m-verdict"></div>
     <div class="ai-section" id="m-ai-section">
       <div class="ai-loading" id="m-ai-loading">🤖 &nbsp;Analisi AI in corso...</div>
@@ -1368,6 +1443,20 @@ const fmtP = v => {
 };
 const fmtC = v => (v>=0?'+':'')+v.toFixed(2)+'%';
 function toggleFX(){localStorage.setItem('masker_fx',_fxActive?'usd':'eur');location.reload();}
+
+// ── Dark/Light toggle ──────────────────────────────────────────────────────
+function toggleTheme(){
+  const isDark=document.body.classList.toggle('dark');
+  localStorage.setItem('masker_theme', isDark?'dark':'light');
+  document.getElementById('theme-toggle').textContent = isDark?'☀️':'🌙';
+}
+(()=>{
+  if(localStorage.getItem('masker_theme')==='dark'){
+    document.body.classList.add('dark');
+    const btn=document.getElementById('theme-toggle');
+    if(btn) btn.textContent='☀️';
+  }
+})();
 async function initFX(){
   if(!_fxActive) return;
   try{const r=await fetch('/api/fx').then(r=>r.json());_fxRate=r.rate||0.92;}catch(_){_fxRate=0.92;}
@@ -1651,6 +1740,9 @@ async function openModal(stock){
 
   // Chart
   _renderChart(stock.ticker,_chartPeriod,_chartInterval,_chartType);
+  // Analyst targets + short interest
+  document.getElementById('m-targets-wrap').style.display='none';
+  loadTargets(stock.ticker, stock.current_price);
   // Orario migliore
   document.getElementById('m-bh-wrap').style.display='none';
   loadBestHour(stock.ticker);
@@ -2859,6 +2951,53 @@ function _applyLevel() {
 _applyLevel();
 
 // ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// Analyst targets + Short interest
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadTargets(ticker, currPrice){
+  try {
+    const d = await fetch(`/api/stock/${ticker}/targets`).then(r=>r.ok?r.json():null);
+    if(!d) return;
+    const wrap = document.getElementById('m-targets-wrap');
+    wrap.style.display = 'block';
+
+    // Recommendation label con colore
+    const recMap = {strongbuy:'Acquisto forte',buy:'Acquisto',hold:'Neutro',sell:'Vendi',strongsell:'Vendi forte'};
+    const recColors = {strongbuy:'var(--green)',buy:'var(--secondary)',hold:'var(--gold)',sell:'var(--red)',strongsell:'var(--red)'};
+    const rec = (d.recommendation||'').toLowerCase();
+    const recEl = document.getElementById('m-target-consensus');
+    recEl.textContent = recMap[rec] || (d.recommendation||'—');
+    recEl.style.color = recColors[rec] || 'var(--text)';
+    if(d.numAnalysts) recEl.textContent += ` (${d.numAnalysts})`;
+
+    // Range target
+    const lo = d.targetLow, hi = d.targetHigh, mean = d.targetMean;
+    document.getElementById('m-target-range').textContent =
+      (lo&&hi) ? `$${lo.toFixed(2)} – $${hi.toFixed(2)}` : '—';
+
+    // Short interest
+    const sf = d.shortFloat;
+    const sfEl = document.getElementById('m-short-float');
+    if(sf!=null){ sfEl.textContent=(sf*100).toFixed(1)+'%'; sfEl.style.color=sf>0.15?'var(--red)':sf>0.08?'var(--gold)':'var(--text)'; }
+    else sfEl.textContent='—';
+    const sr = d.shortRatio;
+    document.getElementById('m-short-ratio').textContent = sr!=null ? sr.toFixed(1)+' gg' : '—';
+
+    // Barra prezzo vs target
+    if(lo&&hi&&mean&&currPrice){
+      const barWrap = document.getElementById('m-targets-bar-wrap');
+      barWrap.style.display = 'block';
+      const clampedPrice = Math.max(lo, Math.min(hi, currPrice));
+      const pct = ((clampedPrice - lo) / (hi - lo) * 100).toFixed(1);
+      document.getElementById('m-targets-bar').style.width = '100%';
+      document.getElementById('m-targets-bar-price').style.left = pct+'%';
+      document.getElementById('m-tgt-low').textContent = '$'+lo.toFixed(0);
+      document.getElementById('m-tgt-mean').textContent = '▲ $'+mean.toFixed(0);
+      document.getElementById('m-tgt-high').textContent = '$'+hi.toFixed(0);
+    }
+  } catch(_){}
+}
+
 // Orario migliore
 // ══════════════════════════════════════════════════════════════════════════════
 async function loadBestHour(ticker) {
