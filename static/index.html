@@ -1032,6 +1032,14 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .sb-dot.neg{background:var(--red)}
 .sb-val{font-size:.7rem;font-weight:700;min-width:18px;text-align:right;color:var(--text-dim)}
 
+/* ── Watchlist Judge ── */
+.wl-judge-card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.wl-judge-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:.76rem}
+.wl-judge-row:last-child{border-bottom:none}
+.wl-judge-ticker{font-weight:800;min-width:52px;color:var(--text)}
+.wl-judge-verdict{flex:1;color:var(--text-dim)}
+.wl-judge-ts{font-size:.6rem;color:var(--text-dim);padding:6px 14px;border-top:1px solid var(--border);font-style:italic}
+
 /* ── Backtest panel ── */
 .backtest-panel{margin:0 24px 20px;border-radius:var(--r-xl);border:1px solid var(--border);overflow:hidden}
 .backtest-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--surf);border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
@@ -1069,6 +1077,9 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .ts-cell.target .ts-cell-val{color:var(--green)}
 .trade-setup-rr{font-size:.64rem;color:var(--text-dim);margin-top:7px;text-align:center}
 .trade-setup-rr strong{color:var(--text)}
+
+/* ── Score in linguaggio umano ── */
+.score-text{font-size:.67rem;color:var(--text-dim);line-height:1.45;margin-top:7px;padding:7px 10px;background:var(--surf-v);border-radius:var(--r-sm);border-left:3px solid var(--primary)}
 
 /* ── "Perché oggi?" button + result ── */
 .why-today-btn{display:flex;align-items:center;gap:5px;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:5px 11px;font-size:.68rem;font-weight:600;color:var(--text-dim);cursor:pointer;transition:background .18s,border-color .18s;font-family:'Inter',sans-serif;margin-top:8px;width:100%}
@@ -1455,6 +1466,14 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
   <div id="wl-grid" class="hgrid">
     <div class="history-empty"><span class="icon">⭐</span>Aggiungi azioni da monitorare.</div>
+  </div>
+
+  <!-- Watchlist Judge -->
+  <div id="wl-judge-wrap" style="display:none;padding:0 24px 24px">
+    <button class="why-today-btn" id="wl-judge-btn" onclick="runWatchlistJudge()" style="max-width:300px;margin-bottom:12px;font-size:.76rem;padding:9px 16px">
+      🧑‍⚖️ Giudica la mia watchlist
+    </button>
+    <div id="wl-judge-result"></div>
   </div>
 </div>
 
@@ -1996,6 +2015,48 @@ const fmtP = v => {
 const fmtC = v => (v>=0?'+':'')+v.toFixed(2)+'%';
 function toggleFX(){localStorage.setItem('masker_fx',_fxActive?'usd':'eur');location.reload();}
 
+// ── Score in linguaggio umano (logica pura, nessuna AI) ──
+function scoreToText(d) {
+  const bd = d.score_breakdown;
+  if (!bd) return null;
+  const score  = d.score_10   ?? 5;
+  const rsi    = d.rsi        ?? 50;
+  const vol    = d.vol_ratio  ?? 1;
+  const chg    = d.day_change_pct ?? 0;
+  const parts  = [];
+
+  // RSI
+  if      (bd.rsi >= 3)  parts.push(`RSI oversold (${Math.round(rsi)})`);
+  else if (bd.rsi >= 2)  parts.push(`RSI basso (${Math.round(rsi)})`);
+  else if (bd.rsi <= -3) parts.push(`RSI ipercomprato (${Math.round(rsi)})`);
+  else if (bd.rsi <= -1) parts.push(`RSI alto (${Math.round(rsi)})`);
+  else                   parts.push(`RSI neutro (${Math.round(rsi)})`);
+
+  // Momentum
+  if      (bd.momentum >= 3)  parts.push(`momentum forte (+${chg.toFixed(1)}%)`);
+  else if (bd.momentum >= 2)  parts.push(`slancio positivo (+${chg.toFixed(1)}%)`);
+  else if (bd.momentum >= 1)  parts.push(`lieve rialzo`);
+  else if (bd.momentum <= -2) parts.push(`calo deciso (${chg.toFixed(1)}%)`);
+  else                        parts.push(`prezzo stabile`);
+
+  // Volume
+  if      (bd.volume >= 3) parts.push(`volume anomalo (${vol.toFixed(1)}x)`);
+  else if (bd.volume >= 2) parts.push(`volume alto (${vol.toFixed(1)}x)`);
+  else if (bd.volume >= 1) parts.push(`volume sopra media`);
+
+  // Trend SMA20
+  const trendTxt = bd.trend > 0 ? 'sopra SMA20' : 'sotto SMA20';
+
+  // Verdict
+  let verdict;
+  if      (score >= 8) verdict = 'Segnale forte.';
+  else if (score >= 6) verdict = 'Setup moderato.';
+  else if (score >= 4) verdict = 'Neutro — aspetta conferma.';
+  else                 verdict = 'Segnale debole.';
+
+  return `${parts.join(', ')} · ${trendTxt}. ${verdict}`;
+}
+
 // ── Dark/Light toggle ──────────────────────────────────────────────────────
 function toggleTheme(){
   const isDark=document.body.classList.toggle('dark');
@@ -2222,6 +2283,7 @@ function buildCard(d, rank){
       <div class="score-track"><div class="score-bar" data-s="${score}"></div></div>
       <span class="score-num">${score}<span style="font-weight:400;color:var(--text-dim)">/10</span></span>
     </div>
+    ${(()=>{const t=scoreToText(d);return t?`<div class="score-text">${t}</div>`:''})()}
     ${chipsHTML?`<div class="chips">${chipsHTML}</div>`:''}
     <div class="sparkline-wrap"><canvas class="sparkline"></canvas></div>
     <div class="verdict"></div>
@@ -2686,6 +2748,7 @@ async function loadData(){
     document.getElementById('last-update').textContent=now();
 
     applyAndRender();
+    tryShowScanNotification(data);
 
     // Enrich progressivo (nome + segnali)
     data.forEach((stock,i)=>{
@@ -3656,6 +3719,47 @@ async function renderWatchlist(){
     frag.appendChild(card);
   });
   grid.appendChild(frag);
+
+  // Mostra il pulsante "Giudica la mia watchlist" se ci sono azioni
+  const judgeWrap = document.getElementById('wl-judge-wrap');
+  if (judgeWrap) judgeWrap.style.display = tickers.length ? 'block' : 'none';
+}
+
+async function runWatchlistJudge() {
+  const btn = document.getElementById('wl-judge-btn');
+  const result = document.getElementById('wl-judge-result');
+  const wl = loadWlData();
+  const tickers = Object.keys(wl);
+  if (!tickers.length || !result) return;
+
+  btn.classList.add('loading');
+  btn.textContent = '⏳ Analizzando la tua watchlist…';
+  result.innerHTML = '';
+
+  try {
+    const d = await fetch('/api/watchlist/judge', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({tickers}),
+    }).then(r => r.json());
+
+    if (d.error) {
+      result.innerHTML = `<div class="why-today-result">${d.error}</div>`;
+    } else {
+      const rows = (d.verdicts || []).map(v => `
+        <div class="wl-judge-row">
+          <span class="wl-judge-ticker">${v.ticker}</span>
+          <span class="wl-judge-verdict">${v.verdict}</span>
+        </div>`).join('');
+      const ts = d.generated_at ? new Date(d.generated_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) : '';
+      result.innerHTML = `<div class="wl-judge-card">${rows}<div class="wl-judge-ts">Aggiornato ${ts} · dati in tempo reale · non sono consigli finanziari</div></div>`;
+    }
+  } catch(e) {
+    result.innerHTML = `<div class="why-today-result">Errore nel caricamento</div>`;
+  } finally {
+    btn.classList.remove('loading');
+    btn.textContent = '🧑‍⚖️ Aggiorna giudizio';
+  }
 }
 
 function deleteWatchlist(ticker){
@@ -3685,6 +3789,7 @@ loadData().then(startCountdown);
 loadAccuracy();
 loadBacktest();
 initAuth();
+initNotifications();
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab switching (5 tab)
@@ -5170,6 +5275,42 @@ async function loadBacktest() {
 
     panel.style.display = 'block';
   } catch(e) { /* silenzioso */ }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Push Notifications PWA
+// ══════════════════════════════════════════════════════════════════════════════
+let _notifPermission = Notification?.permission ?? 'default';
+let _lastNotifTicker = null;  // evita notifiche duplicate
+
+function initNotifications() {
+  if (!('Notification' in window) || !navigator.serviceWorker) return;
+  // Chiedi permesso solo se non già deciso, dopo 3 secondi (non subito)
+  if (_notifPermission === 'default') {
+    setTimeout(() => {
+      Notification.requestPermission().then(p => { _notifPermission = p; });
+    }, 3000);
+  }
+}
+
+function tryShowScanNotification(stocks) {
+  if (!stocks || !stocks.length) return;
+  if (_notifPermission !== 'granted') return;
+  if (!navigator.serviceWorker?.controller) return;
+
+  // Prendi il titolo con score più alto
+  const best = [...stocks].sort((a,b) => (b.score_10??0)-(a.score_10??0))[0];
+  if (!best || (best.score_10??0) < 8) return;
+  if (best.ticker === _lastNotifTicker) return;  // già notificato
+  _lastNotifTicker = best.ticker;
+
+  const chg = best.day_change_pct ?? 0;
+  const sign = chg >= 0 ? '+' : '';
+  navigator.serviceWorker.controller.postMessage({
+    type: 'SHOW_NOTIFICATION',
+    title: `🎯 ${best.ticker} — Score ${best.score_10}/10`,
+    body: `${sign}${chg.toFixed(1)}% oggi · RSI ${Math.round(best.rsi??50)} · ${scoreToText(best)?.split('.')[2]?.trim() || 'Segnale forte'}`,
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

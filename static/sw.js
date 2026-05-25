@@ -1,4 +1,4 @@
-const CACHE = 'masker-v29';
+const CACHE = 'masker-v30';
 const IMMUTABLE = ['/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', e => {
@@ -47,4 +47,32 @@ self.addEventListener('fetch', e => {
       });
     })
   );
+});
+
+// ── Notification click: apre la app ──────────────────────────────────────────
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      for (const c of clients) {
+        if (c.url.includes(self.location.origin) && 'focus' in c) return c.focus();
+      }
+      return self.clients.openWindow('/');
+    })
+  );
+});
+
+// ── Messaggio dalla pagina: mostra notifica immediata ────────────────────────
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SHOW_NOTIFICATION') {
+    const { title, body, icon } = e.data;
+    self.registration.showNotification(title, {
+      body,
+      icon: icon || '/icon.svg',
+      badge: '/icon.svg',
+      vibrate: [200, 100, 200],
+      tag: 'masker-signal',
+      renotify: true,
+    });
+  }
 });

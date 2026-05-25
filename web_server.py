@@ -1690,6 +1690,94 @@ async def api_user_watchlist_post(body: BodyWatchlist, authorization: Optional[s
     return {"ok": True}
 
 
+# ─── Watchlist Judge ──────────────────────────────────────────────────────────
+
+class WatchlistJudgeBody(BaseModel):
+    tickers: List[str]
+
+@app.post("/api/watchlist/judge")
+async def api_watchlist_judge(body: WatchlistJudgeBody):
+    """
+    Per ogni ticker nella watchlist, genera un verdetto AI in una riga.
+    Cached per ticker-set (hash), TTL 30 min.
+    """
+    if not groq_client:
+        return JSONResponse({"error": "AI non disponibile"}, status_code=503)
+
+    tickers = [t.upper() for t in body.tickers[:12]]  # max 12
+    if not tickers:
+        return {"verdicts": []}
+
+    key = "wljudge:" + ",".join(sorted(tickers))
+    if (c := _cached(key, _AI_TTL)) is not None:
+        return c
+
+    # Fetch dati per ogni ticker (in parallelo tramite asyncio)
+    async def _fetch(t: str):
+        try:
+            d = await asyncio.to_thread(get_enriched_analysis, t)
+            return t, _clean(d) if d else None
+        except Exception:
+            return t, None
+
+    results = await asyncio.gather(*[_fetch(t) for t in tickers])
+
+    # Costruisci contesto compatto per il prompt
+    lines = []
+    for ticker, d in results:
+        if not d:
+            lines.append(f"{ticker}: nessun dato")
+            continue
+        chg   = d.get("day_change_pct", 0) or 0
+        rsi   = d.get("rsi", 50) or 50
+        score = d.get("score_10", 5) or 5
+        vol   = d.get("volatility", 0) or 0
+        price = d.get("current_price", 0) or 0
+        news  = d.get("news_sentiment_label", "neutre") or "neutre"
+        lines.append(
+            f"{ticker}: prezzo ${price:.2f}, oggi {chg:+.1f}%, RSI={rsi:.0f}, "
+            f"score={score}/10, volatilità={vol:.0f}%, notizie={news}"
+        )
+
+    context = "\n".join(lines)
+    prompt = (
+        f"Sei un analista che valuta ogni stock della watchlist di un trader.\n"
+        f"Dati aggiornati:\n{context}\n\n"
+        f"Per OGNI ticker, scrivi ESATTAMENTE una riga nel formato:\n"
+        f"TICKER | [emoji] [verdetto breve, max 12 parole]\n\n"
+        f"Emoji: ✅ compra/interessante, ⚠️ attento/aspetta, 🔴 evita/pericoloso, ⏸ neutro.\n"
+        f"Sii diretto, concreto, in italiano. Zero generalità. Cita numeri specifici.\n"
+        f"Esempio: 'NVDA | ⚠️ RSI 68, aspetta pullback sotto $118 prima di entrare'"
+    )
+
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=400,
+            temperature=0.35,
+        )
+        text = resp.choices[0].message.content.strip()
+
+        # Parse: TICKER | verdict
+        verdicts = []
+        for line in text.split("\n"):
+            line = line.strip()
+            if "|" in line:
+                parts = line.split("|", 1)
+                t = parts[0].strip().upper().lstrip("•-*0123456789. ")
+                v = parts[1].strip()
+                if t and v:
+                    verdicts.append({"ticker": t, "verdict": v})
+
+        result = {"verdicts": verdicts, "generated_at": datetime.now(timezone.utc).isoformat()}
+        _store(key, result)
+        return result
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 # ─── Notizie titolo ───────────────────────────────────────────────────────────
 
 @app.get("/api/stock/{ticker}/news")
