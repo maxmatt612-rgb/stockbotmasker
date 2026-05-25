@@ -1699,17 +1699,17 @@ class WatchlistJudgeBody(BaseModel):
 async def api_watchlist_judge(body: WatchlistJudgeBody):
     """
     Per ogni ticker nella watchlist, genera un verdetto AI in una riga.
-    Cached per ticker-set (hash), TTL 30 min.
+    Cached per ticker-set, TTL 30 min.
     """
-    if not groq_client:
-        return JSONResponse({"error": "AI non disponibile"}, status_code=503)
-
     tickers = [t.upper() for t in body.tickers[:12]]  # max 12
     if not tickers:
         return {"verdicts": []}
 
+    if not groq_client:
+        return JSONResponse({"error": "AI non disponibile"}, status_code=503)
+
     key = "wljudge:" + ",".join(sorted(tickers))
-    if (c := _cached(key, _AI_TTL)) is not None:
+    if (c := _cached(key, 1800)) is not None:
         return c
 
     # Fetch dati per ogni ticker (in parallelo tramite asyncio)

@@ -3689,7 +3689,12 @@ async function renderWatchlist(){
   }
   const wl=loadWlData(); const tickers=Object.keys(wl);
   const grid=document.getElementById('wl-grid');
-  if(!tickers.length){grid.innerHTML='<div class="history-empty"><span class="icon">⭐</span>Aggiungi azioni da monitorare.</div>';return;}
+  const judgeWrap=document.getElementById('wl-judge-wrap');
+  if(!tickers.length){
+    grid.innerHTML='<div class="history-empty"><span class="icon">⭐</span>Aggiungi azioni da monitorare.</div>';
+    if(judgeWrap) judgeWrap.style.display='none';
+    return;
+  }
   grid.innerHTML='<div class="history-empty" style="padding:20px"><span class="icon" style="font-size:1.4rem">⏳</span>Aggiornamento prezzi…</div>';
   let quotes={};
   try{quotes=await fetch('/api/batch_quotes?tickers='+tickers.join(',')).then(r=>r.json());}catch(_){}
@@ -3720,9 +3725,8 @@ async function renderWatchlist(){
   });
   grid.appendChild(frag);
 
-  // Mostra il pulsante "Giudica la mia watchlist" se ci sono azioni
-  const judgeWrap = document.getElementById('wl-judge-wrap');
-  if (judgeWrap) judgeWrap.style.display = tickers.length ? 'block' : 'none';
+  // Mostra il pulsante "Giudica la mia watchlist" (judgeWrap già dichiarata sopra)
+  if (judgeWrap) judgeWrap.style.display = 'block';
 }
 
 async function runWatchlistJudge() {
@@ -5235,8 +5239,8 @@ async function loadBacktest() {
     // Subtitle
     subtitle.textContent = `${d.total} segnali · ${d.days} giorni analizzati`;
 
-    // Portfolio pill
-    if (d.portfolio_final && d.portfolio_return_pct !== undefined) {
+    // Portfolio pill — mostra solo se ci sono stati segnali Score≥8 effettivi
+    if (d.portfolio_final && d.portfolio_return_pct !== undefined && d.portfolio && d.portfolio.length > 0) {
       const retPct = d.portfolio_return_pct;
       const sign = retPct >= 0 ? '+' : '';
       pill.textContent = `📈 Score≥8: ${sign}${retPct}% (sim. $10k)`;
@@ -5254,20 +5258,23 @@ async function loadBacktest() {
       if (!b.total) return `<div class="bt-card"><div class="bt-card-label">${b.label||k}</div><div class="bt-empty">Nessun dato</div></div>`;
       const sign = b.avg_return >= 0 ? '+' : '';
       const cls = b.avg_return > 0 ? 'pos' : b.avg_return < 0 ? 'neg' : 'neu';
-      const top3HTML = (b.top3||[]).map(t => `
-        <div class="bt-top3-row">
+      const top3HTML = (b.top3||[]).map(t => {
+        const rs = t.return_pct >= 0 ? '+' : '';
+        const rc = t.return_pct >= 0 ? 'var(--green)' : 'var(--red)';
+        return `<div class="bt-top3-row">
           <span style="font-weight:700">${t.ticker}</span>
           <span style="color:var(--text-dim)">${t.date}</span>
-          <span style="color:var(--green);font-weight:700">+${t.return_pct}%</span>
-        </div>`).join('');
+          <span style="color:${rc};font-weight:700">${rs}${t.return_pct}%</span>
+        </div>`;
+      }).join('');
       return `<div class="bt-card">
         <div class="bt-card-label">${b.label}</div>
         <div class="bt-avg ${cls}">${sign}${b.avg_return}%</div>
         <div class="bt-stats">
           <div class="bt-stat">Win rate: <strong>${b.win_rate}%</strong></div>
           <div class="bt-stat">Segnali: <strong>${b.total}</strong></div>
-          <div class="bt-stat">Best: <strong style="color:var(--green)">+${b.best}%</strong></div>
-          <div class="bt-stat">Worst: <strong style="color:var(--red)">${b.worst}%</strong></div>
+          <div class="bt-stat">Best: <strong style="color:var(--green)">${b.best >= 0 ? '+' : ''}${b.best}%</strong></div>
+          <div class="bt-stat">Worst: <strong style="color:var(--red)">${b.worst >= 0 ? '+' : ''}${b.worst}%</strong></div>
         </div>
         ${top3HTML ? `<div class="bt-top3"><div class="bt-top3-hd">Top segnali</div>${top3HTML}</div>` : ''}
       </div>`;
@@ -5306,10 +5313,12 @@ function tryShowScanNotification(stocks) {
 
   const chg = best.day_change_pct ?? 0;
   const sign = chg >= 0 ? '+' : '';
+  const _st = scoreToText(best);
+  const _hint = _st ? (_st.split('. ').pop()?.replace(/\.$/, '') || 'Segnale forte') : 'Segnale forte';
   navigator.serviceWorker.controller.postMessage({
     type: 'SHOW_NOTIFICATION',
     title: `🎯 ${best.ticker} — Score ${best.score_10}/10`,
-    body: `${sign}${chg.toFixed(1)}% oggi · RSI ${Math.round(best.rsi??50)} · ${scoreToText(best)?.split('.')[2]?.trim() || 'Segnale forte'}`,
+    body: `${sign}${chg.toFixed(1)}% oggi · RSI ${Math.round(best.rsi??50)} · ${_hint}`,
   });
 }
 
