@@ -800,9 +800,8 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .lb-pct{font-size:.82rem;font-weight:700;min-width:68px;text-align:right}
 
 /* ── Simulatore ── */
-.sim-fab{position:fixed;bottom:20px;left:20px;z-index:200;width:46px;height:46px;border-radius:50%;background:var(--surf);border:1px solid var(--border);color:var(--primary);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;backdrop-filter:blur(12px)}
-.sim-fab:hover{border-color:var(--border-hi);transform:scale(1.08)}
-.sim-panel{position:fixed;bottom:76px;left:20px;z-index:500;width:340px;background:var(--surf);border:1px solid var(--border);border-radius:var(--r-xl);padding:20px;box-shadow:0 24px 64px rgba(0,0,0,.6);display:none;backdrop-filter:blur(20px)}
+.sim-fab{display:none}
+.sim-panel{padding:16px 0;border-top:1px solid var(--border);margin-top:8px;display:none}
 .sim-panel.open{display:block}
 .sim-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
 .sim-title{font-size:.88rem;font-weight:800}
@@ -1008,6 +1007,31 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .diary-stat-val{font-weight:700;font-size:.92rem}
 .diary-empty{text-align:center;color:var(--text-dim);font-size:.8rem;padding:20px 0}
 
+/* ── PWA install banner ── */
+.pwa-banner{display:none;align-items:center;gap:10px;background:rgba(99,102,241,.07);border-bottom:1px solid rgba(99,102,241,.14);padding:8px 20px;font-size:.78rem;color:var(--text)}
+.pwa-banner-text{flex:1}
+.pwa-banner-install{background:var(--primary);border:none;border-radius:var(--r-md);color:#fff;padding:5px 14px;font-size:.76rem;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif}
+.pwa-banner-dismiss{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:.95rem;padding:2px 6px;line-height:1}
+
+/* ── Accuracy bar ── */
+.accuracy-bar{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:0 24px 20px;align-items:center}
+.accuracy-chip{background:var(--surf);border:1px solid var(--border);border-radius:var(--r-lg);padding:10px 16px;font-size:.76rem;text-align:center;min-width:130px}
+.accuracy-chip-val{font-size:1.4rem;font-weight:900;letter-spacing:-.03em;line-height:1.1;color:var(--primary)}
+.accuracy-chip-lbl{font-size:.62rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
+.accuracy-chip-sub{font-size:.65rem;color:var(--text-dim);margin-top:1px}
+.accuracy-chip.good .accuracy-chip-val{color:var(--green)}
+.accuracy-chip.bad .accuracy-chip-val{color:var(--red)}
+
+/* ── Score breakdown ── */
+.score-breakdown{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0}
+.sb-row{display:flex;align-items:center;gap:7px;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:8px 10px}
+.sb-label{font-size:.64rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;min-width:62px}
+.sb-dots{display:flex;gap:2px;flex:1}
+.sb-dot{width:8px;height:8px;border-radius:50%;background:var(--border-hi);flex-shrink:0;transition:background .3s}
+.sb-dot.on{background:var(--primary)}
+.sb-dot.neg{background:var(--red)}
+.sb-val{font-size:.7rem;font-weight:700;min-width:18px;text-align:right;color:var(--text-dim)}
+
 /* ── Responsive ── */
 @media(max-width:640px){
   header{padding:8px 12px;gap:8px}
@@ -1087,6 +1111,14 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     </div>
   </div>
 </header>
+
+<!-- ── PWA install banner ── -->
+<div class="pwa-banner" id="pwa-banner">
+  <span>📱</span>
+  <span class="pwa-banner-text">Installa Masker come app — accesso rapido dal desktop, senza aprire il browser.</span>
+  <button class="pwa-banner-install" onclick="installPWA()">Installa</button>
+  <button class="pwa-banner-dismiss" onclick="dismissPWA()">✕</button>
+</div>
 
 <!-- ── Indices tape ── -->
 <div class="indices-tape">
@@ -1422,6 +1454,27 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
         <div class="conf-text" id="conf-consiglio"></div>
       </div>
     </div>
+    <!-- Simulatore investimento (inline nella tab AI) -->
+    <div class="sim-panel" id="sim-panel">
+      <div class="sim-hd">
+        <span class="sim-title">🧮 Simulatore Investimento</span>
+        <button class="sim-close" onclick="toggleSimulator()">✕</button>
+      </div>
+      <div class="sim-label">Ticker</div>
+      <input class="sim-input" id="sim-ticker" type="text" placeholder="es. NVDA" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter')runSimulator()"/>
+      <div class="sim-label">Importo investito ($)</div>
+      <input class="sim-input" id="sim-amount" type="number" min="1" placeholder="1000" value="1000"/>
+      <div class="sim-label">Periodo</div>
+      <div class="sim-period-group">
+        <button class="sim-period-btn" data-p="3mo" onclick="_simSetPeriod('3mo')">3M</button>
+        <button class="sim-period-btn" data-p="6mo" onclick="_simSetPeriod('6mo')">6M</button>
+        <button class="sim-period-btn active" data-p="1y" onclick="_simSetPeriod('1y')">1A</button>
+        <button class="sim-period-btn" data-p="3y" onclick="_simSetPeriod('3y')">3A</button>
+        <button class="sim-period-btn" data-p="5y" onclick="_simSetPeriod('5y')">5A</button>
+      </div>
+      <button class="sim-run-btn" onclick="runSimulator()">▶ Calcola</button>
+      <div id="sim-result"></div>
+    </div>
     <input type="file" id="chat-photo-input" accept="image/*" style="display:none" onchange="onChatPhotoSelected(this)">
     <div class="chat-attach-preview" id="chat-attach-preview">
       <img class="chat-attach-thumb" id="chat-attach-thumb" src="" alt="">
@@ -1551,11 +1604,30 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     <input class="screener-input" id="sc-custom-tickers" type="text" placeholder="AAPL, MSFT, TSLA…" style="width:260px">
   </div>
   <div class="screener-row">
+    <span class="screener-label">P/E ratio</span>
+    <input class="screener-input" id="sc-pe-min" type="number" placeholder="Min" min="0" step="1">
+    <span class="screener-sep">—</span>
+    <input class="screener-input" id="sc-pe-max" type="number" placeholder="Max" min="0" step="1">
+    <span class="screener-label" style="margin-left:8px">52 settimane</span>
+    <select class="screener-select" id="sc-52w">
+      <option value="all">Tutti</option>
+      <option value="high">↑ Vicino al massimo</option>
+      <option value="low">↓ Vicino al minimo</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:5px;font-size:.76rem;color:var(--text-dim);cursor:pointer;margin-left:8px">
+      <input type="checkbox" id="sc-vol-anomalo" style="width:14px;height:14px;accent-color:var(--primary)">
+      Volume anomalo (&gt;2×)
+    </label>
+  </div>
+  <div class="screener-row">
     <button class="screener-btn" onclick="runScreener()">Cerca</button>
     <button class="screener-btn" style="background:transparent;border-color:var(--border);color:var(--text-dim)" onclick="resetScreener()">Reset</button>
   </div>
   <div class="screener-results" id="screener-results"></div>
 </div>
+
+<!-- ── Accuracy bar ── -->
+<div class="accuracy-bar" id="accuracy-bar" style="display:none"></div>
 
 <!-- ── Stats ── -->
 <div class="stats-bar">
@@ -1615,6 +1687,8 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     <div id="rsi-container" style="display:none"></div>
     <div id="macd-container" style="display:none"></div>
     <div class="detail-grid" id="m-details"></div>
+    <!-- Score breakdown -->
+    <div class="score-breakdown" id="m-score-breakdown" style="display:none"></div>
     <!-- Fondamentali -->
     <div class="fund-section" id="m-fund-section" style="display:none">
       <div class="fund-hd" onclick="document.getElementById('m-fund-grid').classList.toggle('open')">
@@ -1730,28 +1804,6 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   </div>
 </div>
 
-<!-- Simulatore flottante -->
-<button class="sim-fab" id="sim-fab" onclick="toggleSimulator()" title="Simulatore investimento">🔮</button>
-<div class="sim-panel" id="sim-panel">
-  <div class="sim-hd">
-    <span class="sim-title">🧮 Simulatore Investimento</span>
-    <button class="sim-close" onclick="toggleSimulator()">✕</button>
-  </div>
-  <div class="sim-label">Ticker</div>
-  <input class="sim-input" id="sim-ticker" type="text" placeholder="es. NVDA" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter')runSimulator()"/>
-  <div class="sim-label">Importo investito ($)</div>
-  <input class="sim-input" id="sim-amount" type="number" min="1" placeholder="1000" value="1000"/>
-  <div class="sim-label">Periodo</div>
-  <div class="sim-period-group">
-    <button class="sim-period-btn" data-p="3mo" onclick="_simSetPeriod('3mo')">3M</button>
-    <button class="sim-period-btn" data-p="6mo" onclick="_simSetPeriod('6mo')">6M</button>
-    <button class="sim-period-btn active" data-p="1y" onclick="_simSetPeriod('1y')">1A</button>
-    <button class="sim-period-btn" data-p="3y" onclick="_simSetPeriod('3y')">3A</button>
-    <button class="sim-period-btn" data-p="5y" onclick="_simSetPeriod('5y')">5A</button>
-  </div>
-  <button class="sim-run-btn" onclick="runSimulator()">▶ Calcola</button>
-  <div id="sim-result"></div>
-</div>
 
 <!-- Confronto titoli -->
 <div class="cmp-overlay" id="cmp-overlay" onclick="if(event.target===this)closeComparison()">
@@ -1884,7 +1936,8 @@ function toggleTheme(){
   document.getElementById('theme-toggle').textContent = isDark?'☀️':'🌙';
 }
 (()=>{
-  if(localStorage.getItem('masker_theme')==='dark'){
+  // Dark è il default — applica light solo se l'utente ha scelto esplicitamente
+  if(localStorage.getItem('masker_theme') !== 'light'){
     document.body.classList.add('dark');
     const btn=document.getElementById('theme-toggle');
     if(btn) btn.textContent='☀️';
@@ -2287,6 +2340,7 @@ async function openModal(stock){
   document.getElementById('m-details').innerHTML='';
   document.getElementById('m-verdict').textContent='';
   document.getElementById('m-score-hist').style.display='none';
+  renderScoreBreakdown(stock.score_breakdown ?? null);
 
   // Chart (con indicatori tecnici RSI / Bollinger)
   _renderChartWithIndicators(stock.ticker,_chartPeriod,_chartInterval,_chartType);
@@ -3530,6 +3584,7 @@ loadIndices();
 setInterval(()=>{updateMarketStatus();loadIndices();},60000);
 initFX();
 loadData().then(startCountdown);
+loadAccuracy();
 initAuth();
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -4520,23 +4575,35 @@ async function runScreener(){
   const maxPrice=document.getElementById('sc-max-price').value;
   const customRaw=document.getElementById('sc-custom-tickers').value;
   const customTickers=customRaw?customRaw.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean):[];
+  const peMin=document.getElementById('sc-pe-min').value;
+  const peMax=document.getElementById('sc-pe-max').value;
+  const w52=document.getElementById('sc-52w').value;
+  const volAnom=document.getElementById('sc-vol-anomalo').checked;
   const body={universe,direction,mcap};
   if(minChg!=='') body.min_change=parseFloat(minChg);
   if(maxChg!=='') body.max_change=parseFloat(maxChg);
   if(minPrice!=='') body.min_price=parseFloat(minPrice);
   if(maxPrice!=='') body.max_price=parseFloat(maxPrice);
+  if(peMin!=='') body.pe_min=parseFloat(peMin);
+  if(peMax!=='') body.pe_max=parseFloat(peMax);
+  if(w52!=='all') body.near_52w=w52;
+  if(volAnom) body.volume_anomalo=true;
   if(universe==='custom') body.custom_tickers=customTickers;
   try{
     const data=await fetch('/api/screener',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
     if(!data||!data.length){res.innerHTML='<div class="screener-empty">Nessun titolo trovato con questi filtri.</div>';return;}
     const fmtMcap=m=>{if(!m)return'—';if(m>=1e12)return(m/1e12).toFixed(1)+'T';if(m>=1e9)return(m/1e9).toFixed(1)+'B';return(m/1e6).toFixed(0)+'M'};
-    res.innerHTML=data.map(d=>`
-      <div class="screener-card" onclick="openModal({ticker:'${d.ticker}',current_price:${d.price},day_change_pct:${d.chg_pct},name:'${d.ticker}',score_10:5})">
+    res.innerHTML=data.map(d=>{
+      const peStr = d.pe != null ? `<div class="sc-mcap">P/E ${d.pe.toFixed(1)}</div>` : '';
+      const volStr = d.vol_ratio != null ? `<div class="sc-mcap" title="Volume vs media">Vol ${d.vol_ratio.toFixed(1)}×</div>` : '';
+      return `<div class="screener-card" onclick="openModal({ticker:'${d.ticker}',current_price:${d.price},day_change_pct:${d.chg_pct},name:'${d.ticker}',score_10:5})">
         <div class="sc-ticker">${d.ticker}</div>
         <div class="sc-price">${fmtP(d.price)}</div>
         <div class="sc-chg ${d.chg_pct>=0?'pos':'neg'}">${d.chg_pct>=0?'▲ +':'▼ '}${Math.abs(d.chg_pct).toFixed(2)}%</div>
         <div class="sc-mcap">${fmtMcap(d.mcap)}</div>
-      </div>`).join('');
+        ${peStr}${volStr}
+      </div>`;
+    }).join('');
   }catch(e){res.innerHTML='<div class="screener-empty">❌ Errore di connessione.</div>';}
 }
 
@@ -4544,7 +4611,9 @@ function resetScreener(){
   document.getElementById('sc-universe').value='us_large';
   document.getElementById('sc-direction').value='all';
   document.getElementById('sc-mcap').value='all';
-  ['sc-min-chg','sc-max-chg','sc-min-price','sc-max-price','sc-custom-tickers'].forEach(id=>{document.getElementById(id).value='';});
+  ['sc-min-chg','sc-max-chg','sc-min-price','sc-max-price','sc-custom-tickers','sc-pe-min','sc-pe-max'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('sc-52w').value='all';
+  document.getElementById('sc-vol-anomalo').checked=false;
   document.getElementById('sc-custom-row').style.display='none';
   document.getElementById('screener-results').innerHTML='';
 }
@@ -4842,12 +4911,96 @@ function _renderTaxSection(totalPL, numOps){
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PWA — Service Worker
+// PWA — Service Worker + Install Banner
 // ══════════════════════════════════════════════════════════════════════════════
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('/sw.js').catch(()=>{});
   });
+}
+
+let _pwaPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _pwaPrompt = e;
+  if (!localStorage.getItem('pwa_dismissed')) {
+    const banner = document.getElementById('pwa-banner');
+    if (banner) banner.style.display = 'flex';
+  }
+});
+function installPWA() {
+  if (!_pwaPrompt) return;
+  _pwaPrompt.prompt();
+  _pwaPrompt.userChoice.then(() => {
+    _pwaPrompt = null;
+    const banner = document.getElementById('pwa-banner');
+    if (banner) banner.style.display = 'none';
+  });
+}
+function dismissPWA() {
+  const banner = document.getElementById('pwa-banner');
+  if (banner) banner.style.display = 'none';
+  localStorage.setItem('pwa_dismissed', '1');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Accuracy storica segnali
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadAccuracy() {
+  const bar = document.getElementById('accuracy-bar');
+  if (!bar) return;
+  try {
+    const d = await fetch('/api/accuracy').then(r => r.json());
+    if (!d || d.total === 0) return;
+    const pct = d.accuracy_pct;
+    const cls = pct >= 65 ? 'good' : pct >= 50 ? '' : 'bad';
+    const bs = d.by_score || {};
+    const byScoreHTML = Object.values(bs).filter(b => b.total > 0).map(b => {
+      const bc = b.pct >= 65 ? 'good' : b.pct < 50 ? 'bad' : '';
+      return `<div class="accuracy-chip ${bc}">
+        <div class="accuracy-chip-val">${b.pct}%</div>
+        <div class="accuracy-chip-lbl">${b.label}</div>
+        <div class="accuracy-chip-sub">${b.correct}/${b.total} corretti</div>
+      </div>`;
+    }).join('');
+    bar.innerHTML = `
+      <div class="accuracy-chip ${cls}">
+        <div class="accuracy-chip-val">${pct}%</div>
+        <div class="accuracy-chip-lbl">Accuracy totale</div>
+        <div class="accuracy-chip-sub">${d.correct}/${d.total} segnali corretti</div>
+      </div>
+      ${byScoreHTML}
+    `;
+    bar.style.display = 'flex';
+  } catch(e) { /* silenzioso */ }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Score breakdown nel modal
+// ══════════════════════════════════════════════════════════════════════════════
+function renderScoreBreakdown(breakdown) {
+  const el = document.getElementById('m-score-breakdown');
+  if (!el || !breakdown) { if(el) el.style.display='none'; return; }
+  const items = [
+    { key: 'rsi',      label: 'RSI',      max: 4 },
+    { key: 'momentum', label: 'Momentum', max: 3 },
+    { key: 'volume',   label: 'Volume',   max: 3 },
+    { key: 'trend',    label: 'SMA20',    max: 1 },
+  ];
+  el.innerHTML = items.map(({ key, label, max }) => {
+    const val = breakdown[key] ?? 0;
+    const abs = Math.abs(val);
+    const isNeg = val < 0;
+    const dots = Array.from({ length: max }, (_, i) =>
+      `<span class="sb-dot ${i < abs ? (isNeg ? 'neg' : 'on') : ''}"></span>`
+    ).join('');
+    return `<div class="sb-row">
+      <span class="sb-label">${label}</span>
+      <div class="sb-dots">${dots}</div>
+      <span class="sb-val" style="color:${val>0?'var(--green)':val<0?'var(--red)':'var(--text-dim)'}">${val>0?'+':''}${val}</span>
+    </div>`;
+  }).join('');
+  el.style.display = 'grid';
 }
 </script>
 </body>

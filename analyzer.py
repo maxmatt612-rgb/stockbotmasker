@@ -474,23 +474,30 @@ def scan_cheap_stocks(max_price: float = 40.0, top_n: int = 10) -> list:
                         sma20 = float(close.rolling(20).mean().iloc[-1])
                         above_sma20 = current_price > sma20
 
-                    # Punteggio momento
+                    # Punteggio momento — tracked per component
                     score = 0
-                    if rsi < 35:      score += 3
-                    elif rsi < 45:    score += 2
-                    elif rsi > 70:    score -= 3
-                    elif rsi > 60:    score -= 1
+                    rsi_pts = 0
+                    if rsi < 35:      rsi_pts = 3
+                    elif rsi < 45:    rsi_pts = 2
+                    elif rsi > 70:    rsi_pts = -3
+                    elif rsi > 60:    rsi_pts = -1
+                    score += rsi_pts
 
-                    if day_change_pct > 3:    score += 3
-                    elif day_change_pct > 1:  score += 2
-                    elif day_change_pct > 0:  score += 1
-                    elif day_change_pct < -3: score -= 2
+                    mom_pts = 0
+                    if day_change_pct > 3:    mom_pts = 3
+                    elif day_change_pct > 1:  mom_pts = 2
+                    elif day_change_pct > 0:  mom_pts = 1
+                    elif day_change_pct < -3: mom_pts = -2
+                    score += mom_pts
 
-                    if vol_ratio > 2.5:   score += 3
-                    elif vol_ratio > 1.5: score += 2
-                    elif vol_ratio > 1.2: score += 1
+                    vol_pts = 0
+                    if vol_ratio > 2.5:   vol_pts = 3
+                    elif vol_ratio > 1.5: vol_pts = 2
+                    elif vol_ratio > 1.2: vol_pts = 1
+                    score += vol_pts
 
-                    if above_sma20: score += 1
+                    trend_pts = 1 if above_sma20 else 0
+                    score += trend_pts
 
                     # Rischio
                     returns = close.pct_change().dropna()
@@ -516,6 +523,12 @@ def scan_cheap_stocks(max_price: float = 40.0, top_n: int = 10) -> list:
                         "risk_emoji": risk_emoji,
                         "risk_level": risk_level,
                         "volatility": volatility,
+                        "score_breakdown": {
+                            "rsi": rsi_pts,
+                            "momentum": mom_pts,
+                            "volume": vol_pts,
+                            "trend": trend_pts,
+                        },
                     })
                 except Exception:
                     continue

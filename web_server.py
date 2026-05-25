@@ -19,9 +19,24 @@ from analyzer import get_enriched_analysis, scan_cheap_stocks
 
 STATIC = Path(__file__).parent / "static"
 HISTORY_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "analysis_history.json"
+SCAN_FILE    = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "last_scan.json"
 WEB_USERS_FILE = Path(__file__).parent / "web_users.json"
 
 app = FastAPI(title="Stock Bot Dashboard", docs_url=None, redoc_url=None)
+
+
+@app.on_event("startup")
+async def _startup_load_cache():
+    """Carica l'ultimo scan da disco al riavvio — così il primo accesso è istantaneo."""
+    if SCAN_FILE.exists():
+        try:
+            data = json.loads(SCAN_FILE.read_text(encoding="utf-8"))
+            if data:
+                _store("scan:10", data)
+        except Exception as e:
+            print(f"[startup] Impossibile caricare last_scan.json: {e}")
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -171,14 +186,44 @@ _INTRADAY_INTERVALS = {"1m","2m","5m","15m","30m","60m","90m","1h"}
 
 # ─── Endpoint ─────────────────────────────────────────────────────────────────
 
+def _save_scan_to_disk(data: list):
+    """Persiste l'ultimo scan su disco per sopravvivere ai riavvii."""
+    try:
+        SCAN_FILE.write_text(json.dumps(data), encoding="utf-8")
+    except Exception as e:
+        print(f"[scan] Errore salvataggio su disco: {e}")
+
+
+async def _refresh_scan_background(top: int):
+    """Aggiorna il scan in background senza bloccare la risposta."""
+    try:
+        results = await asyncio.to_thread(scan_cheap_stocks, 40.0, top)
+        clean = _clean(results or [])
+        if clean:
+            _store(f"scan:{top}", clean)
+            if top == 10:
+                _save_scan_to_disk(clean)
+    except Exception as e:
+        print(f"[scan_bg] Errore: {e}")
+
+
 @app.get("/api/scan")
 async def api_scan(top: int = 10):
     key = f"scan:{top}"
-    if (c := _cached(key, _SCAN_TTL)) is not None:
-        return c
+    fresh = _cached(key, _SCAN_TTL)
+    if fresh is not None:
+        return fresh
+    # Dati stale in cache → restituisci subito e aggiorna in background
+    stale = _cache.get(key)
+    if stale:
+        asyncio.create_task(_refresh_scan_background(top))
+        return stale["data"]
+    # Nessun dato: attendi il primo scan
     results = await asyncio.to_thread(scan_cheap_stocks, 40.0, top)
     clean = _clean(results or [])
     _store(key, clean)
+    if top == 10:
+        _save_scan_to_disk(clean)
     return clean
 
 
@@ -1231,6 +1276,64 @@ async def api_score_history(ticker: str):
     return points
 
 
+# ─── Accuracy storica dei segnali ─────────────────────────────────────────────
+
+@app.get("/api/accuracy")
+async def api_accuracy():
+    """Accuracy storica: quante volte il segnale di Masker ha predetto la direzione corretta."""
+    if not HISTORY_FILE.exists():
+        return {"total": 0, "correct": 0, "accuracy_pct": 0, "by_score": {}}
+    try:
+        history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {"total": 0, "correct": 0, "accuracy_pct": 0, "by_score": {}}
+
+    total = 0
+    correct = 0
+    by_score = {
+        "high": {"label": "Score 8–10", "total": 0, "correct": 0, "pct": 0},
+        "mid":  {"label": "Score 6–7",  "total": 0, "correct": 0, "pct": 0},
+        "low":  {"label": "Score 0–5",  "total": 0, "correct": 0, "pct": 0},
+    }
+
+    for snap in history.values():
+        if not snap.get("closed", False):
+            continue
+        for s in snap.get("stocks", []):
+            pa = s.get("price_at_analysis") or 0.0
+            pc = s.get("price_at_close") or 0.0
+            score = s.get("score_10") or 5.0
+            if pa <= 0 or pc <= 0:
+                continue
+            pct = (pc - pa) / pa * 100
+            verdict = (s.get("verdict") or "").upper()
+            # Determina se il segnale era bullish o bearish
+            if score >= 7 or any(k in verdict for k in ("COMPRA", "BUY", "SI", "SÌ")):
+                expected_up = True
+            elif score <= 4 or any(k in verdict for k in ("VENDI", "SELL", "NO")):
+                expected_up = False
+            else:
+                continue  # neutro: skip
+            is_correct = (expected_up and pct > 0) or (not expected_up and pct < 0)
+            total += 1
+            if is_correct:
+                correct += 1
+            bucket = "high" if score >= 8 else ("mid" if score >= 6 else "low")
+            by_score[bucket]["total"] += 1
+            if is_correct:
+                by_score[bucket]["correct"] += 1
+
+    for b in by_score.values():
+        b["pct"] = round(b["correct"] / b["total"] * 100, 1) if b["total"] > 0 else 0
+
+    return {
+        "total": total,
+        "correct": correct,
+        "accuracy_pct": round(correct / total * 100, 1) if total > 0 else 0,
+        "by_score": by_score,
+    }
+
+
 # ─── FX rate ──────────────────────────────────────────────────────────────────
 
 @app.get("/api/fx")
@@ -1808,8 +1911,12 @@ class ScreenerBody(BaseModel):
     max_change: Optional[float] = None
     min_price: Optional[float] = None
     max_price: Optional[float] = None
-    direction: str = "all"  # all | up | down
-    mcap: str = "all"       # all | mega | large | mid | small
+    direction: str = "all"       # all | up | down
+    mcap: str = "all"            # all | mega | large | mid | small
+    pe_min: Optional[float] = None
+    pe_max: Optional[float] = None
+    volume_anomalo: bool = False  # volume > 2x media
+    near_52w: Optional[str] = None  # "high" | "low"
 
 
 @app.post("/api/screener")
@@ -1819,25 +1926,47 @@ async def api_screener(body: ScreenerBody):
     else:
         tickers = _SCREENER_UNIVERSES.get(body.universe, _SCREENER_UNIVERSES["us_large"])
 
-    cache_key = f"screener:{body.universe}:{hash(tuple(sorted(tickers)))}"
+    needs_advanced = any([body.pe_min, body.pe_max, body.volume_anomalo, body.near_52w])
+    cache_key = f"screener:{'adv' if needs_advanced else 'base'}:{body.universe}:{hash(tuple(sorted(tickers)))}"
     universe_data = _cached(cache_key, _SCREENER_TTL)
 
     if universe_data is None:
         def _fetch_one(t: str):
             import yfinance as yf
             try:
-                fi = yf.Ticker(t).fast_info
+                tk = yf.Ticker(t)
+                fi = tk.fast_info
                 price = fi.last_price
                 prev  = fi.regular_market_previous_close
                 if not price or not prev or prev == 0:
                     return None
                 chg = (price - prev) / prev * 100
-                return {
+                result = {
                     "ticker": t,
                     "price": round(float(price), 4),
                     "chg_pct": round(float(chg), 2),
                     "mcap": int(fi.market_cap or 0),
+                    "pe": None,
+                    "52w_high": None,
+                    "52w_low": None,
+                    "vol_ratio": None,
                 }
+                if needs_advanced:
+                    try:
+                        info = tk.info or {}
+                        result["pe"] = info.get("forwardPE") or info.get("trailingPE")
+                        result["52w_high"] = info.get("fiftyTwoWeekHigh")
+                        result["52w_low"]  = info.get("fiftyTwoWeekLow")
+                        # Volume ratio (current vs 10-day avg)
+                        hist = tk.history(period="10d", interval="1d")
+                        if not hist.empty and len(hist) >= 2:
+                            avg_vol = float(hist["Volume"].iloc[:-1].mean())
+                            curr_vol = float(hist["Volume"].iloc[-1])
+                            if avg_vol > 0:
+                                result["vol_ratio"] = round(curr_vol / avg_vol, 2)
+                    except Exception:
+                        pass
+                return result
             except Exception:
                 return None
 
@@ -1868,6 +1997,16 @@ async def api_screener(body: ScreenerBody):
             if body.mcap == "small": return 0 < m < 2_000_000_000
             return True
         out = [x for x in out if _mcap_ok(x["mcap"])]
+    if body.pe_min is not None:
+        out = [x for x in out if x.get("pe") is not None and x["pe"] >= body.pe_min]
+    if body.pe_max is not None:
+        out = [x for x in out if x.get("pe") is not None and x["pe"] <= body.pe_max]
+    if body.volume_anomalo:
+        out = [x for x in out if (x.get("vol_ratio") or 0) >= 2.0]
+    if body.near_52w == "high":
+        out = [x for x in out if x.get("52w_high") and x["price"] >= x["52w_high"] * 0.95]
+    elif body.near_52w == "low":
+        out = [x for x in out if x.get("52w_low") and x["price"] <= x["52w_low"] * 1.05]
 
     out.sort(key=lambda x: abs(x["chg_pct"]), reverse=True)
     return out[:30]
