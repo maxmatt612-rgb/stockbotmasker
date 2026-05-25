@@ -1385,6 +1385,118 @@ async def api_accuracy():
     }
 
 
+# ─── Backtest storico dei segnali ─────────────────────────────────────────────
+
+@app.get("/api/backtest")
+async def api_backtest():
+    """
+    Backtest: per ogni segnale nella history con price_at_close,
+    calcola il ritorno mattina→chiusura, raggruppato per score bucket.
+    Mostra avg return, win rate, best/worst, e portafoglio cumulativo simulato.
+    """
+    key = "backtest:v1"
+    if (c := _cached(key, 1800)) is not None:
+        return c
+
+    if not HISTORY_FILE.exists():
+        return {"total": 0, "days": 0, "by_score": {}, "portfolio": []}
+
+    try:
+        history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {"total": 0, "days": 0, "by_score": {}, "portfolio": []}
+
+    signals: list = []
+    portfolio_days: list = []  # per la curva cumulativa
+
+    # Ordina le date per simulare in cronologia
+    sorted_keys = sorted(history.keys())
+
+    for date_key in sorted_keys:
+        snap = history[date_key]
+        if not snap.get("closed", False):
+            continue
+        date_str = date_key[:10]
+        day_high_stocks = []
+
+        for s in snap.get("stocks", []):
+            pa = s.get("price_at_analysis") or 0.0
+            pc = s.get("price_at_close") or 0.0
+            score_10 = s.get("score_10") or 0.0
+            ticker = s.get("ticker", "")
+            if pa <= 0 or pc <= 0 or not ticker:
+                continue
+            ret = (pc - pa) / pa * 100
+            signals.append({
+                "ticker": ticker,
+                "date": date_str,
+                "score_10": score_10,
+                "entry": round(pa, 4),
+                "exit": round(pc, 4),
+                "return_pct": round(ret, 2),
+                "win": ret > 0,
+            })
+            if score_10 >= 8:
+                day_high_stocks.append(ret)
+
+        # Portafoglio simulato: equal-weight su tutti i Score≥8 di quel giorno
+        if day_high_stocks:
+            avg_day = sum(day_high_stocks) / len(day_high_stocks)
+            portfolio_days.append({"date": date_str, "daily_return": round(avg_day, 2), "n": len(day_high_stocks)})
+
+    # Calcola valore cumulativo portafoglio ($10k iniziali)
+    portfolio_value = 10000.0
+    portfolio_curve = []
+    for pd_day in portfolio_days:
+        portfolio_value *= (1 + pd_day["daily_return"] / 100)
+        portfolio_curve.append({"date": pd_day["date"], "value": round(portfolio_value, 2)})
+
+    # Raggruppa per score bucket
+    def _bucket(s10: float) -> str:
+        if s10 >= 8: return "high"
+        if s10 >= 6: return "mid"
+        return "low"
+
+    buckets: dict = {
+        "high": {"label": "Score ≥8",  "sigs": []},
+        "mid":  {"label": "Score 6-7", "sigs": []},
+        "low":  {"label": "Score <6",  "sigs": []},
+    }
+    for sig in signals:
+        buckets[_bucket(sig["score_10"])]["sigs"].append(sig)
+
+    by_score: dict = {}
+    for k, b in buckets.items():
+        sigs = b["sigs"]
+        if not sigs:
+            by_score[k] = {"label": b["label"], "total": 0, "avg_return": 0,
+                           "win_rate": 0, "best": 0, "worst": 0, "top3": []}
+            continue
+        rets = [s["return_pct"] for s in sigs]
+        wins = sum(1 for s in sigs if s["win"])
+        top3 = sorted(sigs, key=lambda x: x["return_pct"], reverse=True)[:3]
+        by_score[k] = {
+            "label": b["label"],
+            "total": len(sigs),
+            "avg_return": round(sum(rets) / len(rets), 2),
+            "win_rate": round(wins / len(sigs) * 100, 0),
+            "best": round(max(rets), 2),
+            "worst": round(min(rets), 2),
+            "top3": [{"ticker": s["ticker"], "date": s["date"], "return_pct": s["return_pct"]} for s in top3],
+        }
+
+    result = {
+        "total": len(signals),
+        "days": len([k for k, v in history.items() if v.get("closed")]),
+        "by_score": by_score,
+        "portfolio": portfolio_curve,
+        "portfolio_final": round(portfolio_value, 2),
+        "portfolio_return_pct": round((portfolio_value - 10000) / 100, 2),
+    }
+    _store(key, result)
+    return result
+
+
 # ─── FX rate ──────────────────────────────────────────────────────────────────
 
 @app.get("/api/fx")

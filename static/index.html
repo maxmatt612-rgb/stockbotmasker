@@ -1032,6 +1032,31 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .sb-dot.neg{background:var(--red)}
 .sb-val{font-size:.7rem;font-weight:700;min-width:18px;text-align:right;color:var(--text-dim)}
 
+/* ── Backtest panel ── */
+.backtest-panel{margin:0 24px 20px;border-radius:var(--r-xl);border:1px solid var(--border);overflow:hidden}
+.backtest-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--surf);border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
+.backtest-header-left{display:flex;align-items:center;gap:10px}
+.backtest-title{font-size:.82rem;font-weight:700;color:var(--text)}
+.backtest-subtitle{font-size:.68rem;color:var(--text-dim)}
+.backtest-portfolio-pill{background:var(--primary-dim);border:1px solid rgba(99,102,241,.2);border-radius:20px;padding:3px 12px;font-size:.72rem;font-weight:700;color:var(--primary)}
+.backtest-toggle{font-size:.75rem;color:var(--text-dim);transition:transform .2s}
+.backtest-toggle.open{transform:rotate(180deg)}
+.backtest-body{display:none;padding:16px 20px;background:var(--surf)}
+.backtest-body.open{display:block}
+.backtest-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+.bt-card{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 14px}
+.bt-card-label{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-dim);margin-bottom:6px}
+.bt-avg{font-size:1.5rem;font-weight:900;line-height:1}
+.bt-avg.pos{color:var(--green)}.bt-avg.neg{color:var(--red)}.bt-avg.neu{color:var(--text-dim)}
+.bt-stats{margin-top:6px;display:flex;flex-direction:column;gap:3px}
+.bt-stat{font-size:.67rem;color:var(--text-dim)}.bt-stat strong{color:var(--text)}
+.bt-note{font-size:.64rem;color:var(--text-dim);text-align:center;margin-top:10px;font-style:italic}
+.bt-top3{margin-top:10px}
+.bt-top3-hd{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin-bottom:5px}
+.bt-top3-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border);font-size:.68rem}
+.bt-top3-row:last-child{border-bottom:none}
+.bt-empty{text-align:center;padding:20px;color:var(--text-dim);font-size:.78rem}
+
 /* ── Trade setup ("Cosa farei io") ── */
 .trade-setup{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 12px;margin-top:10px}
 .trade-setup-hd{font-size:.64rem;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;display:flex;align-items:center;gap:5px}
@@ -1649,6 +1674,27 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 <!-- ── Accuracy bar ── -->
 <div class="accuracy-bar" id="accuracy-bar" style="display:none"></div>
+
+<!-- ── Backtest panel ── -->
+<div class="backtest-panel" id="backtest-panel" style="display:none">
+  <div class="backtest-header" onclick="toggleBacktest()">
+    <div class="backtest-header-left">
+      <span style="font-size:1.1rem">📊</span>
+      <div>
+        <div class="backtest-title">Backtest — Risultati reali dei segnali</div>
+        <div class="backtest-subtitle" id="bt-subtitle">Caricamento…</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="backtest-portfolio-pill" id="bt-portfolio-pill" style="display:none"></div>
+      <span class="backtest-toggle" id="bt-toggle">▼</span>
+    </div>
+  </div>
+  <div class="backtest-body" id="backtest-body">
+    <div class="backtest-grid" id="bt-grid"></div>
+    <div class="bt-note">Calcolo basato su segnali mattutini vs prezzo di chiusura. Passato ≠ futuro.</div>
+  </div>
+</div>
 
 <!-- ── Stats ── -->
 <div class="stats-bar">
@@ -3637,6 +3683,7 @@ setInterval(()=>{updateMarketStatus();loadIndices();},60000);
 initFX();
 loadData().then(startCountdown);
 loadAccuracy();
+loadBacktest();
 initAuth();
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -5053,6 +5100,76 @@ function renderScoreBreakdown(breakdown) {
     </div>`;
   }).join('');
   el.style.display = 'grid';
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Backtest storico dei segnali
+// ══════════════════════════════════════════════════════════════════════════════
+function toggleBacktest() {
+  const body = document.getElementById('backtest-body');
+  const toggle = document.getElementById('bt-toggle');
+  if (!body) return;
+  const isOpen = body.classList.toggle('open');
+  toggle.classList.toggle('open', isOpen);
+}
+
+async function loadBacktest() {
+  const panel = document.getElementById('backtest-panel');
+  const subtitle = document.getElementById('bt-subtitle');
+  const grid = document.getElementById('bt-grid');
+  const pill = document.getElementById('bt-portfolio-pill');
+  if (!panel) return;
+  try {
+    const d = await fetch('/api/backtest').then(r => r.json());
+    if (!d || d.total === 0) {
+      subtitle.textContent = 'Nessun segnale chiuso ancora — torna dopo la prima giornata completa';
+      panel.style.display = 'block';
+      return;
+    }
+
+    // Subtitle
+    subtitle.textContent = `${d.total} segnali · ${d.days} giorni analizzati`;
+
+    // Portfolio pill
+    if (d.portfolio_final && d.portfolio_return_pct !== undefined) {
+      const retPct = d.portfolio_return_pct;
+      const sign = retPct >= 0 ? '+' : '';
+      pill.textContent = `📈 Score≥8: ${sign}${retPct}% (sim. $10k)`;
+      pill.style.display = 'block';
+      pill.style.color = retPct >= 0 ? 'var(--green)' : 'var(--red)';
+      pill.style.borderColor = retPct >= 0 ? 'rgba(16,185,129,.25)' : 'rgba(239,68,68,.25)';
+      pill.style.background = retPct >= 0 ? 'rgba(16,185,129,.08)' : 'rgba(239,68,68,.08)';
+    }
+
+    // Grid: 3 bucket cards
+    const bs = d.by_score || {};
+    const order = ['high', 'mid', 'low'];
+    grid.innerHTML = order.map(k => {
+      const b = bs[k] || {};
+      if (!b.total) return `<div class="bt-card"><div class="bt-card-label">${b.label||k}</div><div class="bt-empty">Nessun dato</div></div>`;
+      const sign = b.avg_return >= 0 ? '+' : '';
+      const cls = b.avg_return > 0 ? 'pos' : b.avg_return < 0 ? 'neg' : 'neu';
+      const top3HTML = (b.top3||[]).map(t => `
+        <div class="bt-top3-row">
+          <span style="font-weight:700">${t.ticker}</span>
+          <span style="color:var(--text-dim)">${t.date}</span>
+          <span style="color:var(--green);font-weight:700">+${t.return_pct}%</span>
+        </div>`).join('');
+      return `<div class="bt-card">
+        <div class="bt-card-label">${b.label}</div>
+        <div class="bt-avg ${cls}">${sign}${b.avg_return}%</div>
+        <div class="bt-stats">
+          <div class="bt-stat">Win rate: <strong>${b.win_rate}%</strong></div>
+          <div class="bt-stat">Segnali: <strong>${b.total}</strong></div>
+          <div class="bt-stat">Best: <strong style="color:var(--green)">+${b.best}%</strong></div>
+          <div class="bt-stat">Worst: <strong style="color:var(--red)">${b.worst}%</strong></div>
+        </div>
+        ${top3HTML ? `<div class="bt-top3"><div class="bt-top3-hd">Top segnali</div>${top3HTML}</div>` : ''}
+      </div>`;
+    }).join('');
+
+    panel.style.display = 'block';
+  } catch(e) { /* silenzioso */ }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
