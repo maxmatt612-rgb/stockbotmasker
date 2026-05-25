@@ -34,7 +34,8 @@ logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=loggin
 logger = logging.getLogger(__name__)
 
 ROME = ZoneInfo("Europe/Rome")
-DATA_FILE = Path("user_data.json")
+DATA_FILE      = Path(__file__).parent / "user_data.json"
+HISTORY_FILE   = Path(__file__).parent / "analysis_history.json"
 
 _GROQ_KEY = os.getenv("GROQ_API_KEY")
 groq_client = AsyncGroq(api_key=_GROQ_KEY) if _GROQ_KEY else None
@@ -931,7 +932,7 @@ async def _send_to_group(bot, text: str, topic_id: int, **kwargs):
 
 def _save_history_snapshot(date_iso: str, enriched: list, ai_verdicts: list):
     """Salva snapshot analisi giornaliera su analysis_history.json (ultimi 60 gg)."""
-    history_file = Path("analysis_history.json")
+    history_file = HISTORY_FILE
     try:
         history = json.loads(history_file.read_text(encoding="utf-8")) if history_file.exists() else {}
     except Exception:
@@ -1059,7 +1060,7 @@ async def job_evening_report(context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ── 1. Carica snapshot mattutino di oggi ────────────────────────────────
-    history_file = Path("analysis_history.json")
+    history_file = HISTORY_FILE
     history = {}
     if history_file.exists():
         try:
