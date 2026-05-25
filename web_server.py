@@ -350,6 +350,57 @@ async def api_ai(ticker: str):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@app.get("/api/stock/{ticker}/why-today")
+async def api_why_today(ticker: str):
+    """3 bullet points: perché il titolo si è mosso oggi (AI, cached 30 min)."""
+    t = ticker.upper()
+    key = f"why:{t}"
+    if (c := _cached(key, _AI_TTL)) is not None:
+        return c
+
+    if not groq_client:
+        return JSONResponse({"error": "AI non disponibile"}, status_code=503)
+
+    data = await asyncio.to_thread(get_enriched_analysis, t)
+    if not data:
+        return JSONResponse({"error": "ticker non trovato"}, status_code=404)
+    data = _clean(data)
+
+    change = data.get("day_change_pct", 0) or 0
+    rsi = data.get("rsi", 50) or 50
+    vol_ratio = data.get("vol_ratio", 1) or 1
+    name = data.get("name", t) or t
+    news = data.get("news_sentiment_label", "neutre") or "neutre"
+    direction = "salito" if change >= 0 else "sceso"
+
+    prompt = (
+        f"Il titolo {t} ({name}) ha {direction} del {abs(change):.1f}% oggi.\n"
+        f"Dati tecnici: RSI={rsi:.0f}, volume {vol_ratio:.1f}x la media, "
+        f"notizie {news}, volatilità {data.get('volatility', 0):.0f}%.\n"
+        "Spiega in ESATTAMENTE 3 bullet points brevissimi (max 12 parole ciascuno) "
+        "perché si è mosso così oggi.\n"
+        "Formato:\n"
+        "• [motivo 1]\n"
+        "• [motivo 2]\n"
+        "• [motivo 3]\n"
+        "Rispondi SOLO con i 3 bullet, nessun'altra parola. In italiano."
+    )
+
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=150,
+            temperature=0.4,
+        )
+        text = resp.choices[0].message.content.strip()
+        result = {"ticker": t, "bullets": text, "change_pct": change}
+        _store(key, result)
+        return result
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.get("/api/stock/{ticker}/forecast")
 async def api_forecast(ticker: str):
     """Previsione AI 7 giorni — trend, range prezzi, confidenza, catalizzatori."""

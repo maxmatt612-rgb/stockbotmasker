@@ -512,6 +512,23 @@ def scan_cheap_stocks(max_price: float = 40.0, top_n: int = 10) -> list:
                     # Normalizza score grezzo (-5..10) → 0-10
                     score_10 = round(min(10.0, max(0.0, (score + 5) / 15 * 10)), 1)
 
+                    # Trade setup matematico ("Cosa farei io")
+                    daily_vol_pct = volatility / (252 ** 0.5) / 100
+                    daily_vol_dollar = current_price * daily_vol_pct
+                    stop_mult = 1.5 if volatility < 30 else (2.0 if volatility < 60 else 2.5)
+                    stop_dist = max(daily_vol_dollar * stop_mult, current_price * 0.005)
+                    target_dist = stop_dist * 2.5
+                    stop_price = round(current_price - stop_dist, 2)
+                    target_price = round(current_price + target_dist, 2)
+                    trade_setup = {
+                        "entry": round(current_price, 2),
+                        "stop": stop_price,
+                        "target": target_price,
+                        "stop_pct": round(-stop_dist / current_price * 100, 1),
+                        "target_pct": round(target_dist / current_price * 100, 1),
+                        "rr": 2.5,
+                    }
+
                     risultati.append({
                         "ticker": ticker,
                         "current_price": current_price,
@@ -529,6 +546,7 @@ def scan_cheap_stocks(max_price: float = 40.0, top_n: int = 10) -> list:
                             "volume": vol_pts,
                             "trend": trend_pts,
                         },
+                        "trade_setup": trade_setup,
                     })
                 except Exception:
                     continue

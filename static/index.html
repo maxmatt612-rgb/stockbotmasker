@@ -1032,6 +1032,27 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .sb-dot.neg{background:var(--red)}
 .sb-val{font-size:.7rem;font-weight:700;min-width:18px;text-align:right;color:var(--text-dim)}
 
+/* ── Trade setup ("Cosa farei io") ── */
+.trade-setup{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 12px;margin-top:10px}
+.trade-setup-hd{font-size:.64rem;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;display:flex;align-items:center;gap:5px}
+.trade-setup-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px}
+.ts-cell{text-align:center;padding:5px 4px;border-radius:var(--r-sm);background:var(--surf)}
+.ts-cell-label{font-size:.55rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em}
+.ts-cell-val{font-size:.78rem;font-weight:700;margin-top:2px}
+.ts-cell.entry .ts-cell-val{color:var(--primary)}
+.ts-cell.stop .ts-cell-val{color:var(--red)}
+.ts-cell.target .ts-cell-val{color:var(--green)}
+.trade-setup-rr{font-size:.64rem;color:var(--text-dim);margin-top:7px;text-align:center}
+.trade-setup-rr strong{color:var(--text)}
+
+/* ── "Perché oggi?" button + result ── */
+.why-today-btn{display:flex;align-items:center;gap:5px;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:5px 11px;font-size:.68rem;font-weight:600;color:var(--text-dim);cursor:pointer;transition:background .18s,border-color .18s;font-family:'Inter',sans-serif;margin-top:8px;width:100%}
+.why-today-btn:hover{background:var(--primary-dim);border-color:var(--primary);color:var(--primary)}
+.why-today-btn.loading{opacity:.6;pointer-events:none}
+.why-today-result{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:9px 12px;margin-top:6px;font-size:.72rem;line-height:1.55;color:var(--text)}
+.why-today-result .bullet{display:flex;gap:6px;padding:2px 0}
+.why-today-result .bullet::before{content:"•";color:var(--primary);font-weight:700;flex-shrink:0}
+
 /* ── Responsive ── */
 @media(max-width:640px){
   header{padding:8px 12px;gap:8px}
@@ -2112,6 +2133,32 @@ function buildCard(d, rank){
     d.news_sentiment_emoji?`<span class="chip">${d.news_sentiment_emoji} ${d.news_sentiment_label??'Neutre'}</span>`:'',
     d.next_earnings_str?`<span class="chip">📅 ${d.next_earnings_str}</span>`:'',
   ].join('');
+
+  // "Cosa farei io" — trade setup (solo se score>=6)
+  let tradeHTML='';
+  if(score>=6 && d.trade_setup){
+    const ts=d.trade_setup;
+    tradeHTML=`
+    <div class="trade-setup">
+      <div class="trade-setup-hd">🎯 Cosa farei io</div>
+      <div class="trade-setup-grid">
+        <div class="ts-cell entry">
+          <div class="ts-cell-label">Entrata</div>
+          <div class="ts-cell-val">${fmtP(ts.entry)}</div>
+        </div>
+        <div class="ts-cell stop">
+          <div class="ts-cell-label">Stop</div>
+          <div class="ts-cell-val">${fmtP(ts.stop)}<span style="font-size:.55rem;font-weight:400"> (${ts.stop_pct}%)</span></div>
+        </div>
+        <div class="ts-cell target">
+          <div class="ts-cell-label">Target</div>
+          <div class="ts-cell-val">${fmtP(ts.target)}<span style="font-size:.55rem;font-weight:400"> (+${ts.target_pct}%)</span></div>
+        </div>
+      </div>
+      <div class="trade-setup-rr">Risk/Reward <strong>1:${ts.rr}</strong> — basato sulla volatilità annualizzata</div>
+    </div>`;
+  }
+
   div.innerHTML=`
     <div class="card-rank"># ${rank}</div>
     <div class="card-row">
@@ -2132,6 +2179,11 @@ function buildCard(d, rank){
     ${chipsHTML?`<div class="chips">${chipsHTML}</div>`:''}
     <div class="sparkline-wrap"><canvas class="sparkline"></canvas></div>
     <div class="verdict"></div>
+    ${tradeHTML}
+    <button class="why-today-btn" data-ticker="${d.ticker}" onclick="loadWhyToday('${d.ticker}',this);event.stopPropagation()">
+      ⚡ Perché oggi?
+    </button>
+    <div class="why-today-result" id="why-${d.ticker}" style="display:none"></div>
   `;
   div.addEventListener('click',()=>openModal(d));
   addTilt(div);
@@ -5001,6 +5053,50 @@ function renderScoreBreakdown(breakdown) {
     </div>`;
   }).join('');
   el.style.display = 'grid';
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// "Perché oggi?" — AI bullet points per il movimento di giornata
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadWhyToday(ticker, btn) {
+  const resultEl = document.getElementById('why-' + ticker);
+  if (!resultEl) return;
+
+  // Toggle: se già aperto, chiudi
+  if (resultEl.style.display !== 'none') {
+    resultEl.style.display = 'none';
+    btn.textContent = '⚡ Perché oggi?';
+    return;
+  }
+
+  btn.classList.add('loading');
+  btn.textContent = '⏳ Analizzando…';
+
+  try {
+    const d = await fetch('/api/stock/' + ticker + '/why-today').then(r => r.json());
+    if (d.error) {
+      resultEl.innerHTML = `<span style="color:var(--text-dim);font-size:.7rem">${d.error}</span>`;
+    } else {
+      // Parse bullet points: split on newlines, filter lines starting with •
+      const lines = (d.bullets || '').split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 0);
+      const html = lines.map(l => {
+        const text = l.replace(/^[•\-\*]\s*/, '');
+        return `<div class="bullet">${text}</div>`;
+      }).join('');
+      const dir = (d.change_pct ?? 0) >= 0 ? '📈' : '📉';
+      resultEl.innerHTML = `<div style="font-size:.62rem;color:var(--text-dim);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">${dir} Movimento di oggi</div>${html || d.bullets}`;
+    }
+    resultEl.style.display = 'block';
+    btn.textContent = '⚡ Perché oggi? ▲';
+  } catch(e) {
+    resultEl.innerHTML = `<span style="color:var(--text-dim);font-size:.7rem">Errore nel caricamento</span>`;
+    resultEl.style.display = 'block';
+    btn.textContent = '⚡ Perché oggi?';
+  } finally {
+    btn.classList.remove('loading');
+  }
 }
 </script>
 </body>
