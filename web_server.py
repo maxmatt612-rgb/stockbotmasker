@@ -1122,6 +1122,8 @@ async def api_history_list():
             "date": d,
             "count": len(history[d].get("stocks", [])),
             "generated_at": history[d].get("generated_at", d),
+            "closed": history[d].get("closed", False),
+            "closed_at": history[d].get("closed_at"),
         }
         for d in dates
     ]
@@ -1142,7 +1144,32 @@ async def api_history_date(date: str):
 
     snap = history[date]
     stocks = snap.get("stocks", [])
+    is_closed = snap.get("closed", False)
 
+    if is_closed:
+        # Mercato chiuso: usa price_at_close già salvato, niente fetch live
+        enriched = []
+        for s in stocks:
+            pa  = s.get("price_at_analysis", 0.0)
+            pc  = s.get("price_at_close", pa)
+            pct = s.get("close_vs_morning_pct") or (
+                round((pc - pa) / pa * 100, 2) if pa > 0 and pc > 0 else None
+            )
+            enriched.append({
+                **s,
+                "current_price": round(pc, 4),
+                "pct_since_analysis": pct,
+                "closed": True,
+            })
+        return _clean({
+            "date": date,
+            "generated_at": snap.get("generated_at"),
+            "closed": True,
+            "closed_at": snap.get("closed_at"),
+            "stocks": enriched,
+        })
+
+    # Mercato ancora aperto o dato intraday: fetch prezzi live
     def _get_current_prices(tickers: list) -> dict:
         import yfinance as yf
         result = {}
@@ -1168,6 +1195,7 @@ async def api_history_date(date: str):
     return _clean({
         "date": date,
         "generated_at": snap.get("generated_at"),
+        "closed": False,
         "stocks": enriched,
     })
 

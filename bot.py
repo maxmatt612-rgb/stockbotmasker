@@ -1045,16 +1045,114 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
 
 async def job_evening_report(context: ContextTypes.DEFAULT_TYPE):
     from datetime import datetime as _dt
+    now = _dt.now(ROME)
     # Solo lun–ven
-    if _dt.now(ROME).weekday() >= 5:
+    if now.weekday() >= 5:
         return
+
+    today = now.strftime("%Y-%m-%d")
+    date_str = f"{_GIORNI_IT[now.weekday()]} {now.day} {_MESI_IT[now.month - 1]} {now.year}"
 
     data = load_data()
     all_uids = list(data["watchlists"].keys())
     if not all_uids and not GROUP_CHAT_ID:
         return
 
-    # Usa lo scanner per il recap serale (stesso metodo del mattino)
+    # ── 1. Carica snapshot mattutino di oggi ────────────────────────────────
+    history_file = Path("analysis_history.json")
+    history = {}
+    if history_file.exists():
+        try:
+            history = json.loads(history_file.read_text(encoding="utf-8"))
+        except Exception:
+            history = {}
+
+    snap = history.get(today)
+
+    if snap and not snap.get("closed"):
+        # ── 2. Scarica prezzi di chiusura per le stesse azioni del mattino ──
+        tickers = [s["ticker"] for s in snap.get("stocks", [])]
+        logger.info(f"Chiusura mercato: fetch prezzi per {tickers}")
+
+        def _fetch_close_prices(tks: list) -> dict:
+            import yfinance as yf
+            out = {}
+            for t in tks:
+                try:
+                    fi = yf.Ticker(t).fast_info
+                    out[t] = round(float(fi.last_price or 0), 4)
+                except Exception:
+                    out[t] = 0.0
+            return out
+
+        close_prices = await asyncio.to_thread(_fetch_close_prices, tickers)
+
+        # ── 3. Aggiorna snapshot con price_at_close ──────────────────────────
+        for s in snap["stocks"]:
+            t = s["ticker"]
+            pc = close_prices.get(t, 0.0)
+            pa = s.get("price_at_analysis", 0.0)
+            s["price_at_close"] = pc
+            if pa > 0 and pc > 0:
+                s["close_vs_morning_pct"] = round((pc - pa) / pa * 100, 2)
+
+        snap["closed"] = True
+        snap["closed_at"] = now.strftime("%Y-%m-%dT%H:%M:%S")
+        history[today] = snap
+
+        try:
+            history_file.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+            logger.info(f"Storico chiusura salvato: {today}")
+        except Exception as e:
+            logger.error(f"Errore salvataggio storico chiusura: {e}")
+
+        # ── 4. Messaggio Telegram: mattina → chiusura ────────────────────────
+        stocks_sorted = sorted(
+            snap["stocks"],
+            key=lambda x: x.get("close_vs_morning_pct", 0),
+            reverse=True,
+        )
+
+        lines = [f"📊 <b>Chiusura mercato — {date_str}</b>\n"
+                 f"<i>Analisi mattutina → prezzi di chiusura NYSE</i>\n"]
+
+        for s in stocks_sorted:
+            pa   = s.get("price_at_analysis", 0)
+            pc   = s.get("price_at_close", 0)
+            chg  = s.get("close_vs_morning_pct")
+            emj  = "📈" if (chg or 0) >= 0 else "📉"
+            chg_str = f"{chg:+.2f}%" if chg is not None else "—"
+            verdict = s.get("verdict", "")
+            score   = s.get("score_10", 0)
+            lines.append(
+                f"{emj} <b>{s['ticker']}</b> {s.get('name', '')}  Score {score:.1f}/10\n"
+                f"   ${pa:.4f} → <b>${pc:.4f}</b>  ({chg_str})\n"
+                + (f"   🎯 {verdict}\n" if verdict else "")
+            )
+
+        if stocks_sorted:
+            best   = stocks_sorted[0]
+            worst  = stocks_sorted[-1]
+            lines += [
+                f"🏆 Migliore: <b>{best['ticker']}</b> "
+                f"{best.get('close_vs_morning_pct', 0):+.2f}%",
+                f"💔 Peggiore: <b>{worst['ticker']}</b> "
+                f"{worst.get('close_vs_morning_pct', 0):+.2f}%",
+            ]
+
+        lines.append("\n<i>Dati: Yahoo Finance · Prossima analisi domani alle 7:30</i>")
+        text = "\n".join(lines)
+
+        await _send_to_group(context.bot, text, TOPIC_ANALISI_ID)
+        for uid in all_uids:
+            try:
+                await context.bot.send_message(int(uid), text, parse_mode=ParseMode.HTML)
+            except Exception as e:
+                logger.warning(f"Errore recap serale {uid}: {e}")
+        return
+
+    # ── Fallback: nessuno snapshot mattutino oggi (es. giorno non lavorativo) ─
+    logger.info("Nessuno snapshot mattutino trovato — recap serale con scanner fresco")
     scanner_raw = await asyncio.to_thread(scan_cheap_stocks, 40.0, 10)
     if not scanner_raw:
         return
@@ -1070,7 +1168,7 @@ async def job_evening_report(context: ContextTypes.DEFAULT_TYPE):
     risultati.sort(key=lambda x: x["day_change_pct"], reverse=True)
     migliore, peggiore = risultati[0], risultati[-1]
 
-    lines = ["🌙 <b>Recap serale — chiusura mercato USA</b>\n"]
+    lines = [f"🌙 <b>Recap serale — {date_str}</b>\n"]
     for d in risultati:
         lines.append(format_report_line(d))
     lines += [

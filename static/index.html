@@ -717,6 +717,8 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 .hcard-meta{display:flex;flex-wrap:wrap;gap:5px}
 .hcard-chip{font-size:.66rem;padding:2px 8px;border-radius:100px;border:1px solid var(--border);color:var(--text-dim)}
 .hcard-verdict{font-size:.76rem;color:var(--text-dim);line-height:1.5;margin-top:8px;border-left:2px solid rgba(196,166,255,.2);padding-left:8px}
+.hcard-closed-badge{display:inline-flex;align-items:center;gap:4px;font-size:.62rem;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:100px;background:rgba(114,239,160,.12);color:var(--green);border:1px solid rgba(114,239,160,.3);margin-bottom:8px}
+.date-pill.closed::after{content:'✓';margin-left:4px;font-size:.7em;opacity:.7}
 
 /* ── Forecast 7 giorni ── */
 .forecast-section{margin-top:14px;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden}
@@ -2024,7 +2026,7 @@ async function loadSparklines(tickersCsv, data){
       const card=grid.children[i];
       if(!card)return;
       const canvas=card.querySelector('.sparkline');
-      if(canvas)drawSparkline(canvas,vals,d.day_change_pct>=0);
+      if(canvas)drawSparkline(canvas,vals,(d.change_since_analysis??d.day_change_pct)>=0);
     });
   }catch(_){}
 }
@@ -2033,7 +2035,8 @@ async function loadSparklines(tickersCsv, data){
 // Build Card
 // ══════════════════════════════════════════════════════════════════════════════
 function buildCard(d, rank){
-  const isPos=d.day_change_pct>=0;
+  const dispPct = d.change_since_analysis != null ? d.change_since_analysis : d.day_change_pct;
+  const isPos=dispPct>=0;
   const score=d.score_10??5;
   const div=document.createElement('div');
   div.className='card';
@@ -2051,7 +2054,7 @@ function buildCard(d, rank){
       </div>
       <div class="price-block">
         <div class="price-val">${fmtP(d.current_price)}</div>
-        <div class="price-chg ${isPos?'chg-pos':'chg-neg'}">${fmtC(d.day_change_pct)}</div>
+        <div class="price-chg ${isPos?'chg-pos':'chg-neg'}" title="${d.change_since_analysis!=null?'Variazione dall\'analisi mattutina':'Variazione giornaliera'}">${fmtC(dispPct)}</div>
       </div>
     </div>
     <div class="score-wrap">
@@ -2402,18 +2405,43 @@ function closeModal(){_destroyChart();document.getElementById('modal-overlay').c
 // ══════════════════════════════════════════════════════════════════════════════
 async function loadData(){
   try{
-    const data=await fetch('/api/scan?top=10').then(r=>r.json());
+    // Fetch scan + snapshot mattutino in parallelo
+    const todayIso = new Date().toISOString().slice(0,10);
+    const [data, histSnap] = await Promise.all([
+      fetch('/api/scan?top=10').then(r=>r.json()),
+      fetch(`/api/history/${todayIso}`).then(r=>r.ok?r.json():null).catch(()=>null),
+    ]);
     if(!Array.isArray(data)||!data.length){
       document.getElementById('grid').innerHTML='<div class="empty-state"><span class="icon">⚠️</span>Dati non disponibili. Riprova tra qualche minuto.</div>';
       return;
     }
+
+    // Mappa ticker → price_at_analysis (dallo snapshot delle 7:30)
+    const analysisMap={};
+    if(histSnap?.stocks){
+      histSnap.stocks.forEach(s=>{ if(s.price_at_analysis>0) analysisMap[s.ticker]=s.price_at_analysis; });
+    }
+
+    // Aggiungi change_since_analysis a ogni stock
+    data.forEach(d=>{
+      const pa=analysisMap[d.ticker];
+      if(pa>0 && d.current_price>0){
+        d.price_at_analysis=pa;
+        d.change_since_analysis=Math.round((d.current_price-pa)/pa*10000)/100;
+      }
+    });
+
     cardsData=data;
 
     const avg=(data.reduce((s,d)=>s+(d.score_10??5),0)/data.length).toFixed(1);
-    const top=data.reduce((a,b)=>Math.abs(a.day_change_pct)>Math.abs(b.day_change_pct)?a:b);
+    const top=data.reduce((a,b)=>{
+      const pa=Math.abs(a.change_since_analysis??a.day_change_pct);
+      const pb=Math.abs(b.change_since_analysis??b.day_change_pct);
+      return pa>pb?a:b;
+    });
     document.getElementById('s-total').textContent=data.length;
     document.getElementById('s-avg').textContent=avg+' / 10';
-    document.getElementById('s-top').textContent=top.ticker+' '+fmtC(top.day_change_pct);
+    document.getElementById('s-top').textContent=top.ticker+' '+fmtC(top.change_since_analysis??top.day_change_pct);
     document.getElementById('last-update').textContent=now();
 
     applyAndRender();
@@ -2464,14 +2492,39 @@ function startCountdown(){
 // Export PDF (stampa)
 // ══════════════════════════════════════════════════════════════════════════════
 function exportPDF(){
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelector('[data-tab="live"]').classList.add('active');
-  _VIEWS.forEach(v=>{const el=document.getElementById(v+'-view');if(el)el.style.display=v==='live'?'':'none';});
+  const activeTab=document.querySelector('.tab-btn.active')?.dataset.tab;
   const now=new Date();
   const dateStr=now.toLocaleDateString('it-IT',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const timeStr=now.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+
+  if(activeTab==='history'){
+    // ── PDF da tab Storico: stampa le hcard della data selezionata ──────────
+    const activePill=document.querySelector('.date-pill.active');
+    const dateLabel=activePill?.textContent||'Analisi';
+    const isClosed=activePill?.classList.contains('closed');
+    const suffix=isClosed?' · Dati chiusura mercato':' · Prezzi intraday';
+    document.getElementById('print-date').textContent=
+      `Analisi ${dateLabel} · ${dateStr} ${timeStr} · Masker${suffix} · Solo uso informativo`;
+
+    // Porta in primo piano la tab history per la stampa
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelector('[data-tab="history"]').classList.add('active');
+    _VIEWS.forEach(v=>{const el=document.getElementById(v+'-view');if(el)el.style.display=v==='history'?'':'none';});
+
+    window.addEventListener('afterprint',()=>{
+      // Ripristina la vista history dopo la stampa
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelector('[data-tab="history"]').classList.add('active');
+    },{once:true});
+    setTimeout(()=>window.print(),80);
+    return;
+  }
+
+  // ── PDF da tab Live (comportamento originale) ─────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('[data-tab="live"]').classList.add('active');
+  _VIEWS.forEach(v=>{const el=document.getElementById(v+'-view');if(el)el.style.display=v==='live'?'':'none';});
   document.getElementById('print-date').textContent=`Generato il ${dateStr} alle ${timeStr} · Masker Stock Intelligence · Solo uso informativo`;
-  // Mostra solo le prime 12 card per stare in una pagina
   const cards=[...document.querySelectorAll('#grid .card')];
   const hidden=cards.slice(5);
   hidden.forEach(c=>c.style.display='none');
@@ -3446,9 +3499,11 @@ async function loadHistoryDates() {
     pills.innerHTML = '';
     dates.forEach((entry, i) => {
       const pill = document.createElement('button');
-      pill.className = 'date-pill' + (i === 0 ? ' active' : '');
+      pill.className = 'date-pill' + (i === 0 ? ' active' : '') + (entry.closed ? ' closed' : '');
       pill.textContent = fmtDateLabel(entry.date) + ` (${entry.count})`;
-      pill.title = `${entry.count} azioni analizzate`;
+      pill.title = entry.closed
+        ? `${entry.count} azioni · chiusura mercato registrata`
+        : `${entry.count} azioni analizzate`;
       pill.addEventListener('click', () => {
         document.querySelectorAll('.date-pill').forEach(p => p.classList.remove('active'));
         pill.classList.add('active');
@@ -4071,18 +4126,26 @@ function _logoutUser() {
 // History — costruisce una singola card performance
 // ══════════════════════════════════════════════════════════════════════════════
 function buildHistoryCard(s, idx, date) {
-  const pct    = s.pct_since_analysis;
-  const hasCP  = s.current_price > 0;
-  const isPos  = pct != null && pct >= 0;
-  const isNeg  = pct != null && pct < 0;
-  const pctCls = pct == null ? 'neu' : (isPos ? 'pos' : 'neg');
-  const pctTxt = pct == null ? '—' : (isPos ? '▲ +' : '▼ ') + Math.abs(pct).toFixed(2) + '%';
-  const pctSub = pct == null ? 'prezzo attuale non disponibile' : (isPos ? 'salita dall\'analisi' : 'scesa dall\'analisi');
+  const isClosed  = s.closed === true;
+  const dispPrice = isClosed ? s.price_at_close : s.current_price;
+  const rightLbl  = isClosed ? 'Chiusura' : 'Ora';
+  const pct       = s.pct_since_analysis;
+  const hasCP     = dispPrice > 0;
+  const isPos     = pct != null && pct >= 0;
+  const isNeg     = pct != null && pct < 0;
+  const pctCls    = pct == null ? 'neu' : (isPos ? 'pos' : 'neg');
+  const pctTxt    = pct == null ? '—' : (isPos ? '▲ +' : '▼ ') + Math.abs(pct).toFixed(2) + '%';
+  const pctSub    = pct == null
+    ? 'prezzo non disponibile'
+    : isClosed
+      ? (isPos ? 'salita dal mattino a chiusura' : 'scesa dal mattino a chiusura')
+      : (isPos ? 'salita dall\'analisi' : 'scesa dall\'analisi');
 
   const div = document.createElement('div');
   div.className = 'hcard';
   div.style.animationDelay = (idx * 0.06) + 's';
   div.innerHTML = `
+    ${isClosed ? '<div class="hcard-closed-badge">📊 CHIUSURA NYSE</div>' : ''}
     <div class="hcard-top">
       <div>
         <div class="hcard-ticker">${s.ticker}</div>
@@ -4096,13 +4159,13 @@ function buildHistoryCard(s, idx, date) {
 
     <div class="hcard-perf">
       <div class="hcard-perf-col">
-        <span class="hcard-perf-label">Analisi</span>
+        <span class="hcard-perf-label">Analisi 7:30</span>
         <span class="hcard-perf-price">$${s.price_at_analysis?.toFixed(4) ?? '—'}</span>
       </div>
       <div class="hcard-perf-arrow">→</div>
       <div class="hcard-perf-col" style="text-align:right">
-        <span class="hcard-perf-label">Ora</span>
-        <span class="hcard-perf-price">${hasCP ? '$' + s.current_price.toFixed(4) : '—'}</span>
+        <span class="hcard-perf-label">${rightLbl}</span>
+        <span class="hcard-perf-price">${hasCP ? '$' + dispPrice.toFixed(4) : '—'}</span>
       </div>
     </div>
 
@@ -4114,13 +4177,13 @@ function buildHistoryCard(s, idx, date) {
     <div class="hcard-meta">
       <span class="hcard-chip">${s.risk_emoji ?? '🟡'} ${s.risk_level ?? 'Medio'}</span>
       <span class="hcard-chip">RSI ${s.rsi?.toFixed(0) ?? '—'}</span>
-      <span class="hcard-chip">${s.day_change_pct >= 0 ? '📈' : '📉'} ${s.day_change_pct >= 0 ? '+' : ''}${s.day_change_pct?.toFixed(1) ?? '0'}% analisi</span>
+      <span class="hcard-chip">${(s.day_change_pct ?? 0) >= 0 ? '📈' : '📉'} ${(s.day_change_pct ?? 0) >= 0 ? '+' : ''}${s.day_change_pct?.toFixed(1) ?? '0'}% apertura</span>
     </div>
     ${s.verdict ? `<div class="hcard-verdict">🎯 ${s.verdict}</div>` : ''}
   `;
   div.addEventListener('click', () => openModal({
     ticker: s.ticker, day_change_pct: s.day_change_pct ?? 0,
-    current_price: s.current_price ?? s.price_at_analysis, name: s.name, score_10: s.score_10
+    current_price: dispPrice ?? s.price_at_analysis, name: s.name, score_10: s.score_10
   }));
   return div;
 }
