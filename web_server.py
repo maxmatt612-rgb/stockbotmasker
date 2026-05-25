@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from analyzer import get_enriched_analysis, scan_cheap_stocks
 
 STATIC = Path(__file__).parent / "static"
-HISTORY_FILE = Path(__file__).parent / "analysis_history.json"
+HISTORY_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "analysis_history.json"
 WEB_USERS_FILE = Path(__file__).parent / "web_users.json"
 
 app = FastAPI(title="Stock Bot Dashboard", docs_url=None, redoc_url=None)
@@ -1198,6 +1198,37 @@ async def api_history_date(date: str):
         "closed": False,
         "stocks": enriched,
     })
+
+
+# ─── Score storico per ticker ─────────────────────────────────────────────────
+
+@app.get("/api/history/score/{ticker}")
+async def api_score_history(ticker: str):
+    """Storico dello score giornaliero di un ticker (tutte le date disponibili)."""
+    ticker = ticker.upper()
+    if not HISTORY_FILE.exists():
+        return []
+    try:
+        history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+    points = []
+    for date_iso in sorted(history.keys()):
+        snap = history[date_iso]
+        for s in snap.get("stocks", []):
+            if s.get("ticker", "").upper() == ticker:
+                points.append({
+                    "date": date_iso,
+                    "score_10": s.get("score_10"),
+                    "price_at_analysis": s.get("price_at_analysis"),
+                    "price_at_close": s.get("price_at_close"),
+                    "verdict": s.get("verdict", ""),
+                    "closed": snap.get("closed", False),
+                })
+                break
+
+    return points
 
 
 # ─── FX rate ──────────────────────────────────────────────────────────────────

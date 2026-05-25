@@ -34,8 +34,14 @@ logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=loggin
 logger = logging.getLogger(__name__)
 
 ROME = ZoneInfo("Europe/Rome")
-DATA_FILE      = Path(__file__).parent / "user_data.json"
-HISTORY_FILE   = Path(__file__).parent / "analysis_history.json"
+# DATA_DIR: Railway Volume montato su /app/data se configurato, altrimenti directory dello script
+_DATA_DIR      = Path(os.getenv("DATA_DIR", str(Path(__file__).parent)))
+DATA_FILE      = _DATA_DIR / "user_data.json"
+HISTORY_FILE   = _DATA_DIR / "analysis_history.json"
+
+# Caption usata per identificare il messaggio di backup su Telegram
+_BACKUP_CAPTION = "MASKER_HISTORY_BACKUP_v1"
+_backup_msg_id: int | None = None   # ID dell'ultimo messaggio di backup inviato
 
 _GROQ_KEY = os.getenv("GROQ_API_KEY")
 groq_client = AsyncGroq(api_key=_GROQ_KEY) if _GROQ_KEY else None
@@ -53,6 +59,66 @@ def load_data() -> dict:
 
 def save_data(data: dict):
     DATA_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+# ─── Backup history su Telegram ───────────────────────────────────────────────
+
+async def _backup_history_to_telegram(bot) -> None:
+    """Invia analysis_history.json come documento su Telegram (pinnato nel gruppo).
+    Sopravvive ai deploy su Railway dove il filesystem è effimero."""
+    global _backup_msg_id
+    if not GROUP_CHAT_ID or not HISTORY_FILE.exists():
+        return
+    try:
+        import io
+        data_bytes = HISTORY_FILE.read_bytes()
+        doc = InputFile(io.BytesIO(data_bytes), filename="analysis_history.json")
+        # Elimina il vecchio backup (se presente)
+        if _backup_msg_id:
+            try:
+                await bot.delete_message(GROUP_CHAT_ID, _backup_msg_id)
+            except Exception:
+                pass
+        msg = await bot.send_document(
+            GROUP_CHAT_ID,
+            document=doc,
+            caption=_BACKUP_CAPTION,
+            disable_notification=True,
+        )
+        _backup_msg_id = msg.message_id
+        # Pinna il messaggio così possiamo ritrovarlo al riavvio
+        try:
+            await bot.pin_chat_message(
+                GROUP_CHAT_ID, msg.message_id, disable_notification=True
+            )
+        except Exception:
+            pass  # Se il bot non è admin, il pin fallisce silenziosamente
+        logger.info(f"History backup Telegram: msg_id={msg.message_id}")
+    except Exception as e:
+        logger.warning(f"Backup history Telegram fallito: {e}")
+
+
+async def _restore_history_from_telegram(bot) -> None:
+    """All'avvio, se il file non esiste, tenta di ripristinarlo dal messaggio pinnato."""
+    if HISTORY_FILE.exists():
+        return
+    if not GROUP_CHAT_ID:
+        return
+    try:
+        chat = await bot.get_chat(GROUP_CHAT_ID)
+        pinned = chat.pinned_message
+        if pinned and pinned.caption == _BACKUP_CAPTION and pinned.document:
+            tg_file = await bot.get_file(pinned.document.file_id)
+            _DATA_DIR.mkdir(parents=True, exist_ok=True)
+            await tg_file.download_to_drive(HISTORY_FILE)
+            logger.info(
+                f"History ripristinata da backup Telegram "
+                f"({HISTORY_FILE.stat().st_size} bytes)"
+            )
+        else:
+            logger.info("Nessun backup Telegram trovato — history vuota")
+    except Exception as e:
+        logger.warning(f"Ripristino history Telegram fallito: {e}")
 
 
 # ─── Livelli utente ──────────────────────────────────────────────────────────
@@ -1030,8 +1096,9 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
         + "\n\n<i>Dati: Yahoo Finance | AI: Groq Llama 70B</i>"
     )
 
-    # 5 ── Salva snapshot storico
+    # 5 ── Salva snapshot storico + backup Telegram
     _save_history_snapshot(now.strftime("%Y-%m-%d"), enriched, ai_verdicts)
+    await _backup_history_to_telegram(context.bot)
 
     # 6 ── Invia: UN messaggio al gruppo + UN messaggio per ogni DM
     await _send_to_group(context.bot, text, TOPIC_ANALISI_ID)
@@ -1102,10 +1169,12 @@ async def job_evening_report(context: ContextTypes.DEFAULT_TYPE):
         history[today] = snap
 
         try:
-            history_file.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+            HISTORY_FILE.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
             logger.info(f"Storico chiusura salvato: {today}")
         except Exception as e:
             logger.error(f"Errore salvataggio storico chiusura: {e}")
+
+        await _backup_history_to_telegram(context.bot)
 
         # ── 4. Messaggio Telegram: mattina → chiusura ────────────────────────
         stocks_sorted = sorted(
@@ -1470,7 +1539,10 @@ def main():
     web_thread = threading.Thread(target=_run_web_server, daemon=True, name="web-server")
     web_thread.start()
 
-    app = Application.builder().token(BOT_TOKEN).build()
+    async def _post_init(application):
+        await _restore_history_from_telegram(application.bot)
+
+    app = Application.builder().token(BOT_TOKEN).post_init(_post_init).build()
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))

@@ -889,6 +889,13 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 /* ── Orario migliore ── */
 .bh-wrap{margin:14px 0 0;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:14px}
+.score-hist-wrap{margin:14px 0 0;background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:14px}
+.score-hist-hd{font-size:.64rem;font-weight:700;color:var(--text-dim);letter-spacing:.08em;margin-bottom:10px}
+.score-hist-canvas{width:100%;height:72px;display:block;border-radius:6px}
+.score-hist-stats{display:flex;gap:0;margin-top:10px;justify-content:space-around}
+.score-hist-stat{text-align:center}
+.score-hist-stat-val{font-size:.92rem;font-weight:800;color:var(--primary)}
+.score-hist-stat-lbl{font-size:.6rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em}
 .bh-title{font-size:.64rem;font-weight:700;color:var(--text-dim);letter-spacing:.08em;margin-bottom:10px}
 .bh-bars{display:flex;align-items:flex-end;gap:3px;height:50px}
 .bh-bar-wrap{display:flex;flex-direction:column;align-items:center;flex:1}
@@ -1713,6 +1720,13 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
         <div class="forecast-loading">🔮 &nbsp;Calcolo in corso…</div>
       </div>
     </div>
+
+    <!-- Score storico -->
+    <div class="score-hist-wrap" id="m-score-hist" style="display:none">
+      <div class="score-hist-hd">📊 STORICO SCORE GIORNALIERO</div>
+      <canvas class="score-hist-canvas" id="m-score-canvas"></canvas>
+      <div class="score-hist-stats" id="m-score-stats"></div>
+    </div>
   </div>
 </div>
 
@@ -2272,9 +2286,12 @@ async function openModal(stock){
   chgEl.className='price-chg '+(stock.day_change_pct>=0?'chg-pos':'chg-neg');
   document.getElementById('m-details').innerHTML='';
   document.getElementById('m-verdict').textContent='';
+  document.getElementById('m-score-hist').style.display='none';
 
   // Chart (con indicatori tecnici RSI / Bollinger)
   _renderChartWithIndicators(stock.ticker,_chartPeriod,_chartInterval,_chartType);
+  // Score storico
+  _loadScoreHistory(stock.ticker);
   // Analyst targets + short interest
   document.getElementById('m-targets-wrap').style.display='none';
   loadTargets(stock.ticker, stock.current_price);
@@ -2399,6 +2416,78 @@ async function _loadForecast(ticker){
 document.getElementById('modal-close').addEventListener('click',closeModal);
 document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal();});
 function closeModal(){_destroyChart();document.getElementById('modal-overlay').classList.remove('open');}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Score storico — grafico canvas nel modale
+// ══════════════════════════════════════════════════════════════════════════════
+async function _loadScoreHistory(ticker){
+  const wrap  = document.getElementById('m-score-hist');
+  const canvas= document.getElementById('m-score-canvas');
+  const stats = document.getElementById('m-score-stats');
+  wrap.style.display='none';
+  stats.innerHTML='';
+  try{
+    const pts = await fetch(`/api/history/score/${ticker}`).then(r=>r.ok?r.json():[]);
+    if(!pts||pts.length<2) return;   // meno di 2 punti, non mostrare
+    wrap.style.display='';
+
+    const scores = pts.map(p=>p.score_10??0);
+    const mn = Math.min(...scores), mx = Math.max(...scores);
+    const avg = scores.reduce((a,b)=>a+b,0)/scores.length;
+
+    // Disegna canvas
+    const dpr = window.devicePixelRatio||1;
+    const W = canvas.parentElement.clientWidth - 28; // padding 14 × 2
+    canvas.style.width  = W+'px';
+    canvas.style.height = '72px';
+    canvas.width  = W*dpr;
+    canvas.height = 72*dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr,dpr);
+
+    const pad=8, H=72;
+    const sMin=Math.max(0,mn-0.5), sMax=Math.min(10,mx+0.5), sRange=sMax-sMin||1;
+    const getX= i => pad + (i/(scores.length-1))*(W-pad*2);
+    const getY= s => H-pad - ((s-sMin)/sRange)*(H-pad*2);
+
+    // Fill gradient
+    const grad=ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0,'rgba(196,166,255,.18)');
+    grad.addColorStop(1,'rgba(196,166,255,0)');
+    ctx.beginPath();
+    scores.forEach((s,i)=>i===0?ctx.moveTo(getX(i),getY(s)):ctx.lineTo(getX(i),getY(s)));
+    ctx.lineTo(getX(scores.length-1),H-pad);
+    ctx.lineTo(getX(0),H-pad);
+    ctx.closePath();
+    ctx.fillStyle=grad; ctx.fill();
+
+    // Linea
+    ctx.beginPath();
+    scores.forEach((s,i)=>i===0?ctx.moveTo(getX(i),getY(s)):ctx.lineTo(getX(i),getY(s)));
+    ctx.strokeStyle='rgba(196,166,255,.85)'; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.stroke();
+
+    // Punti colorati
+    scores.forEach((s,i)=>{
+      ctx.beginPath();
+      ctx.arc(getX(i),getY(s),3.5,0,Math.PI*2);
+      ctx.fillStyle = s>=7?'#72EFA0': s>=5?'#C4A6FF':'#FF6B6B';
+      ctx.fill();
+    });
+
+    // Etichette date (prima e ultima)
+    ctx.font=`${10*dpr/dpr}px sans-serif`;
+    ctx.fillStyle='rgba(255,255,255,.35)';
+    ctx.textAlign='left';  ctx.fillText(pts[0].date.slice(5),getX(0),H-1);
+    ctx.textAlign='right'; ctx.fillText(pts[pts.length-1].date.slice(5),getX(pts.length-1),H-1);
+
+    stats.innerHTML=`
+      <div class="score-hist-stat"><div class="score-hist-stat-val">${avg.toFixed(1)}</div><div class="score-hist-stat-lbl">Media</div></div>
+      <div class="score-hist-stat"><div class="score-hist-stat-val">${mx.toFixed(1)}</div><div class="score-hist-stat-lbl">Max</div></div>
+      <div class="score-hist-stat"><div class="score-hist-stat-val">${mn.toFixed(1)}</div><div class="score-hist-stat-lbl">Min</div></div>
+      <div class="score-hist-stat"><div class="score-hist-stat-val">${pts.length}</div><div class="score-hist-stat-lbl">Giorni</div></div>
+    `;
+  }catch(_){}
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Load Data
