@@ -145,3 +145,27 @@ EUROPEAN_UNIVERSE = [
 
 # Universo completo = US + Europa
 REVOLUT_UNIVERSE = REVOLUT_UNIVERSE + EUROPEAN_UNIVERSE
+
+# ── ETF Universe ─────────────────────────────────────────────────────────────
+ETF_UNIVERSE = [
+    # ── ARK (tematici innovazione) ──
+    "ARKK", "ARKG", "ARKQ", "ARKF",
+    # ── AI & Robotica ──
+    "BOTZ", "ROBO", "AIQ",
+    # ── Cybersecurity ──
+    "HACK", "CIBR", "BUG",
+    # ── Gold & Metalli ──
+    "GDX", "GDXJ", "IAU", "SLV", "COPX", "SILJ",
+    # ── Mercati emergenti ──
+    "EEM", "EWZ", "FXI", "MCHI", "INDA",
+    # ── Cannabis ──
+    "MSOS", "YOLO",
+    # ── Energia ──
+    "GUSH", "DRIP",
+    # ── Leveraged / Inverse (alta volatilità) ──
+    "SQQQ", "TECS", "LABD", "LABU", "TNA", "FAZ", "UVXY",
+    # ── Clean energy ──
+    "ICLN", "TAN", "FAN",
+    # ── Semi / Tech ──
+    "SOXS", "FNGU",
+]

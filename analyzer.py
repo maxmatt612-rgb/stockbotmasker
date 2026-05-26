@@ -419,11 +419,12 @@ def _ticker_currency(ticker: str) -> str:
     return "USD"
 
 
-def scan_cheap_stocks(max_price: float = 60.0, top_n: int = 10) -> list:
+def scan_cheap_stocks(max_price: float = 60.0, top_n: int = 10, universe: list = None) -> list:
     from config import REVOLUT_UNIVERSE
 
+    tickers = universe if universe is not None else REVOLUT_UNIVERSE
     risultati = []
-    chunks = [REVOLUT_UNIVERSE[i:i+50] for i in range(0, len(REVOLUT_UNIVERSE), 50)]
+    chunks = [tickers[i:i+50] for i in range(0, len(tickers), 50)]
 
     for chunk in chunks:
         try:

@@ -1626,6 +1626,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   <button class="ctrl-btn" onclick="toggleScreener()">🔍 Screener</button>
   <button class="ctrl-btn" onclick="openComparison()">📊 Confronta</button>
   <button class="ctrl-btn" id="export-pdf-btn" title="Esporta analisi corrente in PDF" onclick="exportPDF()">📄 PDF</button>
+  <button class="ctrl-btn" id="etf-scan-btn" onclick="toggleEtfScan()">📦 ETF</button>
   <button class="ctrl-btn" id="dl-morning-btn" title="Scarica PDF analisi mattutina" onclick="downloadReport('morning')">🌅 Mattina</button>
   <button class="ctrl-btn" id="dl-evening-btn" title="Scarica PDF recap serale" onclick="downloadReport('evening')">🌆 Sera</button>
 </div>
@@ -2917,6 +2918,43 @@ function startCountdown(initial=60){
 // ══════════════════════════════════════════════════════════════════════════════
 // Report PDF automatici (mattina / sera)
 // ══════════════════════════════════════════════════════════════════════════════
+// ── ETF scan ──────────────────────────────────────────────────────────────────
+let _etfMode = false;
+async function toggleEtfScan() {
+  const btn = document.getElementById('etf-scan-btn');
+  if (_etfMode) {
+    // Torna ai titoli normali
+    _etfMode = false;
+    btn.classList.remove('active');
+    btn.textContent = '📦 ETF';
+    loadData();
+    return;
+  }
+  _etfMode = true;
+  btn.classList.add('active');
+  btn.textContent = '⏳ ETF…';
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '<div class="skel-card"></div>'.repeat(5);
+  try {
+    const data = await fetch('/api/scan/etf').then(r => r.json());
+    if (!Array.isArray(data) || !data.length) {
+      grid.innerHTML = '<div class="empty-state"><span class="icon">⏳</span><div>Scan ETF in corso…</div></div>';
+      btn.textContent = '📦 ETF';
+      showToast('⏳ Scan ETF in corso, riprova tra 30 secondi');
+      _etfMode = false; btn.classList.remove('active');
+      return;
+    }
+    cardsData = data;
+    applyAndRender();
+    btn.textContent = '✕ ETF';
+    showToast(`📦 Top ${data.length} ETF caricati`);
+  } catch(e) {
+    showToast('❌ Errore scan ETF');
+    btn.textContent = '📦 ETF';
+    _etfMode = false; btn.classList.remove('active');
+  }
+}
+
 async function downloadReport(kind) {
   const btn = document.getElementById(kind === 'morning' ? 'dl-morning-btn' : 'dl-evening-btn');
   const orig = btn.textContent;

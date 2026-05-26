@@ -442,6 +442,20 @@ async def api_scan_force():
     return {"ok": True, "scan_in_progress": _scan_in_progress}
 
 
+@app.get("/api/scan/etf")
+async def api_scan_etf():
+    """Scansione top 10 ETF per score giornaliero."""
+    key = "scan:etf"
+    if (c := _cached(key, _SCAN_TTL)) is not None:
+        return c
+    from config import ETF_UNIVERSE
+    results = await asyncio.to_thread(scan_cheap_stocks, 500.0, 10, ETF_UNIVERSE)
+    clean = _clean(results or [])
+    if clean:
+        _store(key, clean)
+    return clean or JSONResponse([], status_code=202)
+
+
 @app.get("/api/report/morning")
 async def api_report_morning():
     """Scarica il PDF analisi mattutina. Se non ancora generato, lo genera ora."""
