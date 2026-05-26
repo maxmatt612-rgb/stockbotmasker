@@ -379,6 +379,29 @@ header{
 .fund-hd{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);padding:8px 0 6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border)}
 .fund-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;display:none}
 .fund-grid.open{display:grid}
+/* ── Lungo Termine ── */
+.lt-section{margin-top:12px}
+.lt-hd{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--primary);padding:8px 0 6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border)}
+.lt-body{display:none;flex-direction:column;gap:10px;padding-bottom:4px}
+.lt-body.open{display:flex}
+.lt-cagr-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.lt-cagr-cell{background:var(--surf);border-radius:var(--r-md);padding:8px;text-align:center}
+.lt-cagr-val{font-size:1rem;font-weight:800;margin-bottom:2px}
+.lt-cagr-lbl{font-size:.62rem;color:var(--text-dim);text-transform:uppercase}
+.lt-proj{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.lt-proj-col{background:var(--surf);border-radius:var(--r-md);padding:8px;text-align:center}
+.lt-proj-yr{font-size:.62rem;font-weight:700;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px}
+.lt-proj-base{font-size:.88rem;font-weight:800;color:var(--primary)}
+.lt-proj-bull{font-size:.72rem;color:var(--green)}
+.lt-proj-bear{font-size:.72rem;color:var(--red)}
+.lt-ai-card{background:var(--surf);border-radius:var(--r-md);padding:10px;font-size:.78rem;line-height:1.5}
+.lt-verdict{display:inline-block;padding:3px 10px;border-radius:100px;font-weight:800;font-size:.72rem;margin-top:6px}
+.lt-verdict.ACCUMULA{background:#d4f5e2;color:#1a7a45}
+.lt-verdict.MANTIENI{background:#fff3cd;color:#7a5c00}
+.lt-verdict.EVITA{background:#fde8e8;color:#a02020}
+body.dark .lt-verdict.ACCUMULA{background:#1a3a28;color:#6fdfa5}
+body.dark .lt-verdict.MANTIENI{background:#3a3010;color:#e0c060}
+body.dark .lt-verdict.EVITA{background:#3a1010;color:#f08080}
 .fund-cell{background:var(--surf-v);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 12px}
 .fund-cell-label{font-size:.6rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
 .fund-cell-val{font-size:.84rem;font-weight:700}
@@ -1786,6 +1809,14 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
       </div>
       <div class="fund-grid" id="m-fund-grid"></div>
     </div>
+    <!-- Lungo Termine -->
+    <div class="lt-section" id="m-lt-section">
+      <div class="lt-hd" onclick="toggleLt()">📅 Analisi Lungo Termine <span id="lt-arrow">▸</span></div>
+      <div class="lt-body" id="lt-body">
+        <div id="lt-content"><div style="color:var(--text-dim);font-size:.78rem;padding:6px 0">⏳ Caricamento…</div></div>
+      </div>
+    </div>
+
     <!-- Analyst targets + short interest -->
     <div id="m-targets-wrap" style="display:none;margin-top:12px">
       <div class="targets-card">
@@ -2549,6 +2580,10 @@ async function openModal(stock){
   document.getElementById('m-forecast-badge').textContent='';
   document.getElementById('m-forecast-badge').className='forecast-badge';
   document.getElementById('modal-overlay').classList.add('open');
+  _ltTicker = stock.ticker; _ltLoaded = false;
+  // Reset sezione lungo termine
+  const ltBody = document.getElementById('lt-body');
+  if (ltBody) { ltBody.classList.remove('open'); document.getElementById('lt-arrow').textContent='▸'; document.getElementById('lt-content').innerHTML='<div style="color:var(--text-dim);font-size:.78rem;padding:6px 0">⏳ Caricamento…</div>'; }
   document.getElementById('m-ticker').textContent=stock.ticker;
   document.getElementById('m-company').textContent=stock.name??stock.ticker;
   document.getElementById('m-price').textContent=fmtP(stock.current_price);
@@ -2687,7 +2722,100 @@ async function _loadForecast(ticker){
 
 document.getElementById('modal-close').addEventListener('click',closeModal);
 document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal();});
-function closeModal(){_destroyChart();document.getElementById('modal-overlay').classList.remove('open');}
+function closeModal(){_destroyChart();document.getElementById('modal-overlay').classList.remove('open'); _ltLoaded=false;}
+
+// ── Lungo Termine ─────────────────────────────────────────────────────────────
+let _ltLoaded = false;
+let _ltTicker = null;
+
+function toggleLt() {
+  const body = document.getElementById('lt-body');
+  const arrow = document.getElementById('lt-arrow');
+  const isOpen = body.classList.toggle('open');
+  arrow.textContent = isOpen ? '▾' : '▸';
+  if (isOpen && !_ltLoaded) _loadLt();
+}
+
+async function _loadLt() {
+  if (!_ltTicker) return;
+  _ltLoaded = true;
+  const el = document.getElementById('lt-content');
+  try {
+    const d = await fetch(`/api/stock/${_ltTicker}/longterm`).then(r => r.json());
+    if (d.error) { el.innerHTML = `<div style="color:var(--text-dim);font-size:.78rem">${d.error}</div>`; return; }
+
+    const sym = d.currency === 'EUR' ? '€' : (d.currency === 'GBP' ? '£' : '$');
+    const cColor = v => v == null ? 'color:var(--text-dim)' : (v >= 0 ? 'color:var(--green)' : 'color:var(--red)');
+    const cFmt   = v => v == null ? '—' : `${v >= 0 ? '+' : ''}${v}%`;
+    const pFmt   = v => v == null ? '—' : `${sym}${v.toFixed(2)}`;
+
+    // CAGR row
+    const cagrHtml = `
+      <div class="lt-cagr-row">
+        <div class="lt-cagr-cell"><div class="lt-cagr-val" style="${cColor(d.cagr_1y)}">${cFmt(d.cagr_1y)}</div><div class="lt-cagr-lbl">CAGR 1 anno</div></div>
+        <div class="lt-cagr-cell"><div class="lt-cagr-val" style="${cColor(d.cagr_3y)}">${cFmt(d.cagr_3y)}</div><div class="lt-cagr-lbl">CAGR 3 anni</div></div>
+        <div class="lt-cagr-cell"><div class="lt-cagr-val" style="${cColor(d.cagr_5y)}">${cFmt(d.cagr_5y)}</div><div class="lt-cagr-lbl">CAGR 5 anni</div></div>
+      </div>`;
+
+    // Proiezioni
+    const p = d.projections || {};
+    const projHtml = `
+      <div style="font-size:.66rem;font-weight:700;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px">Proiezioni basate su CAGR storico</div>
+      <div class="lt-proj">
+        ${['1y','3y','5y'].map(yr => `
+          <div class="lt-proj-col">
+            <div class="lt-proj-yr">${yr === '1y' ? '1 anno' : yr === '3y' ? '3 anni' : '5 anni'}</div>
+            <div class="lt-proj-base">${pFmt(p[yr+'_base'])}</div>
+            <div class="lt-proj-bull">▲ ${pFmt(p[yr+'_bull'])}</div>
+            <div class="lt-proj-bear">▼ ${pFmt(p[yr+'_bear'])}</div>
+          </div>`).join('')}
+      </div>`;
+
+    // ETF extra
+    let etfHtml = '';
+    if (d.expense_ratio != null) {
+      etfHtml = `<div style="font-size:.75rem;color:var(--text-dim)">TER: <b>${d.expense_ratio}%</b> &nbsp;·&nbsp; Rendimento medio 3a: <b>${d.three_yr_avg != null ? d.three_yr_avg+'%' : '—'}</b> &nbsp;·&nbsp; 5a: <b>${d.five_yr_avg != null ? d.five_yr_avg+'%' : '—'}</b></div>`;
+    }
+
+    // Fondamentali crescita
+    let fundHtml = '';
+    if (d.revenue_growth != null || d.eps_growth != null || d.forward_pe != null) {
+      fundHtml = `<div style="font-size:.75rem;color:var(--text-dim)">`;
+      if (d.revenue_growth != null) fundHtml += `Crescita ricavi: <b>${d.revenue_growth > 0 ? '+' : ''}${d.revenue_growth}%</b> &nbsp;`;
+      if (d.eps_growth != null)     fundHtml += `Crescita EPS: <b>${d.eps_growth > 0 ? '+' : ''}${d.eps_growth}%</b> &nbsp;`;
+      if (d.forward_pe != null)     fundHtml += `Forward P/E: <b>${d.forward_pe}x</b>`;
+      fundHtml += '</div>';
+    }
+
+    // Target analisti
+    let targetHtml = '';
+    if (d.target_mean) {
+      const upside = d.upside_target;
+      const col = upside >= 0 ? 'var(--green)' : 'var(--red)';
+      targetHtml = `<div style="font-size:.75rem;color:var(--text-dim)">Target analisti: <b style="color:${col}">${sym}${d.target_mean.toFixed(2)} (${upside >= 0 ? '+' : ''}${upside}%)</b> &nbsp;·&nbsp; Range: ${sym}${(d.target_low||0).toFixed(2)} – ${sym}${(d.target_high||0).toFixed(2)}</div>`;
+    }
+
+    // AI outlook
+    let aiHtml = '';
+    const ai = d.ai;
+    if (ai) {
+      const vClass = ai.verdict || 'MANTIENI';
+      aiHtml = `
+        <div class="lt-ai-card">
+          <div style="font-weight:700;margin-bottom:6px;font-size:.8rem">🤖 Outlook AI 3-5 anni</div>
+          ${ai.outlook ? `<div style="margin-bottom:4px">${ai.outlook}</div>` : ''}
+          ${ai.bull    ? `<div style="color:var(--green)">▲ ${ai.bull}</div>` : ''}
+          ${ai.bear    ? `<div style="color:var(--red)">▼ ${ai.bear}</div>` : ''}
+          ${ai.motivo  ? `<div style="color:var(--text-dim);margin-top:4px;font-size:.72rem">${ai.motivo}</div>` : ''}
+          <span class="lt-verdict ${vClass}">${vClass}</span>
+        </div>`;
+    }
+
+    el.innerHTML = cagrHtml + projHtml + etfHtml + fundHtml + targetHtml + aiHtml;
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--text-dim);font-size:.78rem">Errore caricamento analisi.</div>';
+  }
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Score storico — grafico canvas nel modale

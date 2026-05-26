@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-from analyzer import get_enriched_analysis, scan_cheap_stocks
+from analyzer import get_enriched_analysis, scan_cheap_stocks, get_longterm_analysis
 
 STATIC = Path(__file__).parent / "static"
 HISTORY_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "analysis_history.json"
@@ -630,6 +630,78 @@ async def api_ai(ticker: str):
 
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/stock/{ticker}/longterm")
+async def api_longterm(ticker: str):
+    """Analisi lungo termine: CAGR storici, proiezioni scenari, AI outlook 3-5 anni."""
+    t = ticker.upper()
+    key = f"longterm:{t}"
+    if (c := _cached(key, 21600)) is not None:   # cache 6h
+        return c
+
+    data = await asyncio.to_thread(get_longterm_analysis, t)
+    if not data:
+        return JSONResponse({"error": "ticker non trovato"}, status_code=404)
+    data = _clean(data)
+
+    ai_outlook = None
+    if groq_client:
+        cagr_str = (
+            f"CAGR 1a: {data.get('cagr_1y') or 'N/D'}% | "
+            f"CAGR 3a: {data.get('cagr_3y') or 'N/D'}% | "
+            f"CAGR 5a: {data.get('cagr_5y') or 'N/D'}%"
+        )
+        target_str = f"Target analisti: ${data['target_mean']:.2f}" if data.get("target_mean") else "Target analisti: N/D"
+        etf_str = ""
+        if data.get("expense_ratio"):
+            etf_str = f"ETF — TER: {data['expense_ratio']}% | Rendimento 3a medio: {data.get('three_yr_avg') or 'N/D'}%"
+        growth_str = ""
+        if data.get("revenue_growth"):
+            growth_str = f"Crescita ricavi: +{data['revenue_growth']}% | Crescita EPS: {data.get('eps_growth') or 'N/D'}%"
+
+        prompt = (
+            f"Analisi lungo termine di {t}:\n"
+            f"Prezzo attuale: {data['current_price']:.2f} {data.get('currency','USD')}\n"
+            f"{cagr_str}\n"
+            f"Proiezione 3 anni (base): {data['projections'].get('3y_base'):.2f} | "
+            f"Bull: {data['projections'].get('3y_bull'):.2f} | "
+            f"Bear: {data['projections'].get('3y_bear'):.2f}\n"
+            f"{target_str}\n{etf_str}\n{growth_str}\n\n"
+            "Rispondi SOLO in questo formato (italiano, conciso):\n"
+            "OUTLOOK: [1 frase sull'outlook generale 3-5 anni]\n"
+            "BULL: [scenario ottimistico in 1 frase]\n"
+            "BEAR: [scenario pessimistico in 1 frase]\n"
+            "VERDICT: ACCUMULA oppure MANTIENI oppure EVITA\n"
+            "MOTIVO: [1 frase secca sul motivo principale]\n"
+        )
+        try:
+            resp = await groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                max_tokens=250,
+                messages=[
+                    {"role": "system", "content": "Sei un analista buy-side esperto di investimenti a lungo termine. Dai giudizi netti (ACCUMULA/MANTIENI/EVITA) basandoti su dati quantitativi. Rispondi in italiano."},
+                    {"role": "user",   "content": prompt},
+                ],
+            )
+            text = resp.choices[0].message.content.strip()
+            outlook = bull = bear = verdict = motivo = ""
+            for line in text.split("\n"):
+                l = line.strip()
+                if l.upper().startswith("OUTLOOK:"): outlook = l[8:].strip()
+                elif l.upper().startswith("BULL:"):   bull    = l[5:].strip()
+                elif l.upper().startswith("BEAR:"):   bear    = l[5:].strip()
+                elif l.upper().startswith("VERDICT:"): verdict = l[8:].strip().upper()
+                elif l.upper().startswith("MOTIVO:"): motivo  = l[7:].strip()
+            if verdict not in ("ACCUMULA", "MANTIENI", "EVITA"):
+                verdict = "MANTIENI"
+            ai_outlook = {"outlook": outlook, "bull": bull, "bear": bear, "verdict": verdict, "motivo": motivo}
+        except Exception as e:
+            print(f"[longterm ai] {e}")
+
+    data["ai"] = ai_outlook
+    _store(key, data)
+    return data
 
 
 @app.get("/api/stock/{ticker}/why-today")

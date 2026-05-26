@@ -845,6 +845,92 @@ def format_scan_card(d: dict, ai: dict, rank: int) -> str:
     return "\n".join(lines)
 
 
+# ─── Analisi lungo termine ───────────────────────────────────────────────────
+
+def _cagr(hist, trading_days: int) -> float | None:
+    """CAGR su N giorni di trading (approssimazione anni = days/252)."""
+    if len(hist) < trading_days:
+        return None
+    p0 = float(hist["Close"].iloc[-trading_days])
+    p1 = float(hist["Close"].iloc[-1])
+    if p0 <= 0:
+        return None
+    years = trading_days / 252
+    return ((p1 / p0) ** (1 / years) - 1) * 100
+
+
+def get_longterm_analysis(ticker: str) -> dict | None:
+    """Rendimenti storici CAGR, proiezioni scenari e dati fondamentali pluriennali."""
+    try:
+        stock = yf.Ticker(ticker.upper())
+        hist = stock.history(period="5y")
+        if hist.empty or len(hist) < 20:
+            return None
+
+        info = stock.info
+        current_price = float(hist["Close"].iloc[-1])
+
+        cagr_1y = _cagr(hist, 252)
+        cagr_3y = _cagr(hist, 252 * 3)
+        cagr_5y = _cagr(hist, 252 * 5)
+
+        # Proiezione scenari a 3 anni
+        base_rate = (cagr_3y or cagr_1y or 7.0) / 100
+        proj = {}
+        for label, mult, years in [
+            ("1y_base", 1.0, 1), ("1y_bull", 1.5, 1), ("1y_bear", 0.4, 1),
+            ("3y_base", 1.0, 3), ("3y_bull", 1.5, 3), ("3y_bear", 0.4, 3),
+            ("5y_base", 1.0, 5), ("5y_bull", 1.5, 5), ("5y_bear", 0.4, 5),
+        ]:
+            r = base_rate * mult
+            proj[label] = round(current_price * (1 + r) ** years, 2)
+
+        # ETF specifico
+        three_yr_avg = info.get("threeYearAverageReturn")
+        five_yr_avg  = info.get("fiveYearAverageReturn")
+        expense_ratio = info.get("expenseRatio")
+        fund_family   = info.get("fundFamily")
+        category      = info.get("category") or info.get("quoteType")
+
+        # Fondamentali azioni
+        target_mean = info.get("targetMeanPrice")
+        target_high = info.get("targetHighPrice")
+        target_low  = info.get("targetLowPrice")
+        rev_growth  = info.get("revenueGrowth")
+        eps_growth  = info.get("earningsGrowth")
+        fwd_pe      = info.get("forwardPE")
+
+        upside_target = None
+        if target_mean and current_price > 0:
+            upside_target = round((target_mean - current_price) / current_price * 100, 1)
+
+        return {
+            "ticker": ticker.upper(),
+            "current_price": current_price,
+            "currency": info.get("currency", "USD"),
+            "cagr_1y": round(cagr_1y, 1) if cagr_1y is not None else None,
+            "cagr_3y": round(cagr_3y, 1) if cagr_3y is not None else None,
+            "cagr_5y": round(cagr_5y, 1) if cagr_5y is not None else None,
+            "projections": proj,
+            "target_mean": target_mean,
+            "target_high": target_high,
+            "target_low": target_low,
+            "upside_target": upside_target,
+            "revenue_growth": round(rev_growth * 100, 1) if rev_growth else None,
+            "eps_growth":     round(eps_growth * 100, 1) if eps_growth else None,
+            "forward_pe": round(fwd_pe, 1) if fwd_pe else None,
+            # ETF
+            "three_yr_avg": round(three_yr_avg * 100, 1) if three_yr_avg else None,
+            "five_yr_avg":  round(five_yr_avg  * 100, 1) if five_yr_avg  else None,
+            "expense_ratio": round(expense_ratio * 100, 2) if expense_ratio else None,
+            "fund_family":  fund_family,
+            "category":     category,
+        }
+    except Exception as e:
+        print(f"[longterm] Errore {ticker}: {e}")
+        return None
+
+
 def format_report_line(d: dict) -> str:
     p = d["current_price"]
     chg = d["day_change_pct"]
