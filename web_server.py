@@ -27,14 +27,23 @@ app = FastAPI(title="Stock Bot Dashboard", docs_url=None, redoc_url=None)
 
 @app.on_event("startup")
 async def _startup_load_cache():
-    """Carica l'ultimo scan da disco al riavvio — così il primo accesso è istantaneo."""
+    """Carica l'ultimo scan da disco e avvia immediatamente un refresh in background."""
+    loaded = False
     if SCAN_FILE.exists():
         try:
             data = json.loads(SCAN_FILE.read_text(encoding="utf-8"))
             if data:
                 _store("scan:10", data)
+                loaded = True
+                print(f"[startup] Caricati {len(data)} titoli da last_scan.json")
         except Exception as e:
             print(f"[startup] Impossibile caricare last_scan.json: {e}")
+
+    # Avvia sempre un refresh in background all'avvio così i dati si aggiornano
+    # subito (se abbiamo dati stale) oppure la prima scansione parte in parallelo
+    asyncio.create_task(_refresh_scan_background(10))
+    if not loaded:
+        print("[startup] Nessun dato salvato — scan di avvio in background iniziato")
 
 
 app.add_middleware(
@@ -218,13 +227,15 @@ async def api_scan(top: int = 10):
     if stale:
         asyncio.create_task(_refresh_scan_background(top))
         return stale["data"]
-    # Nessun dato: attendi il primo scan
-    results = await asyncio.to_thread(scan_cheap_stocks, 40.0, top)
-    clean = _clean(results or [])
-    _store(key, clean)
-    if top == 10:
-        _save_scan_to_disk(clean)
-    return clean
+    # Nessun dato in cache: il background task avviato in startup sta già girando.
+    # Aspettiamo al massimo 55s; se arrivano dati nel frattempo li restituiamo.
+    for _ in range(55):
+        await asyncio.sleep(1)
+        stale = _cache.get(key)
+        if stale:
+            return stale["data"]
+    # Timeout — restituiamo lista vuota; il frontend mostra "Riprova"
+    return []
 
 
 @app.get("/api/stock/{ticker}")

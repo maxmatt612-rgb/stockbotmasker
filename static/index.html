@@ -1937,9 +1937,11 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 'use strict';
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Three.js — Particle Network
+// Three.js — Particle Network (opzionale — non blocca l'app se CDN fallisce)
 // ══════════════════════════════════════════════════════════════════════════════
 (function(){
+  try {
+  if (typeof THREE === 'undefined') return; // CDN non caricato — skip silenzioso
   const canvas = document.getElementById('bg-canvas');
   const mob = innerWidth < 640;
   const N = mob ? 60 : 120;
@@ -2000,6 +2002,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   }
   animate();
   window.addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();rdr.setSize(innerWidth,innerHeight);});
+  } catch(e) { console.warn('[Three.js] Animazione sfondo non disponibile:', e.message); }
 })();
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2720,8 +2723,14 @@ async function loadData(){
       fetch(`/api/history/${todayIso}`).then(r=>r.ok?r.json():null).catch(()=>null),
     ]);
     if(!Array.isArray(data)||!data.length){
-      document.getElementById('grid').innerHTML='<div class="empty-state"><span class="icon">⚠️</span>Dati non disponibili. Riprova tra qualche minuto.</div>';
-      return;
+      document.getElementById('grid').innerHTML=`
+        <div class="empty-state">
+          <span class="icon">⏳</span>
+          <div style="font-weight:700;margin-bottom:6px">Scansione in corso…</div>
+          <div style="font-size:.76rem;color:var(--text-dim);margin-bottom:14px">Il server sta analizzando i titoli.<br>Riprovo automaticamente tra pochi secondi.</div>
+          <button onclick="manualRetry()" style="background:var(--primary);color:#fff;border:none;border-radius:var(--r-md);padding:9px 22px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:Inter,sans-serif">🔄 Riprova subito</button>
+        </div>`;
+      return 'retry';
     }
 
     // Mappa ticker → price_at_analysis (dallo snapshot delle 7:30)
@@ -2780,20 +2789,37 @@ async function loadData(){
 
   }catch(e){
     console.error('Load:',e);
-    document.getElementById('grid').innerHTML='<div class="empty-state"><span class="icon">❌</span>Errore connessione al server.</div>';
+    document.getElementById('grid').innerHTML=`
+      <div class="empty-state">
+        <span class="icon">⏳</span>
+        <div style="font-weight:700;margin-bottom:6px">Server in avvio…</div>
+        <div style="font-size:.76rem;color:var(--text-dim);margin-bottom:14px">La prima scansione richiede ~60 secondi.<br>Riprovo automaticamente tra pochi secondi.</div>
+        <button onclick="manualRetry()" style="background:var(--primary);color:#fff;border:none;border-radius:var(--r-md);padding:9px 22px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:Inter,sans-serif">🔄 Riprova subito</button>
+      </div>`;
+    return 'retry'; // segnala al chiamante di riprovarci presto
   }
+}
+
+function manualRetry(){
+  const grid=document.getElementById('grid');
+  grid.innerHTML='<div class="skel-card"></div><div class="skel-card"></div><div class="skel-card"></div>';
+  clearInterval(cdTimer);
+  loadData().then(r=>startCountdown(r==='retry'?10:60));
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Countdown & Boot
 // ══════════════════════════════════════════════════════════════════════════════
 let cdVal=60, cdTimer=null;
-function startCountdown(){
-  cdVal=60;
+function startCountdown(initial=60){
+  cdVal=initial;
+  const el=document.getElementById('countdown');
+  if(el) el.textContent=initial; // mostra subito il valore corretto
   if(cdTimer)clearInterval(cdTimer);
   cdTimer=setInterval(()=>{
-    document.getElementById('countdown').textContent=--cdVal;
-    if(cdVal<=0){clearInterval(cdTimer);loadData().then(startCountdown);}
+    const el2=document.getElementById('countdown');
+    if(el2) el2.textContent=--cdVal;
+    if(cdVal<=0){clearInterval(cdTimer);loadData().then(r=>startCountdown(r==='retry'?10:60));}
   },1000);
 }
 
@@ -3794,7 +3820,7 @@ updateMarketStatus();
 loadIndices();
 setInterval(()=>{updateMarketStatus();loadIndices();},60000);
 initFX();
-loadData().then(startCountdown);
+loadData().then(r=>startCountdown(r==='retry'?10:60));
 loadAccuracy();
 loadBacktest();
 initAuth();
