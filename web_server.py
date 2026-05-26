@@ -27,24 +27,31 @@ app = FastAPI(title="Stock Bot Dashboard", docs_url=None, redoc_url=None)
 
 @app.on_event("startup")
 async def _startup_load_cache():
-    """Carica l'ultimo scan da disco e avvia immediatamente un refresh in background."""
+    """Carica l'ultimo scan da disco. Non rilancia il scan se i dati sono di oggi."""
     loaded = False
+    scan_is_today = False
+
     if SCAN_FILE.exists():
         try:
             data = json.loads(SCAN_FILE.read_text(encoding="utf-8"))
             if data:
                 _store("scan:10", data)
                 loaded = True
-                print(f"[startup] Caricati {len(data)} titoli da last_scan.json")
+                mtime = datetime.fromtimestamp(SCAN_FILE.stat().st_mtime, tz=timezone.utc)
+                scan_is_today = mtime.date() == datetime.now(tz=timezone.utc).date()
+                print(f"[startup] Caricati {len(data)} titoli — dati di oggi: {scan_is_today}")
         except Exception as e:
             print(f"[startup] Impossibile caricare last_scan.json: {e}")
 
-    # Avvia sempre un refresh in background all'avvio così i dati si aggiornano
-    # subito (se abbiamo dati stale) oppure la prima scansione parte in parallelo
-    asyncio.create_task(_refresh_scan_background(10))
+    # Lancia scan solo se non abbiamo già i dati di oggi (es. primo avvio o dopo mezzanotte)
+    if not scan_is_today:
+        asyncio.create_task(_refresh_scan_background(10))
+        if not loaded:
+            print("[startup] Nessun dato salvato — scan di avvio in background iniziato")
+    else:
+        print("[startup] Dati odierni presenti — nessun nuovo scan (analisi fissata dal mattino)")
+
     asyncio.create_task(_pdf_scheduler())
-    if not loaded:
-        print("[startup] Nessun dato salvato — scan di avvio in background iniziato")
 
 
 app.add_middleware(
@@ -133,7 +140,7 @@ _morning_pdf: Optional[bytes] = None
 _morning_pdf_ts: Optional[str] = None   # timestamp generazione
 _evening_pdf: Optional[bytes] = None
 _evening_pdf_ts: Optional[str] = None
-_SCAN_TTL     = 300    # 5 min — scanner
+_SCAN_TTL     = 86400  # 24h — scan fissato dal mattino, non si aggiorna intraday
 _STOCK_TTL    = 180    # 3 min — analisi singola
 _AI_TTL       = 600    # 10 min — AI (chiamata Groq costosa)
 _FORECAST_TTL = 14400  # 4 h — previsione 7 giorni
@@ -353,18 +360,52 @@ async def _generate_morning_pdf():
 
 
 async def _generate_evening_pdf():
-    """Genera il PDF recap serale dai dati in cache."""
+    """Genera il PDF recap serale: confronta prezzi mattino vs chiusura USA."""
     global _evening_pdf, _evening_pdf_ts
-    data = (_cache.get("scan:10") or {}).get("data") or []
-    if not data:
-        print("[pdf] Nessun dato per il PDF serale")
+    import yfinance as yf
+    import pandas as pd
+
+    morning_data = (_cache.get("scan:10") or {}).get("data") or []
+    if not morning_data:
+        print("[pdf] Nessun dato mattutino per il recap serale")
         return
+
+    # Fetch prezzi di chiusura per tutti i ticker del mattino
+    tickers = [s["ticker"] for s in morning_data]
+    closing = {}
+    try:
+        raw = await asyncio.to_thread(
+            lambda: yf.download(tickers, period="1d", progress=False, auto_adjust=True)
+        )
+        if not raw.empty:
+            if isinstance(raw.columns, pd.MultiIndex):
+                close_df = raw["Close"]
+            else:
+                close_df = raw[["Close"]].rename(columns={"Close": tickers[0]})
+            for t in tickers:
+                if t in close_df.columns:
+                    s = close_df[t].dropna()
+                    if len(s):
+                        closing[t] = float(s.iloc[-1])
+    except Exception as e:
+        print(f"[evening] Errore fetch prezzi chiusura: {e}")
+
+    # Arricchisci con delta mattino→chiusura
+    enriched = []
+    for s in morning_data:
+        t = s["ticker"]
+        mp = s.get("current_price", 0)
+        ep = closing.get(t, mp)
+        delta = round((ep - mp) / mp * 100, 2) if mp > 0 else 0
+        enriched.append({**s, "evening_price": ep, "delta_pct": delta})
+    enriched.sort(key=lambda x: x.get("delta_pct", 0), reverse=True)
+
     now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
     try:
         pdf_bytes = await asyncio.to_thread(
-            _build_pdf, data,
+            _build_evening_pdf, enriched,
             f"Recap Serale — {datetime.now().strftime('%A %d %B %Y').capitalize()}",
-            f"Chiusura mercati | Generato il {now_str}"
+            f"Chiusura mercati USA | Generato il {now_str}"
         )
         _evening_pdf = pdf_bytes
         _evening_pdf_ts = now_str
@@ -373,21 +414,105 @@ async def _generate_evening_pdf():
         print(f"[pdf] Errore generazione PDF serale: {e}")
 
 
+def _build_evening_pdf(stocks: list, title: str, subtitle: str) -> bytes:
+    """PDF recap serale: mostra prezzo mattino, chiusura, e delta %."""
+    from fpdf import FPDF
+
+    class PDF(FPDF):
+        def header(self):
+            self.set_fill_color(15, 15, 25)
+            self.rect(0, 0, 210, 28, 'F')
+            self.set_text_color(196, 166, 255)
+            self.set_font("Helvetica", "B", 16)
+            self.set_xy(10, 8)
+            self.cell(0, 8, "MASKER Stock Intelligence", ln=True)
+            self.set_text_color(180, 180, 200)
+            self.set_font("Helvetica", "", 9)
+            self.set_x(10)
+            self.cell(0, 6, subtitle, ln=True)
+            self.ln(4)
+
+        def footer(self):
+            self.set_y(-12)
+            self.set_font("Helvetica", "I", 7)
+            self.set_text_color(120, 120, 140)
+            self.cell(0, 6, "Solo a scopo informativo — non costituisce consulenza finanziaria", align="C")
+
+    pdf = PDF()
+    pdf.set_margins(10, 32, 10)
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.set_text_color(30, 30, 50)
+    pdf.cell(0, 8, title, ln=True)
+    pdf.ln(2)
+
+    # Tabella recap
+    col_w = [22, 30, 28, 28, 22, 24, 24]
+    headers = ["Ticker", "Score", "Mattina", "Chiusura", "Δ %", "Esito", "Rischio"]
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_fill_color(240, 238, 255)
+    pdf.set_text_color(40, 40, 80)
+    for i, h in enumerate(headers):
+        pdf.cell(col_w[i], 7, h, border=1, fill=True, align="C")
+    pdf.ln()
+
+    pdf.set_font("Helvetica", "", 8)
+    for rank, s in enumerate(stocks, 1):
+        delta = s.get("delta_pct", 0) or 0
+        ccy = s.get("currency", "USD")
+        sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+        morning_str  = f"{sym}{s.get('current_price', 0):.2f}"
+        evening_str  = f"{sym}{s.get('evening_price', 0):.2f}"
+        delta_str    = f"{'+' if delta >= 0 else ''}{delta:.2f}%"
+        esito        = "✅ SALITA" if delta > 0 else ("⚠️ STABILE" if delta == 0 else "❌ SCESA")
+        score_str    = f"{(s.get('score_10') or 0):.1f}/10"
+
+        if rank % 2 == 0:
+            pdf.set_fill_color(248, 247, 255)
+        else:
+            pdf.set_fill_color(255, 255, 255)
+
+        pdf.set_text_color(20, 120, 60) if delta >= 0 else pdf.set_text_color(180, 30, 30)
+        row = [s["ticker"], score_str, morning_str, evening_str, delta_str, esito, s.get("risk_level", "—")]
+        for i, cell in enumerate(row):
+            pdf.cell(col_w[i], 6, str(cell), border=1, fill=True, align="C" if i > 0 else "L")
+        pdf.set_text_color(30, 30, 50)
+        pdf.ln()
+
+    # Riepilogo
+    pdf.ln(6)
+    salite  = sum(1 for s in stocks if (s.get("delta_pct") or 0) > 0)
+    scese   = sum(1 for s in stocks if (s.get("delta_pct") or 0) < 0)
+    stabili = len(stocks) - salite - scese
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_text_color(30, 30, 50)
+    pdf.cell(0, 6, f"Riepilogo giornata: ✅ {salite} salite  ❌ {scese} scese  ⚠️ {stabili} stabili", ln=True)
+
+    return bytes(pdf.output())
+
+
 async def _pdf_scheduler():
-    """Genera PDF automaticamente: 07:35 (mattina) e 17:40 (chiusura EU)."""
+    """Scheduler giornaliero: 07:30 scan, 07:35 PDF mattina, 22:05 recap serale."""
     while True:
         now = datetime.now()
         h, m = now.hour, now.minute
-        # Mattina: 07:35 (5 min dopo il report mattutino delle 7:30)
-        if h == 7 and m == 35:
+        # 07:30 — scan mattutino (dati fissati per la giornata)
+        if h == 7 and m == 30:
+            print("[scheduler] Avvio scan mattutino 07:30")
+            asyncio.create_task(_refresh_scan_background(10))
+            await asyncio.sleep(60)
+        # 07:35 — PDF analisi mattutina (dopo che lo scan ha avuto 5 min)
+        elif h == 7 and m == 35:
             await _generate_morning_pdf()
-            await asyncio.sleep(60)  # evita doppio trigger
-        # Chiusura USA: 22:05 (5 min dopo la chiusura delle 22:00 ora italiana)
+            await asyncio.sleep(60)
+        # 22:05 — recap serale con confronto prezzi chiusura USA
         elif h == 22 and m == 5:
             await _generate_evening_pdf()
             await asyncio.sleep(60)
         else:
-            await asyncio.sleep(30)  # controlla ogni 30 secondi
+            await asyncio.sleep(30)
 
 
 async def _refresh_scan_background(top: int):

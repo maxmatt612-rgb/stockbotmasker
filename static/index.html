@@ -1638,7 +1638,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 <!-- ── Hero ── -->
 <section class="hero">
   <h1>Masker <span>Intelligence</span></h1>
-  <p>Scanner AI · Grafici · Portafoglio · Mercati · Aggiornamento ogni 60s</p>
+  <p>Scanner AI · Grafici · Portafoglio · Mercati · Analisi fissata ogni mattina alle 7:30</p>
 </section>
 
 
@@ -1966,7 +1966,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 <div class="refresh-pill" id="refresh-pill">
   <div class="live-dot" id="refresh-dot"></div>
-  <span id="refresh-label">Refresh in <b id="countdown">60</b>s</span>
+  <span id="refresh-label">Caricamento…</span>
   <button id="force-refresh-btn" onclick="forceRefresh()" title="Forza aggiornamento" style="display:none;margin-left:6px;background:none;border:none;cursor:pointer;color:var(--primary);font-size:.8rem;padding:0;font-family:Inter,sans-serif;font-weight:600">↺ Aggiorna</button>
 </div>
 
@@ -3051,15 +3051,22 @@ async function forceRefresh(){
 // ══════════════════════════════════════════════════════════════════════════════
 let cdVal=60, cdTimer=null;
 function startCountdown(initial=60){
-  cdVal=initial;
-  const el=document.getElementById('countdown');
-  if(el) el.textContent=initial; // mostra subito il valore corretto
-  if(cdTimer)clearInterval(cdTimer);
-  cdTimer=setInterval(()=>{
-    const el2=document.getElementById('countdown');
-    if(el2) el2.textContent=--cdVal;
-    if(cdVal<=0){clearInterval(cdTimer);loadData().then(r=>startCountdown(r==='retry'?3:60));}
-  },1000);
+  // Se initial è piccolo siamo ancora in attesa dei dati iniziali — riprova subito
+  if(initial <= 10){
+    cdVal=initial;
+    if(cdTimer)clearInterval(cdTimer);
+    cdTimer=setInterval(()=>{
+      if(--cdVal<=0){clearInterval(cdTimer);loadData().then(r=>{ if(r==='retry') startCountdown(3); });}
+    },1000);
+    return;
+  }
+  // Dati caricati: l'analisi è fissa — mostra solo "Analisi di oggi"
+  if(cdTimer) clearInterval(cdTimer);
+  const pill = document.getElementById('refresh-pill');
+  if(pill){
+    const label = document.getElementById('refresh-label');
+    if(label) label.innerHTML = 'Analisi del <b>' + new Date().toLocaleDateString('it-IT',{day:'2-digit',month:'short'}) + '</b> — 07:30';
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
