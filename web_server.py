@@ -382,8 +382,8 @@ async def _pdf_scheduler():
         if h == 7 and m == 35:
             await _generate_morning_pdf()
             await asyncio.sleep(60)  # evita doppio trigger
-        # Chiusura EU: 17:40 (10 min dopo la chiusura delle 17:30)
-        elif h == 17 and m == 40:
+        # Chiusura USA: 22:05 (5 min dopo la chiusura delle 22:00 ora italiana)
+        elif h == 22 and m == 5:
             await _generate_evening_pdf()
             await asyncio.sleep(60)
         else:

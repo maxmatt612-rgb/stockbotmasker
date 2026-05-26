@@ -2955,7 +2955,7 @@ async function _checkReportStatus() {
       : 'PDF mattutino non ancora disponibile (verrà generato alle 7:35)';
     if (eb) eb.title = s.evening.available
       ? `PDF disponibile — generato alle ${s.evening.generated_at}`
-      : 'PDF serale non ancora disponibile (verrà generato alle 17:40)';
+      : 'PDF serale non ancora disponibile (verrà generato alle 22:05)';
     if (mb) mb.style.opacity = s.morning.available ? '1' : '0.5';
     if (eb) eb.style.opacity = s.evening.available ? '1' : '0.5';
   } catch(_) {}
