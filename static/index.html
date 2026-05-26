@@ -177,7 +177,7 @@ header{
   display:flex;align-items:center;gap:8px;flex-wrap:wrap;
   padding:0 28px 18px;max-width:1180px;margin:0 auto;
 }
-.ctrl-label{font-size:.72rem;color:var(--text-dim);margin-right:2px}
+.ctrl-label{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-dim);margin-right:2px;white-space:nowrap}
 .ctrl-group{display:flex;gap:5px;flex-wrap:wrap}
 .ctrl-div{width:1px;height:22px;background:var(--border);margin:0 4px}
 .ctrl-btn{
@@ -1238,14 +1238,14 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 <!-- ── Tab navigation ── -->
 <div class="tab-nav">
-  <button class="tab-btn active" data-tab="live" onclick="switchTab('live')">📊 Live</button>
-  <button class="tab-btn" data-tab="history" onclick="switchTab('history')">📅 Storico</button>
-  <button class="tab-btn" data-tab="heatmap" onclick="switchTab('heatmap')">📈 Mercati</button>
-  <button class="tab-btn" data-tab="portfolio" onclick="switchTab('portfolio')">💼 Portafoglio</button>
+  <button class="tab-btn active" data-tab="live"      onclick="switchTab('live')">📊 Live</button>
+  <button class="tab-btn" data-tab="heatmap"   onclick="switchTab('heatmap')">📈 Mercati</button>
+  <button class="tab-btn" data-tab="history"   onclick="switchTab('history')">📅 Storico</button>
+  <button class="tab-btn" data-tab="portfolio" onclick="switchTab('portfolio')">💼 Portfolio</button>
   <button class="tab-btn" data-tab="watchlist" onclick="switchTab('watchlist')">⭐ Watchlist</button>
-  <button class="tab-btn" data-tab="calendar" onclick="switchTab('calendar')">🗓 Calendario</button>
-  <button class="tab-btn" data-tab="ai-chat" onclick="switchTab('ai-chat')">🤖 AI</button>
-  <button class="tab-btn" data-tab="briefing" onclick="switchTab('briefing')">📰 Briefing</button>
+  <button class="tab-btn" data-tab="ai-chat"   onclick="switchTab('ai-chat')">🤖 AI Chat</button>
+  <button class="tab-btn" data-tab="briefing"  onclick="switchTab('briefing')">📰 Briefing</button>
+  <button class="tab-btn" data-tab="calendar"  onclick="switchTab('calendar')">🗓 Calendario</button>
 </div>
 
 <!-- ── History view (nascosta di default) ── -->
@@ -1645,13 +1645,27 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 <!-- ── Controls ── -->
 <div class="controls-bar">
+  <span class="ctrl-label">Ordina</span>
+  <div class="ctrl-group">
+    <button class="ctrl-btn active" data-sort="score">⭐ Score</button>
+    <button class="ctrl-btn" data-sort="change">📈 Variazione</button>
+    <button class="ctrl-btn" data-sort="rsi">📊 RSI</button>
+    <button class="ctrl-btn" data-sort="vol">🔊 Volume</button>
+  </div>
   <div class="ctrl-div"></div>
-  <button class="ctrl-btn" onclick="toggleScreener()">🔍 Screener</button>
-  <button class="ctrl-btn" onclick="openComparison()">📊 Confronta</button>
-  <button class="ctrl-btn" id="export-pdf-btn" title="Esporta analisi corrente in PDF" onclick="exportPDF()">📄 PDF</button>
-  <button class="ctrl-btn" id="etf-scan-btn" onclick="toggleEtfScan()">📦 ETF</button>
-  <button class="ctrl-btn" id="dl-morning-btn" title="Scarica PDF analisi mattutina" onclick="downloadReport('morning')">🌅 Mattina</button>
-  <button class="ctrl-btn" id="dl-evening-btn" title="Scarica PDF recap serale" onclick="downloadReport('evening')">🌆 Sera</button>
+  <span class="ctrl-label">Strumenti</span>
+  <div class="ctrl-group">
+    <button class="ctrl-btn" onclick="toggleScreener()">🔍 Screener</button>
+    <button class="ctrl-btn" onclick="openComparison()">⚔️ Confronta</button>
+    <button class="ctrl-btn" id="etf-scan-btn" onclick="toggleEtfScan()">📦 ETF</button>
+  </div>
+  <div class="ctrl-div"></div>
+  <span class="ctrl-label">Report</span>
+  <div class="ctrl-group">
+    <button class="ctrl-btn" id="export-pdf-btn" title="Stampa analisi corrente" onclick="exportPDF()">🖨️ Stampa</button>
+    <button class="ctrl-btn" id="dl-morning-btn" title="PDF analisi mattutina (07:35)" onclick="downloadReport('morning')">🌅 Mattina</button>
+    <button class="ctrl-btn" id="dl-evening-btn" title="PDF recap chiusura USA (22:05)" onclick="downloadReport('evening')">🌆 Sera</button>
+  </div>
 </div>
 
 <!-- ── Screener panel ── -->
@@ -2397,7 +2411,15 @@ function animateBars(grid){
 let cardsData=[], currentSort='score';
 
 const sortFns={
-  score: (a,b)=>(b.score_10??0)-(a.score_10??0),
+  score:  (a,b) => (b.score_10??0) - (a.score_10??0),
+  change: (a,b) => Math.abs(b.day_change_pct??0) - Math.abs(a.day_change_pct??0),
+  rsi:    (a,b) => {
+    // RSI più lontano da 50 = più interessante (oversold o overbought)
+    const da = Math.abs((a.rsi??50) - 50);
+    const db = Math.abs((b.rsi??50) - 50);
+    return db - da;
+  },
+  vol:    (a,b) => (b.vol_ratio??0) - (a.vol_ratio??0),
 };
 
 function applyAndRender(){
