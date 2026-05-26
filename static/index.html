@@ -3556,8 +3556,8 @@ async function _checkAlerts(){
     _saveAlerts(); _renderAlertList();
   }catch(_){}
 }
-// Richiedi permesso notifiche
-if(Notification.permission==='default') Notification.requestPermission();
+// Richiedi permesso notifiche (safe — Notification non esiste su iOS < 16.4)
+try{ if(typeof Notification!=='undefined'&&Notification.permission==='default') Notification.requestPermission(); }catch(_){}
 setInterval(_checkAlerts,60000);
 _renderAlertList();
 
@@ -5330,7 +5330,7 @@ async function loadBacktest() {
 // ══════════════════════════════════════════════════════════════════════════════
 // Push Notifications PWA
 // ══════════════════════════════════════════════════════════════════════════════
-let _notifPermission = Notification?.permission ?? 'default';
+let _notifPermission = (typeof Notification !== 'undefined' ? Notification?.permission : null) ?? 'default';
 let _lastNotifTicker = null;  // evita notifiche duplicate
 
 function initNotifications() {
