@@ -243,6 +243,9 @@ header{
 
 /* Verdict */
 .verdict{font-size:.76rem;color:var(--text-dim);line-height:1.5;border-left:2px solid rgba(196,166,255,.25);padding-left:9px;margin-top:10px;opacity:0;transition:opacity .5s}
+.ev-delta{font-size:.68rem;font-weight:700;margin-top:4px;padding:2px 8px;border-radius:20px;display:inline-block}
+.ev-up{color:#10B981;background:rgba(16,185,129,.13)}
+.ev-down{color:#EF4444;background:rgba(239,68,68,.13)}
 .verdict.show{opacity:1}
 
 /* ── Skeleton ── */
@@ -2327,7 +2330,11 @@ async function loadSparklines(tickersCsv, data){
 // Build Card
 // ══════════════════════════════════════════════════════════════════════════════
 function buildCard(d, rank){
-  const dispPct = d.change_since_analysis != null ? d.change_since_analysis : d.day_change_pct;
+  // Modalità serale: mostra il prezzo di chiusura e il delta dal mattino
+  const isEvening = d.evening_price != null && d.delta_from_morning != null;
+  const displayPrice = isEvening ? d.evening_price : d.current_price;
+  const dispPct = isEvening ? d.delta_from_morning
+    : (d.change_since_analysis != null ? d.change_since_analysis : d.day_change_pct);
   const isPos=dispPct>=0;
   const score=d.score_10??5;
   const div=document.createElement('div');
@@ -2371,8 +2378,9 @@ function buildCard(d, rank){
         <div class="card-name">${d.name??d.ticker}</div>
       </div>
       <div class="price-block">
-        <div class="price-val">${fmtPCcy(d.current_price, d.currency)}</div>
-        <div class="price-chg ${isPos?'chg-pos':'chg-neg'}" title="${d.change_since_analysis!=null?'Variazione dall\'analisi mattutina':'Variazione giornaliera'}">${fmtC(dispPct)}</div>
+        <div class="price-val">${fmtPCcy(displayPrice, d.currency)}</div>
+        <div class="price-chg ${isPos?'chg-pos':'chg-neg'}" title="${isEvening?'Variazione dalla mattina':(d.change_since_analysis!=null?'Variazione dall\'analisi mattutina':'Variazione giornaliera')}">${fmtC(dispPct)}</div>
+        ${isEvening?`<div class="ev-delta ${isPos?'ev-up':'ev-down'}">${isPos?'▲':'▼'} ${Math.abs(dispPct).toFixed(2)}% · 🌅 ${fmtPCcy(d.morning_price??d.current_price, d.currency)}</div>`:''}
       </div>
     </div>
     <div class="score-wrap">
@@ -2912,46 +2920,91 @@ async function _loadScoreHistory(ticker){
 // Load Data
 // ══════════════════════════════════════════════════════════════════════════════
 async function loadData(){
-  const hasCards = cardsData.length > 0; // abbiamo già dati a schermo?
+  const hasCards = cardsData.length > 0;
+  const todayIso = new Date().toISOString().slice(0,10);
+  const isEvening = new Date().getHours() >= 22;
+
+  // ── Modalità serale: già abbiamo i dati mattutini → aggiorna solo i prezzi ──
+  if(isEvening && hasCards){
+    try{
+      const ev = await fetch('/api/scan/evening').then(r=>r.ok?r.json():null);
+      if(Array.isArray(ev) && ev.length){
+        ev.forEach(d=>{
+          const idx = cardsData.findIndex(c=>c.ticker===d.ticker);
+          if(idx>=0) cardsData[idx]={...cardsData[idx],...d};
+        });
+        applyAndRender();
+        _setEveningLabel();
+        _markRefreshOk();
+        return 'ok';
+      }
+    }catch(_){}
+  }
+
   try{
-    // Fetch scan + snapshot mattutino in parallelo
-    const todayIso = new Date().toISOString().slice(0,10);
-    const [data, histSnap] = await Promise.all([
-      fetch('/api/scan?top=10').then(r=>r.json()),
-      fetch(`/api/history/${todayIso}`).then(r=>r.ok?r.json():null).catch(()=>null),
-    ]);
-    if(!Array.isArray(data)||!data.length){
-      if(hasCards){
-        // Server sta riscansionando — non sovrascrivere le card
-        _markRefreshFailed(false);
+    const lsKey=`masker_morning_${todayIso}`;
+    let data=null;
+
+    // 1. Prova localStorage — dati mattutini bloccati per la giornata
+    if(!hasCards){
+      try{
+        const cached=localStorage.getItem(lsKey);
+        if(cached){
+          const parsed=JSON.parse(cached);
+          if(Array.isArray(parsed)&&parsed.length) data=parsed;
+        }
+      }catch(_){}
+    }
+
+    // 2. Se non in localStorage — scarica dal server
+    if(!data){
+      const [serverData, histSnap] = await Promise.all([
+        fetch('/api/scan?top=10').then(r=>r.json()),
+        fetch(`/api/history/${todayIso}`).then(r=>r.ok?r.json():null).catch(()=>null),
+      ]);
+      if(!Array.isArray(serverData)||!serverData.length){
+        if(hasCards){ _markRefreshFailed(false); return 'retry'; }
+        document.getElementById('grid').innerHTML=`
+          <div class="empty-state">
+            <span class="icon" style="animation:spin 1.2s linear infinite;display:inline-block">⏳</span>
+            <div style="font-weight:700;margin-bottom:6px">Analisi in corso…</div>
+            <div style="font-size:.76rem;color:var(--text-dim)">I titoli vengono caricati automaticamente.</div>
+          </div>`;
         return 'retry';
       }
-      document.getElementById('grid').innerHTML=`
-        <div class="empty-state">
-          <span class="icon" style="animation:spin 1.2s linear infinite;display:inline-block">⏳</span>
-          <div style="font-weight:700;margin-bottom:6px">Analisi in corso…</div>
-          <div style="font-size:.76rem;color:var(--text-dim)">I titoli vengono caricati automaticamente.</div>
-        </div>`;
-      return 'retry';
-    }
-
-    // Mappa ticker → price_at_analysis (dallo snapshot delle 7:30)
-    const analysisMap={};
-    if(histSnap?.stocks){
-      histSnap.stocks.forEach(s=>{ if(s.price_at_analysis>0) analysisMap[s.ticker]=s.price_at_analysis; });
-    }
-
-    // Aggiungi change_since_analysis a ogni stock
-    data.forEach(d=>{
-      const pa=analysisMap[d.ticker];
-      if(pa>0 && d.current_price>0){
-        d.price_at_analysis=pa;
-        d.change_since_analysis=Math.round((d.current_price-pa)/pa*10000)/100;
+      data=serverData;
+      // Annota morning_price se mancante
+      data.forEach(d=>{ if(!d.morning_price) d.morning_price=d.current_price; });
+      // Arricchisci con snapshot storico 7:30 se disponibile
+      const analysisMap={};
+      if(histSnap?.stocks){
+        histSnap.stocks.forEach(s=>{ if(s.price_at_analysis>0) analysisMap[s.ticker]=s.price_at_analysis; });
       }
-    });
+      data.forEach(d=>{
+        const pa=analysisMap[d.ticker]||d.morning_price;
+        if(pa>0&&d.current_price>0){
+          d.price_at_analysis=pa;
+          d.change_since_analysis=Math.round((d.current_price-pa)/pa*10000)/100;
+        }
+      });
+      // Salva in localStorage — bloccato per la giornata, sopravvive ai restart del server
+      try{ localStorage.setItem(lsKey,JSON.stringify(data)); }catch(_){}
+    }
+
+    // 3. Se sera: sovrapponi prezzi live mantenendo ordine mattutino
+    if(isEvening){
+      try{
+        const ev=await fetch('/api/scan/evening').then(r=>r.ok?r.json():null);
+        if(Array.isArray(ev)&&ev.length){
+          ev.forEach(d=>{
+            const idx=data.findIndex(c=>c.ticker===d.ticker);
+            if(idx>=0) data[idx]={...data[idx],...d};
+          });
+        }
+      }catch(_){}
+    }
 
     cardsData=data;
-
     const avg=(data.reduce((s,d)=>s+(d.score_10??5),0)/data.length).toFixed(1);
     const top=data.reduce((a,b)=>{
       const pa=Math.abs(a.change_since_analysis??a.day_change_pct);
@@ -2965,6 +3018,7 @@ async function loadData(){
 
     applyAndRender();
     _markRefreshOk();
+    if(isEvening) _setEveningLabel();
     tryShowScanNotification(data);
 
     // Enrich progressivo (nome + segnali)
@@ -2974,7 +3028,6 @@ async function loadData(){
           const full=await fetch('/api/stock/'+stock.ticker).then(r=>r.ok?r.json():null);
           if(!full)return;
           const grid=document.getElementById('grid');
-          // Trova la card corrispondente (può essere riordinata)
           const allCards=[...grid.querySelectorAll('.card')];
           const card=allCards.find(c=>c.querySelector('.card-ticker')?.textContent===stock.ticker);
           if(!card)return;
@@ -2992,12 +3045,7 @@ async function loadData(){
 
   }catch(e){
     console.error('Load:',e);
-    if(hasCards){
-      // Fallimento silenzioso — non distrae con toast se ci sono già dati
-      _markRefreshFailed(true);
-      return 'retry';
-    }
-    // Nessun dato in memoria — mostra schermata di attesa
+    if(hasCards){ _markRefreshFailed(true); return 'retry'; }
     document.getElementById('grid').innerHTML=`
       <div class="empty-state">
         <span class="icon" style="animation:spin 1.2s linear infinite;display:inline-block">⏳</span>
@@ -3060,13 +3108,32 @@ function startCountdown(initial=60){
     },1000);
     return;
   }
-  // Dati caricati: l'analisi è fissa — mostra solo "Analisi di oggi"
+  // Dati caricati
   if(cdTimer) clearInterval(cdTimer);
-  const pill = document.getElementById('refresh-pill');
-  if(pill){
-    const label = document.getElementById('refresh-label');
-    if(label) label.innerHTML = 'Analisi del <b>' + new Date().toLocaleDateString('it-IT',{day:'2-digit',month:'short'}) + '</b> — 07:30';
+  const nowH = new Date().getHours();
+  if(nowH >= 22){
+    // Già in modalità serale — aggiorna prezzi ogni 5 minuti
+    _setEveningLabel();
+    cdTimer=setInterval(()=>{
+      loadData().then(r=>{ if(r==='retry') startCountdown(3); });
+    }, 300000);
+    return;
   }
+  // Modalità mattutina: label fissa + controlla ogni minuto il passaggio alle 22:00
+  const label = document.getElementById('refresh-label');
+  if(label) label.innerHTML = 'Analisi del <b>' + new Date().toLocaleDateString('it-IT',{day:'2-digit',month:'short'}) + '</b> — 07:30';
+  cdTimer=setInterval(()=>{
+    if(new Date().getHours() >= 22){
+      clearInterval(cdTimer);
+      // Scatta la modalità serale: carica prezzi aggiornati
+      loadData().then(r=>startCountdown(r==='retry'?3:300));
+    }
+  }, 60000); // controlla ogni minuto
+}
+
+function _setEveningLabel(){
+  const label = document.getElementById('refresh-label');
+  if(label) label.innerHTML = 'Chiusura del <b>' + new Date().toLocaleDateString('it-IT',{day:'2-digit',month:'short'}) + '</b> — 22:00';
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

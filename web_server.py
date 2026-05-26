@@ -35,6 +35,12 @@ async def _startup_load_cache():
         try:
             data = json.loads(SCAN_FILE.read_text(encoding="utf-8"))
             if data:
+                # Annota morning_price se mancante (compatibilità con vecchi file)
+                for s in data:
+                    if 'morning_price' not in s:
+                        s['morning_price'] = s.get('current_price')
+                global _morning_data
+                _morning_data = list(data)
                 _store("scan:10", data)
                 loaded = True
                 mtime = datetime.fromtimestamp(SCAN_FILE.stat().st_mtime, tz=timezone.utc)
@@ -134,6 +140,7 @@ def _write_users(d: dict):
 # ─── Cache semplice in memoria ────────────────────────────────────────────────
 _cache: dict[str, dict] = {}
 _scan_in_progress: bool = False          # evita scan concorrenti
+_morning_data: list = []                 # dati scan mattutino — bloccati per la giornata
 
 # ─── PDF report in memoria ────────────────────────────────────────────────────
 _morning_pdf: Optional[bytes] = None
@@ -365,7 +372,8 @@ async def _generate_evening_pdf():
     import yfinance as yf
     import pandas as pd
 
-    morning_data = (_cache.get("scan:10") or {}).get("data") or []
+    # Usa _morning_data (bloccato alle 7:30) se disponibile, altrimenti fallback cache
+    morning_data = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
     if not morning_data:
         print("[pdf] Nessun dato mattutino per il recap serale")
         return
@@ -526,9 +534,14 @@ async def _refresh_scan_background(top: int):
         results = await asyncio.to_thread(scan_cheap_stocks, 60.0, top)
         clean = _clean(results or [])
         if clean:
-            _store(f"scan:{top}", clean)
             if top == 10:
+                # Annota morning_price (prezzo al momento della scansione)
+                for s in clean:
+                    s['morning_price'] = s.get('current_price')
+                global _morning_data
+                _morning_data = list(clean)
                 _save_scan_to_disk(clean)
+            _store(f"scan:{top}", clean)
             print(f"[scan_bg] Completato: {len(clean)} titoli")
         else:
             print("[scan_bg] Scan restituito vuoto")
@@ -579,6 +592,48 @@ async def api_scan_etf():
     if clean:
         _store(key, clean)
     return clean or JSONResponse([], status_code=202)
+
+
+@app.get("/api/scan/evening")
+async def api_scan_evening():
+    """Stesso set di stock mattutino con prezzi live — usato dalla vista serale (≥22:00).
+    Restituisce gli stessi titoli in ordine identico, con evening_price e delta_from_morning."""
+    morning = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
+    if not morning:
+        return JSONResponse([], status_code=404)
+
+    tickers = [s["ticker"] for s in morning]
+    closing: dict = {}
+    try:
+        import yfinance as yf
+        import pandas as pd
+        raw = await asyncio.to_thread(
+            lambda: yf.download(tickers, period="1d", progress=False, auto_adjust=True)
+        )
+        if not raw.empty:
+            if isinstance(raw.columns, pd.MultiIndex):
+                close_df = raw["Close"]
+            else:
+                # singolo ticker: colonna piatta
+                t0 = tickers[0] if tickers else "__"
+                close_df = raw[["Close"]].rename(columns={"Close": t0})
+            for t in tickers:
+                if t in close_df.columns:
+                    ser = close_df[t].dropna()
+                    if len(ser):
+                        closing[t] = float(ser.iloc[-1])
+    except Exception as e:
+        print(f"[evening] Errore fetch prezzi: {e}")
+
+    enriched = []
+    for s in morning:
+        t = s["ticker"]
+        mp = s.get("morning_price") or s.get("current_price") or 0
+        ep = closing.get(t, mp)
+        delta = round((ep - mp) / mp * 100, 2) if mp > 0 else 0
+        enriched.append({**s, "evening_price": round(ep, 4), "delta_from_morning": delta})
+
+    return _clean(enriched)
 
 
 @app.get("/api/report/morning")
