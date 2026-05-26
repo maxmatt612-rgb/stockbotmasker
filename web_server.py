@@ -227,8 +227,17 @@ def _save_scan_to_disk(data: list):
 
 # ─── PDF generation ───────────────────────────────────────────────────────────
 
+def _stock_bias(score: float) -> tuple[str, tuple]:
+    """Restituisce (bias_label, rgb_color) in base allo score."""
+    if score >= 7:
+        return "RIALZO", (15, 120, 60)
+    if score >= 5:
+        return "LATERALE", (140, 100, 20)
+    return "RIBASSO", (180, 30, 30)
+
+
 def _build_pdf(stocks: list, title: str, subtitle: str) -> bytes:
-    """Genera un PDF professionale con i dati dei titoli."""
+    """PDF analisi mattutina: stima direzionale + setup di trading per ogni titolo."""
     from fpdf import FPDF
 
     class PDF(FPDF):
@@ -236,14 +245,17 @@ def _build_pdf(stocks: list, title: str, subtitle: str) -> bytes:
             self.set_fill_color(15, 15, 25)
             self.rect(0, 0, 210, 28, 'F')
             self.set_text_color(196, 166, 255)
-            self.set_font("Helvetica", "B", 16)
-            self.set_xy(10, 8)
-            self.cell(0, 8, "MASKER Stock Intelligence", ln=True)
-            self.set_text_color(180, 180, 200)
-            self.set_font("Helvetica", "", 9)
+            self.set_font("Helvetica", "B", 15)
+            self.set_xy(10, 7)
+            self.cell(130, 8, "MASKER Stock Intelligence", ln=False)
+            self.set_font("Helvetica", "", 8)
+            self.set_text_color(140, 140, 160)
+            self.cell(0, 8, "ANALISI MATTUTINA", align="R", ln=True)
+            self.set_text_color(160, 160, 180)
+            self.set_font("Helvetica", "", 8)
             self.set_x(10)
-            self.cell(0, 6, subtitle, ln=True)
-            self.ln(4)
+            self.cell(0, 5, subtitle, ln=True)
+            self.ln(3)
 
         def footer(self):
             self.set_y(-12)
@@ -254,101 +266,143 @@ def _build_pdf(stocks: list, title: str, subtitle: str) -> bytes:
     pdf = PDF()
     pdf.set_margins(10, 32, 10)
     pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_auto_page_break(auto=True, margin=16)
 
-    # Titolo sezione
+    # ── Titolo + riepilogo ──────────────────────────────────────────────────
     pdf.set_font("Helvetica", "B", 13)
-    pdf.set_text_color(30, 30, 50)
+    pdf.set_text_color(20, 20, 40)
     pdf.cell(0, 8, title, ln=True)
-    pdf.ln(2)
+    pdf.ln(1)
 
-    # Intestazione tabella
-    col_w = [20, 38, 28, 22, 18, 20, 20, 24]
-    headers = ["Ticker", "Score", "Prezzo", "Var. %", "RSI", "Rischio", "Vol.", "Segnale"]
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.set_fill_color(240, 238, 255)
-    pdf.set_text_color(40, 40, 80)
+    avg_score = sum(s.get("score_10", 5) or 5 for s in stocks) / max(len(stocks), 1)
+    rialzo_n  = sum(1 for s in stocks if (s.get("score_10") or 5) >= 7)
+    laterale_n = sum(1 for s in stocks if 5 <= (s.get("score_10") or 5) < 7)
+    ribasso_n  = len(stocks) - rialzo_n - laterale_n
+
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_text_color(60, 60, 80)
+    pdf.cell(0, 5,
+        f"Titoli analizzati: {len(stocks)}   |   Score medio: {avg_score:.1f}/10   |   "
+        f"Stime: {rialzo_n} RIALZO  {laterale_n} LATERALE  {ribasso_n} RIBASSO",
+        ln=True)
+    pdf.ln(4)
+
+    # ── Tabella riepilogativa ───────────────────────────────────────────────
+    col_w = [18, 44, 24, 16, 16, 26, 20, 26]
+    headers = ["#", "Ticker / Nome", "Prezzo", "Score", "RSI", "STIMA OGGI", "Rischio", "Setup R/R"]
+    pdf.set_font("Helvetica", "B", 7.5)
+    pdf.set_fill_color(230, 228, 255)
+    pdf.set_text_color(40, 40, 90)
     for i, h in enumerate(headers):
         pdf.cell(col_w[i], 7, h, border=1, fill=True, align="C")
     pdf.ln()
 
-    # Righe
     pdf.set_font("Helvetica", "", 8)
     for rank, s in enumerate(stocks, 1):
-        chg = s.get("day_change_pct", 0) or 0
-        rsi = s.get("rsi", 50) or 50
         score = s.get("score_10", 5) or 5
-        vol = s.get("vol_ratio", 1) or 1
-        ccy = s.get("currency", "USD")
-        sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
-        price_str = f"{sym}{s['current_price']:.2f}" if s.get("current_price") else "—"
-        chg_str = f"{'+' if chg >= 0 else ''}{chg:.2f}%"
-        vol_str = f"{vol:.1f}x"
-        rsi_str = f"{rsi:.0f}"
-        score_str = f"{score:.1f}/10"
-        signal = "COMPRA" if score >= 7 else ("VENDI" if score <= 3 else "ATTENDI")
+        rsi   = s.get("rsi", 50) or 50
+        ccy   = s.get("currency", "USD")
+        sym   = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+        price = s.get("morning_price") or s.get("current_price") or 0
+        price_str = f"{sym}{price:.2f}" if price else "—"
+        bias, bias_rgb = _stock_bias(score)
+        ts = s.get("trade_setup")
+        rr_str = f"1:{ts['rr']}" if ts else "—"
+        name_short = (s.get("name") or s["ticker"])[:18]
 
-        # Alternanza righe
-        if rank % 2 == 0:
-            pdf.set_fill_color(248, 247, 255)
-        else:
-            pdf.set_fill_color(255, 255, 255)
+        pdf.set_fill_color(248, 247, 255) if rank % 2 == 0 else pdf.set_fill_color(255, 255, 255)
+        pdf.set_text_color(50, 50, 70)
 
-        # Colore variazione
-        if chg >= 0:
-            pdf.set_text_color(20, 120, 60)
-        else:
-            pdf.set_text_color(180, 30, 30)
+        pdf.cell(col_w[0], 6, f"#{rank}", border=1, fill=True, align="C")
+        pdf.cell(col_w[1], 6, f"{s['ticker']} — {name_short}", border=1, fill=True, align="L")
+        pdf.cell(col_w[2], 6, price_str, border=1, fill=True, align="C")
+        pdf.cell(col_w[3], 6, f"{score:.1f}/10", border=1, fill=True, align="C")
+        pdf.cell(col_w[4], 6, f"{rsi:.0f}", border=1, fill=True, align="C")
 
-        row = [s["ticker"], score_str, price_str, chg_str, rsi_str,
-               s.get("risk_level", "—"), vol_str, signal]
-        for i, cell in enumerate(row):
-            align = "L" if i == 0 else "C"
-            pdf.cell(col_w[i], 6, str(cell), border=1, fill=True, align=align)
-        pdf.set_text_color(30, 30, 50)
+        # Colonna STIMA (colorata)
+        pdf.set_text_color(*bias_rgb)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(col_w[5], 6, bias, border=1, fill=True, align="C")
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(50, 50, 70)
+
+        pdf.cell(col_w[6], 6, s.get("risk_level", "—"), border=1, fill=True, align="C")
+        pdf.cell(col_w[7], 6, rr_str, border=1, fill=True, align="C")
         pdf.ln()
 
-    # Dettaglio per ogni titolo
+    # ── Schede dettaglio ────────────────────────────────────────────────────
     pdf.ln(6)
     pdf.set_font("Helvetica", "B", 11)
-    pdf.set_text_color(30, 30, 50)
-    pdf.cell(0, 7, "Dettaglio titoli", ln=True)
-    pdf.ln(2)
+    pdf.set_text_color(20, 20, 40)
+    pdf.cell(0, 7, "Schede dettaglio — Stima e Setup", ln=True)
+    pdf.ln(1)
 
     for rank, s in enumerate(stocks, 1):
-        if pdf.get_y() > 250:
+        if pdf.get_y() > 248:
             pdf.add_page()
 
-        chg = s.get("day_change_pct", 0) or 0
         score = s.get("score_10", 5) or 5
-        rsi = s.get("rsi", 50) or 50
-        ccy = s.get("currency", "USD")
-        sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
-        price_str = f"{sym}{s['current_price']:.2f}" if s.get("current_price") else "—"
-        chg_str = f"{'+' if chg >= 0 else ''}{chg:.2f}%"
+        rsi   = s.get("rsi", 50) or 50
+        vol   = s.get("vol_ratio", 1) or 1
+        ccy   = s.get("currency", "USD")
+        sym   = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+        price = s.get("morning_price") or s.get("current_price") or 0
+        bias, bias_rgb = _stock_bias(score)
+        name = s.get("name") or s["ticker"]
 
-        # Header card
-        pdf.set_fill_color(230, 228, 255)
+        # Header titolo
+        pdf.set_fill_color(235, 233, 255)
+        pdf.set_text_color(30, 30, 60)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(0, 7, f"#{rank}  {s['ticker']}  —  {name}", fill=True, ln=True)
+
+        # Riga metriche
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(60, 60, 80)
+        metrics = (
+            f"  Prezzo mattino: {sym}{price:.2f}"
+            f"  |  Score: {score:.1f}/10"
+            f"  |  RSI: {rsi:.0f}"
+            f"  |  Vol: {vol:.1f}x media"
+            f"  |  Rischio: {s.get('risk_level','—')}"
+        )
+        pdf.cell(0, 5, metrics, ln=True)
+
+        # Badge STIMA
         pdf.set_font("Helvetica", "B", 9)
-        pdf.set_text_color(40, 40, 100)
-        pdf.cell(0, 6, f"#{rank}  {s['ticker']}  —  {price_str}  {chg_str}  |  Score {score:.1f}/10  |  RSI {rsi:.0f}  |  {s.get('risk_level','—')}", fill=True, ln=True)
+        pdf.set_text_color(*bias_rgb)
+        arrow = "▲" if bias == "RIALZO" else ("▼" if bias == "RIBASSO" else "→")
+        pdf.cell(0, 6, f"  STIMA OGGI: {arrow} {bias}", ln=True)
 
         # Trade setup
         ts = s.get("trade_setup")
         if ts:
             pdf.set_font("Helvetica", "", 8)
-            pdf.set_text_color(60, 60, 80)
-            pdf.cell(0, 5, f"   Entry {sym}{ts['entry']:.2f}  |  Stop {sym}{ts['stop']:.2f} ({ts['stop_pct']}%)  |  Target {sym}{ts['target']:.2f} (+{ts['target_pct']}%)  |  R/R 1:{ts['rr']}", ln=True)
+            pdf.set_text_color(50, 50, 70)
+            pdf.cell(0, 5,
+                f"  Setup: Entrata {sym}{ts['entry']:.2f}"
+                f"  |  Stop {sym}{ts['stop']:.2f} ({ts['stop_pct']}%)"
+                f"  |  Target {sym}{ts['target']:.2f} (+{ts['target_pct']}%)"
+                f"  |  R/R 1:{ts['rr']}",
+                ln=True)
 
-        pdf.ln(2)
+        # Segnali
+        signals = s.get("signals") or []
+        if signals:
+            pdf.set_font("Helvetica", "", 7.5)
+            pdf.set_text_color(90, 90, 110)
+            for sig in signals[:2]:
+                pdf.cell(0, 4.5, f"  • {sig}", ln=True)
+
+        pdf.ln(3)
 
     return bytes(pdf.output())
 
 
 async def _generate_morning_pdf():
-    """Genera il PDF analisi mattutina dai dati in cache."""
+    """Genera il PDF analisi mattutina dai dati bloccati al mattino."""
     global _morning_pdf, _morning_pdf_ts
-    data = (_cache.get("scan:10") or {}).get("data") or []
+    data = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
     if not data:
         print("[pdf] Nessun dato per il PDF mattutino")
         return
@@ -423,22 +477,33 @@ async def _generate_evening_pdf():
 
 
 def _build_evening_pdf(stocks: list, title: str, subtitle: str) -> bytes:
-    """PDF recap serale: mostra prezzo mattino, chiusura, e delta %."""
+    """PDF recap serale: confronta stima mattutina con risultato reale di chiusura."""
     from fpdf import FPDF
+
+    def _prediction_correct(bias: str, delta: float) -> bool:
+        if bias == "RIALZO":
+            return delta > 0.3
+        if bias == "RIBASSO":
+            return delta < -0.3
+        # LATERALE: piccola variazione in entrambe le direzioni
+        return abs(delta) <= 2.0
 
     class PDF(FPDF):
         def header(self):
             self.set_fill_color(15, 15, 25)
             self.rect(0, 0, 210, 28, 'F')
             self.set_text_color(196, 166, 255)
-            self.set_font("Helvetica", "B", 16)
-            self.set_xy(10, 8)
-            self.cell(0, 8, "MASKER Stock Intelligence", ln=True)
-            self.set_text_color(180, 180, 200)
-            self.set_font("Helvetica", "", 9)
+            self.set_font("Helvetica", "B", 15)
+            self.set_xy(10, 7)
+            self.cell(130, 8, "MASKER Stock Intelligence", ln=False)
+            self.set_font("Helvetica", "", 8)
+            self.set_text_color(140, 140, 160)
+            self.cell(0, 8, "RECAP SERALE", align="R", ln=True)
+            self.set_text_color(160, 160, 180)
+            self.set_font("Helvetica", "", 8)
             self.set_x(10)
-            self.cell(0, 6, subtitle, ln=True)
-            self.ln(4)
+            self.cell(0, 5, subtitle, ln=True)
+            self.ln(3)
 
         def footer(self):
             self.set_y(-12)
@@ -449,54 +514,108 @@ def _build_evening_pdf(stocks: list, title: str, subtitle: str) -> bytes:
     pdf = PDF()
     pdf.set_margins(10, 32, 10)
     pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_auto_page_break(auto=True, margin=16)
 
+    # ── Titolo ──────────────────────────────────────────────────────────────
     pdf.set_font("Helvetica", "B", 13)
-    pdf.set_text_color(30, 30, 50)
+    pdf.set_text_color(20, 20, 40)
     pdf.cell(0, 8, title, ln=True)
-    pdf.ln(2)
+    pdf.ln(1)
 
-    # Tabella recap
-    col_w = [22, 30, 28, 28, 22, 24, 24]
-    headers = ["Ticker", "Score", "Mattina", "Chiusura", "Δ %", "Esito", "Rischio"]
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.set_fill_color(240, 238, 255)
-    pdf.set_text_color(40, 40, 80)
+    # Pre-calcola stats
+    salite   = sum(1 for s in stocks if (s.get("delta_pct") or 0) > 0)
+    scese    = sum(1 for s in stocks if (s.get("delta_pct") or 0) < 0)
+    stabili  = len(stocks) - salite - scese
+    corrette = sum(
+        1 for s in stocks
+        if _prediction_correct(
+            _stock_bias(s.get("score_10", 5) or 5)[0],
+            s.get("delta_pct", 0) or 0
+        )
+    )
+
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_text_color(60, 60, 80)
+    pdf.cell(0, 5,
+        f"Titoli: {len(stocks)}   |   Salite: {salite}   Scese: {scese}   Stabili: {stabili}"
+        f"   |   Previsioni corrette: {corrette}/{len(stocks)}"
+        f"  ({round(corrette/max(len(stocks),1)*100)}%)",
+        ln=True)
+    pdf.ln(4)
+
+    # ── Tabella ─────────────────────────────────────────────────────────────
+    col_w = [18, 42, 22, 22, 22, 20, 24, 20]
+    headers = ["#", "Ticker / Nome", "P. Mattino", "P. Chiusura", "Delta %",
+               "Esito", "Stima", "Previsione"]
+    pdf.set_font("Helvetica", "B", 7.5)
+    pdf.set_fill_color(230, 228, 255)
+    pdf.set_text_color(40, 40, 90)
     for i, h in enumerate(headers):
         pdf.cell(col_w[i], 7, h, border=1, fill=True, align="C")
     pdf.ln()
 
+    # Ordina: prima le salite, poi stabili, poi scese
+    sorted_stocks = sorted(stocks, key=lambda x: x.get("delta_pct", 0) or 0, reverse=True)
+
     pdf.set_font("Helvetica", "", 8)
-    for rank, s in enumerate(stocks, 1):
+    for rank, s in enumerate(sorted_stocks, 1):
         delta = s.get("delta_pct", 0) or 0
-        ccy = s.get("currency", "USD")
-        sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
-        morning_str  = f"{sym}{s.get('current_price', 0):.2f}"
-        evening_str  = f"{sym}{s.get('evening_price', 0):.2f}"
-        delta_str    = f"{'+' if delta >= 0 else ''}{delta:.2f}%"
-        esito        = "✅ SALITA" if delta > 0 else ("⚠️ STABILE" if delta == 0 else "❌ SCESA")
-        score_str    = f"{(s.get('score_10') or 0):.1f}/10"
+        ccy   = s.get("currency", "USD")
+        sym   = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+        score = s.get("score_10", 5) or 5
+        mp    = s.get("current_price") or s.get("morning_price") or 0
+        ep    = s.get("evening_price", mp) or mp
+        bias, _ = _stock_bias(score)
+        correct = _prediction_correct(bias, delta)
+        name_short = (s.get("name") or s["ticker"])[:16]
 
-        if rank % 2 == 0:
-            pdf.set_fill_color(248, 247, 255)
-        else:
-            pdf.set_fill_color(255, 255, 255)
+        morning_str = f"{sym}{mp:.2f}" if mp else "—"
+        evening_str = f"{sym}{ep:.2f}" if ep else "—"
+        delta_str   = f"{'+' if delta >= 0 else ''}{delta:.2f}%"
+        esito_str   = "SALITA" if delta > 0 else ("SCESA" if delta < 0 else "STABILE")
+        prev_str    = "CORRETTO" if correct else "ERRATO"
 
-        pdf.set_text_color(20, 120, 60) if delta >= 0 else pdf.set_text_color(180, 30, 30)
-        row = [s["ticker"], score_str, morning_str, evening_str, delta_str, esito, s.get("risk_level", "—")]
-        for i, cell in enumerate(row):
-            pdf.cell(col_w[i], 6, str(cell), border=1, fill=True, align="C" if i > 0 else "L")
-        pdf.set_text_color(30, 30, 50)
+        pdf.set_fill_color(248, 247, 255) if rank % 2 == 0 else pdf.set_fill_color(255, 255, 255)
+        pdf.set_text_color(50, 50, 70)
+        pdf.cell(col_w[0], 6, f"#{rank}", border=1, fill=True, align="C")
+        pdf.cell(col_w[1], 6, f"{s['ticker']} — {name_short}", border=1, fill=True, align="L")
+        pdf.cell(col_w[2], 6, morning_str, border=1, fill=True, align="C")
+        pdf.cell(col_w[3], 6, evening_str, border=1, fill=True, align="C")
+
+        # Delta colorato
+        pdf.set_text_color(15, 110, 55) if delta >= 0 else pdf.set_text_color(170, 25, 25)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(col_w[4], 6, delta_str, border=1, fill=True, align="C")
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(50, 50, 70)
+
+        pdf.cell(col_w[5], 6, esito_str, border=1, fill=True, align="C")
+        # Stima mattutina
+        _, bias_rgb = _stock_bias(score)
+        pdf.set_text_color(*bias_rgb)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(col_w[6], 6, bias, border=1, fill=True, align="C")
+        pdf.set_font("Helvetica", "", 8)
+        # Previsione corretta?
+        pdf.set_text_color(15, 110, 55) if correct else pdf.set_text_color(170, 25, 25)
+        pdf.cell(col_w[7], 6, prev_str, border=1, fill=True, align="C")
+        pdf.set_text_color(50, 50, 70)
         pdf.ln()
 
-    # Riepilogo
-    pdf.ln(6)
-    salite  = sum(1 for s in stocks if (s.get("delta_pct") or 0) > 0)
-    scese   = sum(1 for s in stocks if (s.get("delta_pct") or 0) < 0)
-    stabili = len(stocks) - salite - scese
-    pdf.set_font("Helvetica", "B", 9)
-    pdf.set_text_color(30, 30, 50)
-    pdf.cell(0, 6, f"Riepilogo giornata: ✅ {salite} salite  ❌ {scese} scese  ⚠️ {stabili} stabili", ln=True)
+    # ── Riepilogo ────────────────────────────────────────────────────────────
+    pdf.ln(5)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_fill_color(235, 233, 255)
+    pdf.set_text_color(30, 30, 60)
+    pdf.cell(0, 7, " Riepilogo giornata", fill=True, ln=True)
+    pdf.ln(1)
+    pdf.set_font("Helvetica", "", 8.5)
+    pdf.set_text_color(40, 40, 60)
+    pdf.cell(0, 5, f"  Salite: {salite}  |  Scese: {scese}  |  Stabili: {stabili}", ln=True)
+    pdf.cell(0, 5,
+        f"  Previsioni corrette: {corrette}/{len(stocks)} ({round(corrette/max(len(stocks),1)*100)}%)"
+        f"  —  {'Ottima giornata!' if corrette >= len(stocks)*0.7 else 'Giornata nella norma.'}",
+        ln=True)
 
     return bytes(pdf.output())
 
