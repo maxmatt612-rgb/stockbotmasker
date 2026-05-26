@@ -2052,6 +2052,16 @@ const fmtP = v => {
   const c=v*_fxRate;
   return _fxSym+(c<1?c.toFixed(4):c.toFixed(2));
 };
+// Versione currency-aware: rispetta EUR/GBP senza doppia conversione
+const fmtPCcy = (v, ccy) => {
+  if(v==null||v===0) return '—';
+  if(ccy==='EUR') return '€'+(v<1?v.toFixed(4):v.toFixed(2));
+  if(ccy==='GBP') return '£'+(v<1?v.toFixed(4):v.toFixed(2));
+  if(ccy==='CHF') return '₣'+(v<1?v.toFixed(4):v.toFixed(2));
+  // USD → converti se in modalità EUR
+  const c=v*_fxRate;
+  return _fxSym+(c<1?c.toFixed(4):c.toFixed(2));
+};
 const fmtC = v => v==null||isNaN(v) ? '—' : (v>=0?'+':'')+Number(v).toFixed(2)+'%';
 function toggleFX(){localStorage.setItem('masker_fx',_fxActive?'usd':'eur');location.reload();}
 
@@ -2293,15 +2303,15 @@ function buildCard(d, rank){
       <div class="trade-setup-grid">
         <div class="ts-cell entry">
           <div class="ts-cell-label">Entrata</div>
-          <div class="ts-cell-val">${fmtP(ts.entry)}</div>
+          <div class="ts-cell-val">${fmtPCcy(ts.entry, d.currency)}</div>
         </div>
         <div class="ts-cell stop">
           <div class="ts-cell-label">Stop</div>
-          <div class="ts-cell-val">${fmtP(ts.stop)}<span style="font-size:.55rem;font-weight:400"> (${ts.stop_pct}%)</span></div>
+          <div class="ts-cell-val">${fmtPCcy(ts.stop, d.currency)}<span style="font-size:.55rem;font-weight:400"> (${ts.stop_pct}%)</span></div>
         </div>
         <div class="ts-cell target">
           <div class="ts-cell-label">Target</div>
-          <div class="ts-cell-val">${fmtP(ts.target)}<span style="font-size:.55rem;font-weight:400"> (+${ts.target_pct}%)</span></div>
+          <div class="ts-cell-val">${fmtPCcy(ts.target, d.currency)}<span style="font-size:.55rem;font-weight:400"> (+${ts.target_pct}%)</span></div>
         </div>
       </div>
       <div class="trade-setup-rr">Risk/Reward <strong>1:${ts.rr}</strong> — basato sulla volatilità annualizzata</div>
@@ -2316,7 +2326,7 @@ function buildCard(d, rank){
         <div class="card-name">${d.name??d.ticker}</div>
       </div>
       <div class="price-block">
-        <div class="price-val">${fmtP(d.current_price)}</div>
+        <div class="price-val">${fmtPCcy(d.current_price, d.currency)}</div>
         <div class="price-chg ${isPos?'chg-pos':'chg-neg'}" title="${d.change_since_analysis!=null?'Variazione dall\'analisi mattutina':'Variazione giornaliera'}">${fmtC(dispPct)}</div>
       </div>
     </div>

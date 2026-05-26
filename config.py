@@ -99,3 +99,49 @@ REVOLUT_UNIVERSE = [
     # ── Penny stocks con volume ──
     "IDEX", "SHIP",
 ]
+
+# ── Mercati Europei ──────────────────────────────────────────────────────────
+EUROPEAN_UNIVERSE = [
+    # ── Borsa Italiana — blue chip & mid cap (.MI) ──
+    "ENEL.MI",   # Enel — utility energia
+    "ENI.MI",    # Eni — oil & gas
+    "ISP.MI",    # Intesa Sanpaolo — banca
+    "TIT.MI",    # Telecom Italia
+    "A2A.MI",    # A2A — multiutility
+    "SRG.MI",    # Snam — infrastruttura gas
+    "TRN.MI",    # Terna — rete elettrica
+    "PST.MI",    # Poste Italiane
+    "BAMI.MI",   # Banco BPM
+    "BMED.MI",   # Banca Mediolanum
+    "MB.MI",     # Mediobanca
+    "AZM.MI",    # Azimut Holding — asset management
+    "LDO.MI",    # Leonardo — difesa & aerospazio
+    "G.MI",      # Generali — assicurazioni
+    "PIRC.MI",   # Piaggio
+    "BZU.MI",    # Buzzi Unicem — costruzioni
+    "BGN.MI",    # Banca Generali
+    "CPR.MI",    # Caltagirone Editore
+    "MARR.MI",   # MARR — distribuzione alimentare
+    "SFER.MI",   # Salvatore Ferragamo
+    "SPM.MI",    # Saipem — oil services
+    "DBRG.MI",   # De' Longhi
+    # ── Francia — Euronext Paris (.PA) ──
+    "ORA.PA",    # Orange — telecom
+    "VIE.PA",    # Veolia — utility
+    "RNO.PA",    # Renault — auto
+    "HO.PA",     # Thales — difesa
+    # ── Germania — Xetra (.DE) ──
+    "DB.DE",     # Deutsche Bank
+    "AIXA.DE",   # Aixtron — semiconduttori
+    "IFX.DE",    # Infineon — semiconduttori
+    # ── Olanda — Euronext Amsterdam (.AS) ──
+    "ABN.AS",    # ABN AMRO — banca
+    "PHIA.AS",   # Philips — health tech
+    # ── Spagna — BME (.MC) ──
+    "BBVA.MC",   # BBVA — banca
+    "SAN.MC",    # Santander — banca
+    "TEF.MC",    # Telefónica
+]
+
+# Universo completo = US + Europa
+REVOLUT_UNIVERSE = REVOLUT_UNIVERSE + EUROPEAN_UNIVERSE

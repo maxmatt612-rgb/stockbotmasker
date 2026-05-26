@@ -406,7 +406,20 @@ def _sign(v: float) -> str:
 
 # ─── Scanner mercato ─────────────────────────────────────────────────────────
 
-def scan_cheap_stocks(max_price: float = 40.0, top_n: int = 10) -> list:
+_CURRENCY_BY_SUFFIX = {
+    "MI": "EUR", "PA": "EUR", "DE": "EUR", "AS": "EUR",
+    "MC": "EUR", "BR": "EUR", "LS": "EUR", "VI": "EUR",
+    "ST": "SEK", "CO": "DKK", "ZU": "CHF", "HE": "EUR",
+    "L":  "GBP",
+}
+
+def _ticker_currency(ticker: str) -> str:
+    if "." in ticker:
+        return _CURRENCY_BY_SUFFIX.get(ticker.rsplit(".", 1)[-1].upper(), "USD")
+    return "USD"
+
+
+def scan_cheap_stocks(max_price: float = 60.0, top_n: int = 10) -> list:
     from config import REVOLUT_UNIVERSE
 
     risultati = []
@@ -532,6 +545,7 @@ def scan_cheap_stocks(max_price: float = 40.0, top_n: int = 10) -> list:
                     risultati.append({
                         "ticker": ticker,
                         "current_price": current_price,
+                        "currency": _ticker_currency(ticker),
                         "day_change_pct": day_change_pct,
                         "rsi": rsi,
                         "vol_ratio": vol_ratio,

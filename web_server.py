@@ -212,7 +212,7 @@ async def _refresh_scan_background(top: int):
     _scan_in_progress = True
     try:
         print(f"[scan_bg] Avvio scan top={top}…")
-        results = await asyncio.to_thread(scan_cheap_stocks, 40.0, top)
+        results = await asyncio.to_thread(scan_cheap_stocks, 60.0, top)
         clean = _clean(results or [])
         if clean:
             _store(f"scan:{top}", clean)
