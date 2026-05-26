@@ -1626,6 +1626,8 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   <button class="ctrl-btn" onclick="toggleScreener()">🔍 Screener</button>
   <button class="ctrl-btn" onclick="openComparison()">📊 Confronta</button>
   <button class="ctrl-btn" id="export-pdf-btn" title="Esporta analisi corrente in PDF" onclick="exportPDF()">📄 PDF</button>
+  <button class="ctrl-btn" id="dl-morning-btn" title="Scarica PDF analisi mattutina" onclick="downloadReport('morning')">🌅 Mattina</button>
+  <button class="ctrl-btn" id="dl-evening-btn" title="Scarica PDF recap serale" onclick="downloadReport('evening')">🌆 Sera</button>
 </div>
 
 <!-- ── Screener panel ── -->
@@ -2913,6 +2915,53 @@ function startCountdown(initial=60){
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Report PDF automatici (mattina / sera)
+// ══════════════════════════════════════════════════════════════════════════════
+async function downloadReport(kind) {
+  const btn = document.getElementById(kind === 'morning' ? 'dl-morning-btn' : 'dl-evening-btn');
+  const orig = btn.textContent;
+  btn.textContent = '⏳';
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/report/${kind}`);
+    if (!res.ok) {
+      // Non ancora disponibile — generalo ora
+      await fetch(`/api/report/generate?kind=${kind}`, { method: 'POST' });
+      showToast('⏳ PDF in generazione, riprova tra 10 secondi');
+      btn.textContent = orig; btn.disabled = false;
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const date = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `masker_${kind === 'morning' ? 'mattina' : 'sera'}_${date}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    showToast('❌ Errore download PDF');
+  }
+  btn.textContent = orig; btn.disabled = false;
+}
+
+async function _checkReportStatus() {
+  try {
+    const s = await fetch('/api/report/status').then(r => r.json());
+    const mb = document.getElementById('dl-morning-btn');
+    const eb = document.getElementById('dl-evening-btn');
+    if (mb) mb.title = s.morning.available
+      ? `PDF disponibile — generato alle ${s.morning.generated_at}`
+      : 'PDF mattutino non ancora disponibile (verrà generato alle 7:35)';
+    if (eb) eb.title = s.evening.available
+      ? `PDF disponibile — generato alle ${s.evening.generated_at}`
+      : 'PDF serale non ancora disponibile (verrà generato alle 17:40)';
+    if (mb) mb.style.opacity = s.morning.available ? '1' : '0.5';
+    if (eb) eb.style.opacity = s.evening.available ? '1' : '0.5';
+  } catch(_) {}
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Export PDF (stampa)
 // ══════════════════════════════════════════════════════════════════════════════
 function exportPDF(){
@@ -3914,6 +3963,7 @@ loadAccuracy();
 loadBacktest();
 initAuth();
 initNotifications();
+_checkReportStatus();
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab switching (5 tab)

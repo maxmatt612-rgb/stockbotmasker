@@ -42,6 +42,7 @@ async def _startup_load_cache():
     # Avvia sempre un refresh in background all'avvio così i dati si aggiornano
     # subito (se abbiamo dati stale) oppure la prima scansione parte in parallelo
     asyncio.create_task(_refresh_scan_background(10))
+    asyncio.create_task(_pdf_scheduler())
     if not loaded:
         print("[startup] Nessun dato salvato — scan di avvio in background iniziato")
 
@@ -126,6 +127,12 @@ def _write_users(d: dict):
 # ─── Cache semplice in memoria ────────────────────────────────────────────────
 _cache: dict[str, dict] = {}
 _scan_in_progress: bool = False          # evita scan concorrenti
+
+# ─── PDF report in memoria ────────────────────────────────────────────────────
+_morning_pdf: Optional[bytes] = None
+_morning_pdf_ts: Optional[str] = None   # timestamp generazione
+_evening_pdf: Optional[bytes] = None
+_evening_pdf_ts: Optional[str] = None
 _SCAN_TTL     = 300    # 5 min — scanner
 _STOCK_TTL    = 180    # 3 min — analisi singola
 _AI_TTL       = 600    # 10 min — AI (chiamata Groq costosa)
@@ -204,6 +211,185 @@ def _save_scan_to_disk(data: list):
         print(f"[scan] Errore salvataggio su disco: {e}")
 
 
+# ─── PDF generation ───────────────────────────────────────────────────────────
+
+def _build_pdf(stocks: list, title: str, subtitle: str) -> bytes:
+    """Genera un PDF professionale con i dati dei titoli."""
+    from fpdf import FPDF
+
+    class PDF(FPDF):
+        def header(self):
+            self.set_fill_color(15, 15, 25)
+            self.rect(0, 0, 210, 28, 'F')
+            self.set_text_color(196, 166, 255)
+            self.set_font("Helvetica", "B", 16)
+            self.set_xy(10, 8)
+            self.cell(0, 8, "MASKER Stock Intelligence", ln=True)
+            self.set_text_color(180, 180, 200)
+            self.set_font("Helvetica", "", 9)
+            self.set_x(10)
+            self.cell(0, 6, subtitle, ln=True)
+            self.ln(4)
+
+        def footer(self):
+            self.set_y(-12)
+            self.set_font("Helvetica", "I", 7)
+            self.set_text_color(120, 120, 140)
+            self.cell(0, 6, "Solo a scopo informativo — non costituisce consulenza finanziaria", align="C")
+
+    pdf = PDF()
+    pdf.set_margins(10, 32, 10)
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    # Titolo sezione
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.set_text_color(30, 30, 50)
+    pdf.cell(0, 8, title, ln=True)
+    pdf.ln(2)
+
+    # Intestazione tabella
+    col_w = [20, 38, 28, 22, 18, 20, 20, 24]
+    headers = ["Ticker", "Score", "Prezzo", "Var. %", "RSI", "Rischio", "Vol.", "Segnale"]
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_fill_color(240, 238, 255)
+    pdf.set_text_color(40, 40, 80)
+    for i, h in enumerate(headers):
+        pdf.cell(col_w[i], 7, h, border=1, fill=True, align="C")
+    pdf.ln()
+
+    # Righe
+    pdf.set_font("Helvetica", "", 8)
+    for rank, s in enumerate(stocks, 1):
+        chg = s.get("day_change_pct", 0) or 0
+        rsi = s.get("rsi", 50) or 50
+        score = s.get("score_10", 5) or 5
+        vol = s.get("vol_ratio", 1) or 1
+        ccy = s.get("currency", "USD")
+        sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+        price_str = f"{sym}{s['current_price']:.2f}" if s.get("current_price") else "—"
+        chg_str = f"{'+' if chg >= 0 else ''}{chg:.2f}%"
+        vol_str = f"{vol:.1f}x"
+        rsi_str = f"{rsi:.0f}"
+        score_str = f"{score:.1f}/10"
+        signal = "COMPRA" if score >= 7 else ("VENDI" if score <= 3 else "ATTENDI")
+
+        # Alternanza righe
+        if rank % 2 == 0:
+            pdf.set_fill_color(248, 247, 255)
+        else:
+            pdf.set_fill_color(255, 255, 255)
+
+        # Colore variazione
+        if chg >= 0:
+            pdf.set_text_color(20, 120, 60)
+        else:
+            pdf.set_text_color(180, 30, 30)
+
+        row = [s["ticker"], score_str, price_str, chg_str, rsi_str,
+               s.get("risk_level", "—"), vol_str, signal]
+        for i, cell in enumerate(row):
+            align = "L" if i == 0 else "C"
+            pdf.cell(col_w[i], 6, str(cell), border=1, fill=True, align=align)
+        pdf.set_text_color(30, 30, 50)
+        pdf.ln()
+
+    # Dettaglio per ogni titolo
+    pdf.ln(6)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(30, 30, 50)
+    pdf.cell(0, 7, "Dettaglio titoli", ln=True)
+    pdf.ln(2)
+
+    for rank, s in enumerate(stocks, 1):
+        if pdf.get_y() > 250:
+            pdf.add_page()
+
+        chg = s.get("day_change_pct", 0) or 0
+        score = s.get("score_10", 5) or 5
+        rsi = s.get("rsi", 50) or 50
+        ccy = s.get("currency", "USD")
+        sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+        price_str = f"{sym}{s['current_price']:.2f}" if s.get("current_price") else "—"
+        chg_str = f"{'+' if chg >= 0 else ''}{chg:.2f}%"
+
+        # Header card
+        pdf.set_fill_color(230, 228, 255)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_text_color(40, 40, 100)
+        pdf.cell(0, 6, f"#{rank}  {s['ticker']}  —  {price_str}  {chg_str}  |  Score {score:.1f}/10  |  RSI {rsi:.0f}  |  {s.get('risk_level','—')}", fill=True, ln=True)
+
+        # Trade setup
+        ts = s.get("trade_setup")
+        if ts:
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(60, 60, 80)
+            pdf.cell(0, 5, f"   Entry {sym}{ts['entry']:.2f}  |  Stop {sym}{ts['stop']:.2f} ({ts['stop_pct']}%)  |  Target {sym}{ts['target']:.2f} (+{ts['target_pct']}%)  |  R/R 1:{ts['rr']}", ln=True)
+
+        pdf.ln(2)
+
+    return bytes(pdf.output())
+
+
+async def _generate_morning_pdf():
+    """Genera il PDF analisi mattutina dai dati in cache."""
+    global _morning_pdf, _morning_pdf_ts
+    data = (_cache.get("scan:10") or {}).get("data") or []
+    if not data:
+        print("[pdf] Nessun dato per il PDF mattutino")
+        return
+    now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+    try:
+        pdf_bytes = await asyncio.to_thread(
+            _build_pdf, data,
+            f"Analisi Mattutina — {datetime.now().strftime('%A %d %B %Y').capitalize()}",
+            f"Generato il {now_str} | Top {len(data)} titoli per score"
+        )
+        _morning_pdf = pdf_bytes
+        _morning_pdf_ts = now_str
+        print(f"[pdf] PDF mattutino generato ({len(pdf_bytes)//1024} KB)")
+    except Exception as e:
+        print(f"[pdf] Errore generazione PDF mattutino: {e}")
+
+
+async def _generate_evening_pdf():
+    """Genera il PDF recap serale dai dati in cache."""
+    global _evening_pdf, _evening_pdf_ts
+    data = (_cache.get("scan:10") or {}).get("data") or []
+    if not data:
+        print("[pdf] Nessun dato per il PDF serale")
+        return
+    now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+    try:
+        pdf_bytes = await asyncio.to_thread(
+            _build_pdf, data,
+            f"Recap Serale — {datetime.now().strftime('%A %d %B %Y').capitalize()}",
+            f"Chiusura mercati | Generato il {now_str}"
+        )
+        _evening_pdf = pdf_bytes
+        _evening_pdf_ts = now_str
+        print(f"[pdf] PDF serale generato ({len(pdf_bytes)//1024} KB)")
+    except Exception as e:
+        print(f"[pdf] Errore generazione PDF serale: {e}")
+
+
+async def _pdf_scheduler():
+    """Genera PDF automaticamente: 07:35 (mattina) e 17:40 (chiusura EU)."""
+    while True:
+        now = datetime.now()
+        h, m = now.hour, now.minute
+        # Mattina: 07:35 (5 min dopo il report mattutino delle 7:30)
+        if h == 7 and m == 35:
+            await _generate_morning_pdf()
+            await asyncio.sleep(60)  # evita doppio trigger
+        # Chiusura EU: 17:40 (10 min dopo la chiusura delle 17:30)
+        elif h == 17 and m == 40:
+            await _generate_evening_pdf()
+            await asyncio.sleep(60)
+        else:
+            await asyncio.sleep(30)  # controlla ogni 30 secondi
+
+
 async def _refresh_scan_background(top: int):
     """Aggiorna il scan in background senza bloccare la risposta."""
     global _scan_in_progress
@@ -254,6 +440,59 @@ async def api_scan_force():
     if not _scan_in_progress:
         asyncio.create_task(_refresh_scan_background(10))
     return {"ok": True, "scan_in_progress": _scan_in_progress}
+
+
+@app.get("/api/report/morning")
+async def api_report_morning():
+    """Scarica il PDF analisi mattutina. Se non ancora generato, lo genera ora."""
+    global _morning_pdf, _morning_pdf_ts
+    if _morning_pdf is None:
+        await _generate_morning_pdf()
+    if _morning_pdf is None:
+        return JSONResponse({"error": "Nessun dato disponibile per il PDF"}, status_code=404)
+    from fastapi.responses import Response
+    date_str = datetime.now().strftime("%Y%m%d")
+    return Response(
+        content=_morning_pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=masker_mattina_{date_str}.pdf"},
+    )
+
+
+@app.get("/api/report/evening")
+async def api_report_evening():
+    """Scarica il PDF recap serale. Se non ancora generato, lo genera ora."""
+    global _evening_pdf, _evening_pdf_ts
+    if _evening_pdf is None:
+        await _generate_evening_pdf()
+    if _evening_pdf is None:
+        return JSONResponse({"error": "Nessun dato disponibile per il PDF"}, status_code=404)
+    from fastapi.responses import Response
+    date_str = datetime.now().strftime("%Y%m%d")
+    return Response(
+        content=_evening_pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=masker_sera_{date_str}.pdf"},
+    )
+
+
+@app.get("/api/report/status")
+async def api_report_status():
+    """Restituisce lo stato dei PDF disponibili."""
+    return {
+        "morning": {"available": _morning_pdf is not None, "generated_at": _morning_pdf_ts},
+        "evening": {"available": _evening_pdf is not None, "generated_at": _evening_pdf_ts},
+    }
+
+
+@app.post("/api/report/generate")
+async def api_report_generate(kind: str = "morning"):
+    """Genera manualmente un PDF (morning o evening)."""
+    if kind == "evening":
+        asyncio.create_task(_generate_evening_pdf())
+    else:
+        asyncio.create_task(_generate_morning_pdf())
+    return {"ok": True, "generating": kind}
 
 
 @app.get("/api/stock/{ticker}")
