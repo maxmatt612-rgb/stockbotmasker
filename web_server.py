@@ -125,6 +125,7 @@ def _write_users(d: dict):
 
 # ─── Cache semplice in memoria ────────────────────────────────────────────────
 _cache: dict[str, dict] = {}
+_scan_in_progress: bool = False          # evita scan concorrenti
 _SCAN_TTL     = 300    # 5 min — scanner
 _STOCK_TTL    = 180    # 3 min — analisi singola
 _AI_TTL       = 600    # 10 min — AI (chiamata Groq costosa)
@@ -205,15 +206,25 @@ def _save_scan_to_disk(data: list):
 
 async def _refresh_scan_background(top: int):
     """Aggiorna il scan in background senza bloccare la risposta."""
+    global _scan_in_progress
+    if _scan_in_progress:
+        return  # già in corso, skip
+    _scan_in_progress = True
     try:
+        print(f"[scan_bg] Avvio scan top={top}…")
         results = await asyncio.to_thread(scan_cheap_stocks, 40.0, top)
         clean = _clean(results or [])
         if clean:
             _store(f"scan:{top}", clean)
             if top == 10:
                 _save_scan_to_disk(clean)
+            print(f"[scan_bg] Completato: {len(clean)} titoli")
+        else:
+            print("[scan_bg] Scan restituito vuoto")
     except Exception as e:
         print(f"[scan_bg] Errore: {e}")
+    finally:
+        _scan_in_progress = False
 
 
 @app.get("/api/scan")
@@ -227,8 +238,11 @@ async def api_scan(top: int = 10):
     if stale:
         asyncio.create_task(_refresh_scan_background(top))
         return stale["data"]
-    # Nessun dato in cache: background task già avviato al boot.
-    # Restituiamo 202 con lista vuota — il frontend mostra "in avvio" e riprova tra 10s.
+    # Nessun dato in cache: assicuriamoci che il background task sia avviato
+    # (potrebbe non essersi avviato se il startup event ha avuto problemi).
+    if not _scan_in_progress:
+        asyncio.create_task(_refresh_scan_background(top))
+    # Rispondi subito: il frontend mostra "in avvio" e riprova ogni 10s
     return JSONResponse([], status_code=202)
 
 
