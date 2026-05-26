@@ -227,15 +227,9 @@ async def api_scan(top: int = 10):
     if stale:
         asyncio.create_task(_refresh_scan_background(top))
         return stale["data"]
-    # Nessun dato in cache: il background task avviato in startup sta già girando.
-    # Aspettiamo al massimo 55s; se arrivano dati nel frattempo li restituiamo.
-    for _ in range(55):
-        await asyncio.sleep(1)
-        stale = _cache.get(key)
-        if stale:
-            return stale["data"]
-    # Timeout — restituiamo lista vuota; il frontend mostra "Riprova"
-    return []
+    # Nessun dato in cache: background task già avviato al boot.
+    # Restituiamo 202 con lista vuota — il frontend mostra "in avvio" e riprova tra 10s.
+    return JSONResponse([], status_code=202)
 
 
 @app.get("/api/stock/{ticker}")
