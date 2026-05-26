@@ -2715,6 +2715,7 @@ async function _loadScoreHistory(ticker){
 // Load Data
 // ══════════════════════════════════════════════════════════════════════════════
 async function loadData(){
+  const hasCards = cardsData.length > 0; // abbiamo già dati a schermo?
   try{
     // Fetch scan + snapshot mattutino in parallelo
     const todayIso = new Date().toISOString().slice(0,10);
@@ -2723,6 +2724,11 @@ async function loadData(){
       fetch(`/api/history/${todayIso}`).then(r=>r.ok?r.json():null).catch(()=>null),
     ]);
     if(!Array.isArray(data)||!data.length){
+      if(hasCards){
+        // Non sovrascrivere le card — mostra solo un toast discreto
+        showToast('⏳ Scansione in corso — dati aggiornati tra poco');
+        return 'retry';
+      }
       document.getElementById('grid').innerHTML=`
         <div class="empty-state">
           <span class="icon">⏳</span>
@@ -2789,6 +2795,12 @@ async function loadData(){
 
   }catch(e){
     console.error('Load:',e);
+    if(hasCards){
+      // Non sovrascrivere le card già mostrate — toast discreto
+      showToast('⚠️ Aggiornamento fallito — riprovo tra poco');
+      return 'retry';
+    }
+    // Nessun dato in memoria — mostra schermata di attesa
     document.getElementById('grid').innerHTML=`
       <div class="empty-state">
         <span class="icon">⏳</span>
@@ -2796,7 +2808,7 @@ async function loadData(){
         <div style="font-size:.76rem;color:var(--text-dim);margin-bottom:14px">La prima scansione richiede ~60 secondi.<br>Riprovo automaticamente tra pochi secondi.</div>
         <button onclick="manualRetry()" style="background:var(--primary);color:#fff;border:none;border-radius:var(--r-md);padding:9px 22px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:Inter,sans-serif">🔄 Riprova subito</button>
       </div>`;
-    return 'retry'; // segnala al chiamante di riprovarci presto
+    return 'retry';
   }
 }
 
