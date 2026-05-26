@@ -3083,6 +3083,8 @@ function _markRefreshOk(){
 async function forceRefresh(){
   const btn=document.getElementById('force-refresh-btn');
   if(btn){btn.textContent='⏳';btn.disabled=true;}
+  // Azzera snapshot mattutina locale → il prossimo load salva prezzi freschi come nuova base
+  try{ localStorage.removeItem(`masker_morning_${new Date().toISOString().slice(0,10)}`); }catch(_){}
   try{
     // Forza un nuovo scan sul server (bypassa cache)
     await fetch('/api/scan/force',{method:'POST'}).catch(()=>{});
