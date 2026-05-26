@@ -248,6 +248,7 @@ header{
 /* ── Skeleton ── */
 .skel-card{background:#fff;border:1px solid var(--border);border-radius:var(--r-xl);padding:22px;box-shadow:var(--shadow-sm);animation:shimmer 1.8s infinite}
 @keyframes shimmer{0%,100%{opacity:.5}50%{opacity:.9}}
+@keyframes spin{to{transform:rotate(360deg)}}
 .skel-line{background:var(--surf-v);border-radius:6px;margin-bottom:10px}
 
 /* ── Empty state ── */
@@ -1959,7 +1960,7 @@ window.switchTab = function(tab) {
   VIEWS.forEach(v => {
     const el = document.getElementById(v + '-view');
     if (!el) return;
-    el.style.display = (v === tab) ? (v === 'ai-chat' ? 'flex' : '') : 'none';
+    el.style.display = (v === tab) ? (v === 'ai-chat' ? 'flex' : 'block') : 'none';
   });
   if (!window._tabLoaded[tab]) {
     window._tabLoaded[tab] = true;
@@ -2767,10 +2768,9 @@ async function loadData(){
       }
       document.getElementById('grid').innerHTML=`
         <div class="empty-state">
-          <span class="icon">⏳</span>
-          <div style="font-weight:700;margin-bottom:6px">Scansione in corso…</div>
-          <div style="font-size:.76rem;color:var(--text-dim);margin-bottom:14px">Il server sta analizzando i titoli.<br>Riprovo automaticamente tra pochi secondi.</div>
-          <button onclick="manualRetry()" style="background:var(--primary);color:#fff;border:none;border-radius:var(--r-md);padding:9px 22px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:Inter,sans-serif">🔄 Riprova subito</button>
+          <span class="icon" style="animation:spin 1.2s linear infinite;display:inline-block">⏳</span>
+          <div style="font-weight:700;margin-bottom:6px">Analisi in corso…</div>
+          <div style="font-size:.76rem;color:var(--text-dim)">I titoli vengono caricati automaticamente.</div>
         </div>`;
       return 'retry';
     }
@@ -2840,10 +2840,9 @@ async function loadData(){
     // Nessun dato in memoria — mostra schermata di attesa
     document.getElementById('grid').innerHTML=`
       <div class="empty-state">
-        <span class="icon">⏳</span>
-        <div style="font-weight:700;margin-bottom:6px">Server in avvio…</div>
-        <div style="font-size:.76rem;color:var(--text-dim);margin-bottom:14px">La prima scansione richiede ~60 secondi.<br>Riprovo automaticamente tra pochi secondi.</div>
-        <button onclick="manualRetry()" style="background:var(--primary);color:#fff;border:none;border-radius:var(--r-md);padding:9px 22px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:Inter,sans-serif">🔄 Riprova subito</button>
+        <span class="icon" style="animation:spin 1.2s linear infinite;display:inline-block">⏳</span>
+        <div style="font-weight:700;margin-bottom:6px">Connessione al server…</div>
+        <div style="font-size:.76rem;color:var(--text-dim)">I titoli vengono caricati automaticamente.</div>
       </div>`;
     return 'retry';
   }
@@ -2853,7 +2852,7 @@ function manualRetry(){
   const grid=document.getElementById('grid');
   grid.innerHTML='<div class="skel-card"></div><div class="skel-card"></div><div class="skel-card"></div>';
   clearInterval(cdTimer);
-  loadData().then(r=>startCountdown(r==='retry'?10:60));
+  loadData().then(r=>startCountdown(r==='retry'?3:60));
 }
 
 // ── Refresh pill state ────────────────────────────────────────────────────────
@@ -2882,7 +2881,7 @@ async function forceRefresh(){
   }catch(_){}
   clearInterval(cdTimer);
   loadData().then(r=>{
-    startCountdown(r==='retry'?10:60);
+    startCountdown(r==='retry'?3:60);
     if(btn){btn.textContent='↺ Aggiorna';btn.disabled=false;}
   });
 }
@@ -2899,7 +2898,7 @@ function startCountdown(initial=60){
   cdTimer=setInterval(()=>{
     const el2=document.getElementById('countdown');
     if(el2) el2.textContent=--cdVal;
-    if(cdVal<=0){clearInterval(cdTimer);loadData().then(r=>startCountdown(r==='retry'?10:60));}
+    if(cdVal<=0){clearInterval(cdTimer);loadData().then(r=>startCountdown(r==='retry'?3:60));}
   },1000);
 }
 
@@ -3900,7 +3899,7 @@ updateMarketStatus();
 loadIndices();
 setInterval(()=>{updateMarketStatus();loadIndices();},60000);
 initFX();
-loadData().then(r=>startCountdown(r==='retry'?10:60));
+loadData().then(r=>startCountdown(r==='retry'?3:60));
 loadAccuracy();
 loadBacktest();
 initAuth();
@@ -3920,11 +3919,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     _VIEWS.forEach(v => {
       const el = document.getElementById(v+'-view');
       if(!el) return;
-      if(v === 'ai-chat'){
-        el.style.display = (v === tab) ? 'flex' : 'none';
-      } else {
-        el.style.display = (v === tab) ? '' : 'none';
-      }
+      el.style.display = (v === tab) ? (v === 'ai-chat' ? 'flex' : 'block') : 'none';
     });
     if(!_tabLoaded[tab]){
       _tabLoaded[tab]=true;
