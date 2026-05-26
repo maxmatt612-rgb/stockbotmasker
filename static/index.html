@@ -1214,14 +1214,14 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 <!-- ── Tab navigation ── -->
 <div class="tab-nav">
-  <button class="tab-btn active" data-tab="live">📊 Live</button>
-  <button class="tab-btn" data-tab="history">📅 Storico</button>
-  <button class="tab-btn" data-tab="heatmap">📈 Mercati</button>
-  <button class="tab-btn" data-tab="portfolio">💼 Portafoglio</button>
-  <button class="tab-btn" data-tab="watchlist">⭐ Watchlist</button>
-  <button class="tab-btn" data-tab="calendar">🗓 Calendario</button>
-  <button class="tab-btn" data-tab="ai-chat">🤖 AI</button>
-  <button class="tab-btn" data-tab="briefing">📰 Briefing</button>
+  <button class="tab-btn active" data-tab="live" onclick="switchTab('live')">📊 Live</button>
+  <button class="tab-btn" data-tab="history" onclick="switchTab('history')">📅 Storico</button>
+  <button class="tab-btn" data-tab="heatmap" onclick="switchTab('heatmap')">📈 Mercati</button>
+  <button class="tab-btn" data-tab="portfolio" onclick="switchTab('portfolio')">💼 Portafoglio</button>
+  <button class="tab-btn" data-tab="watchlist" onclick="switchTab('watchlist')">⭐ Watchlist</button>
+  <button class="tab-btn" data-tab="calendar" onclick="switchTab('calendar')">🗓 Calendario</button>
+  <button class="tab-btn" data-tab="ai-chat" onclick="switchTab('ai-chat')">🤖 AI</button>
+  <button class="tab-btn" data-tab="briefing" onclick="switchTab('briefing')">📰 Briefing</button>
 </div>
 
 <!-- ── History view (nascosta di default) ── -->
@@ -1943,6 +1943,33 @@ window.onerror = function(msg, src, line, col, err) {
 };
 window.onunhandledrejection = function(e) {
   console.error('[PROMISE CRASH]', e.reason);
+};
+
+// Notifiche — dichiarate subito per evitare TDZ crash in initNotifications()
+let _notifPermission = (typeof Notification !== 'undefined' ? Notification?.permission : null) ?? 'default';
+let _lastNotifTicker = null;
+
+// switchTab — definita subito così onclick="switchTab(...)" funziona sempre
+window._tabLoaded = {};
+window.switchTab = function(tab) {
+  const VIEWS = ['live','history','heatmap','portfolio','watchlist','calendar','ai-chat','briefing'];
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  VIEWS.forEach(v => {
+    const el = document.getElementById(v + '-view');
+    if (!el) return;
+    el.style.display = (v === tab) ? (v === 'ai-chat' ? 'flex' : '') : 'none';
+  });
+  if (!window._tabLoaded[tab]) {
+    window._tabLoaded[tab] = true;
+    if (tab === 'history')   loadHistoryDates();
+    if (tab === 'heatmap')   loadHeatmap();
+    if (tab === 'portfolio') renderPortfolio();
+    if (tab === 'watchlist') renderWatchlist();
+    if (tab === 'calendar')  loadCalendar();
+    if (tab === 'briefing')  _loadBriefing(false);
+  }
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -5371,8 +5398,7 @@ async function loadBacktest() {
 // ══════════════════════════════════════════════════════════════════════════════
 // Push Notifications PWA
 // ══════════════════════════════════════════════════════════════════════════════
-let _notifPermission = (typeof Notification !== 'undefined' ? Notification?.permission : null) ?? 'default';
-let _lastNotifTicker = null;  // evita notifiche duplicate
+// _notifPermission e _lastNotifTicker dichiarate in cima allo script (evita TDZ)
 
 function initNotifications() {
   if (!('Notification' in window) || !navigator.serviceWorker) return;
