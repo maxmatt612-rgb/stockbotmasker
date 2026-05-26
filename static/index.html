@@ -1478,7 +1478,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 </div>
 
 <!-- ── AI Chat view ── -->
-<div id="ai-chat-view">
+<div id="ai-chat-view" style="display:none">
   <div class="chat-wrap">
     <div class="chat-messages" id="chat-messages">
       <div class="chat-welcome">
@@ -1557,7 +1557,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 </div>
 
 <!-- ── Briefing view ── -->
-<div id="briefing-view">
+<div id="briefing-view" style="display:none">
   <div class="briefing-header">
     <div style="display:flex;justify-content:space-between;align-items:flex-start">
       <div>
@@ -1936,6 +1936,14 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
 
 <script>
 'use strict';
+
+// Cattura qualsiasi errore JS non gestito — utile per debug
+window.onerror = function(msg, src, line, col, err) {
+  console.error('[CRASH]', msg, 'at', src, line+':'+col, err);
+};
+window.onunhandledrejection = function(e) {
+  console.error('[PROMISE CRASH]', e.reason);
+};
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Three.js — Particle Network (opzionale — non blocca l'app se CDN fallisce)
