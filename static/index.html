@@ -1918,9 +1918,10 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   </div>
 </div>
 
-<div class="refresh-pill">
-  <div class="live-dot"></div>
-  Refresh in <b id="countdown">60</b>s
+<div class="refresh-pill" id="refresh-pill">
+  <div class="live-dot" id="refresh-dot"></div>
+  <span id="refresh-label">Refresh in <b id="countdown">60</b>s</span>
+  <button id="force-refresh-btn" onclick="forceRefresh()" title="Forza aggiornamento" style="display:none;margin-left:6px;background:none;border:none;cursor:pointer;color:var(--primary);font-size:.8rem;padding:0;font-family:Inter,sans-serif;font-weight:600">↺ Aggiorna</button>
 </div>
 
 <div class="disc-banner">
@@ -2725,8 +2726,8 @@ async function loadData(){
     ]);
     if(!Array.isArray(data)||!data.length){
       if(hasCards){
-        // Non sovrascrivere le card — mostra solo un toast discreto
-        showToast('⏳ Scansione in corso — dati aggiornati tra poco');
+        // Server sta riscansionando — non sovrascrivere le card
+        _markRefreshFailed(false);
         return 'retry';
       }
       document.getElementById('grid').innerHTML=`
@@ -2768,6 +2769,7 @@ async function loadData(){
     document.getElementById('last-update').textContent=now();
 
     applyAndRender();
+    _markRefreshOk();
     tryShowScanNotification(data);
 
     // Enrich progressivo (nome + segnali)
@@ -2796,8 +2798,8 @@ async function loadData(){
   }catch(e){
     console.error('Load:',e);
     if(hasCards){
-      // Non sovrascrivere le card già mostrate — toast discreto
-      showToast('⚠️ Aggiornamento fallito — riprovo tra poco');
+      // Fallimento silenzioso — non distrae con toast se ci sono già dati
+      _markRefreshFailed(true);
       return 'retry';
     }
     // Nessun dato in memoria — mostra schermata di attesa
@@ -2817,6 +2819,37 @@ function manualRetry(){
   grid.innerHTML='<div class="skel-card"></div><div class="skel-card"></div><div class="skel-card"></div>';
   clearInterval(cdTimer);
   loadData().then(r=>startCountdown(r==='retry'?10:60));
+}
+
+// ── Refresh pill state ────────────────────────────────────────────────────────
+function _markRefreshFailed(isError){
+  const dot=document.getElementById('refresh-dot');
+  const label=document.getElementById('refresh-label');
+  const btn=document.getElementById('force-refresh-btn');
+  if(dot) dot.style.background='var(--red)';
+  if(label) label.style.color='var(--text-dim)';
+  if(btn) btn.style.display='inline';
+}
+function _markRefreshOk(){
+  const dot=document.getElementById('refresh-dot');
+  const label=document.getElementById('refresh-label');
+  const btn=document.getElementById('force-refresh-btn');
+  if(dot) dot.style.background='';
+  if(label) label.style.color='';
+  if(btn) btn.style.display='none';
+}
+async function forceRefresh(){
+  const btn=document.getElementById('force-refresh-btn');
+  if(btn){btn.textContent='⏳';btn.disabled=true;}
+  try{
+    // Forza un nuovo scan sul server (bypassa cache)
+    await fetch('/api/scan/force',{method:'POST'}).catch(()=>{});
+  }catch(_){}
+  clearInterval(cdTimer);
+  loadData().then(r=>{
+    startCountdown(r==='retry'?10:60);
+    if(btn){btn.textContent='↺ Aggiorna';btn.disabled=false;}
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

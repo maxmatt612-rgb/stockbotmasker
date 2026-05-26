@@ -246,6 +246,16 @@ async def api_scan(top: int = 10):
     return JSONResponse([], status_code=202)
 
 
+@app.post("/api/scan/force")
+async def api_scan_force():
+    """Invalida la cache dello scan e forza una nuova scansione in background."""
+    # Rimuovi dalla cache così il prossimo /api/scan vede dati stale → refresh
+    _cache.pop("scan:10", None)
+    if not _scan_in_progress:
+        asyncio.create_task(_refresh_scan_background(10))
+    return {"ok": True, "scan_in_progress": _scan_in_progress}
+
+
 @app.get("/api/stock/{ticker}")
 async def api_stock(ticker: str):
     t = ticker.upper()
