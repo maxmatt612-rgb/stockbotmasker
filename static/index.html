@@ -2012,17 +2012,18 @@ const fmtP = v => {
   const c=v*_fxRate;
   return _fxSym+(c<1?c.toFixed(4):c.toFixed(2));
 };
-const fmtC = v => (v>=0?'+':'')+v.toFixed(2)+'%';
+const fmtC = v => v==null||isNaN(v) ? '—' : (v>=0?'+':'')+Number(v).toFixed(2)+'%';
 function toggleFX(){localStorage.setItem('masker_fx',_fxActive?'usd':'eur');location.reload();}
 
 // ── Score in linguaggio umano (logica pura, nessuna AI) ──
 function scoreToText(d) {
+  try {
   const bd = d.score_breakdown;
   if (!bd) return null;
-  const score  = d.score_10   ?? 5;
-  const rsi    = d.rsi        ?? 50;
-  const vol    = d.vol_ratio  ?? 1;
-  const chg    = d.day_change_pct ?? 0;
+  const score  = Number(d.score_10   ?? 5)  || 5;
+  const rsi    = Number(d.rsi        ?? 50) || 50;
+  const vol    = Number(d.vol_ratio  ?? 1)  || 1;
+  const chg    = Number(d.day_change_pct ?? 0) || 0;
   const parts  = [];
 
   // RSI
@@ -2055,6 +2056,7 @@ function scoreToText(d) {
   else                 verdict = 'Segnale debole.';
 
   return `${parts.join(', ')} · ${trendTxt}. ${verdict}`;
+  } catch(e) { return null; }
 }
 
 // ── Dark/Light toggle ──────────────────────────────────────────────────────
@@ -2328,7 +2330,10 @@ function renderCards(data){
     return;
   }
   const frag=document.createDocumentFragment();
-  data.forEach((d,i)=>frag.appendChild(buildCard(d,i+1)));
+  data.forEach((d,i)=>{
+    try{ frag.appendChild(buildCard(d,i+1)); }
+    catch(e){ console.error('[buildCard]',d?.ticker,e); }
+  });
   grid.appendChild(frag);
   animateBars(grid);
   loadSparklines(data.map(d=>d.ticker).join(','),data);
