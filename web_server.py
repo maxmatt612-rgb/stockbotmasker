@@ -651,24 +651,24 @@ async def _refresh_scan_background(top: int):
         return  # già in corso, skip
     _scan_in_progress = True
     try:
-        _POOL = 100   # pool per screening — sempre 100 anche se display è 10
-        print(f"[scan_bg] Avvio scan pool={_POOL} display={top}…")
-        results = await asyncio.to_thread(scan_cheap_stocks, 200.0, _POOL)
+        # Analizza TUTTO l'universo (6000+): top_n=None → restituisce tutti i candidati
+        print(f"[scan_bg] Avvio scan universo completo, display={top}…")
+        results = await asyncio.to_thread(scan_cheap_stocks, 200.0, None)
         clean = _clean(results or [])
         if clean:
-            # Annota morning_price su tutti i titoli del pool
+            # Annota morning_price su tutti i titoli
             for s in clean:
                 s['morning_price'] = s.get('current_price')
-            # Pool completo disponibile per lo screening (/api/scan/screen)
+            # Pool completo per lo screening (tutti i candidati analizzati)
             _store("scan:full", clean)
-            # Slice display (top N per la view principale)
+            # Top N per la view principale (vero top 10 dall'intero universo)
             display = clean[:top]
             if top == 10:
                 global _morning_data
                 _morning_data = list(display)
                 _save_scan_to_disk(display)
             _store(f"scan:{top}", display)
-            print(f"[scan_bg] Completato: pool={len(clean)} display={len(display)}")
+            print(f"[scan_bg] Completato: pool totale={len(clean)}, display={len(display)}")
         else:
             print("[scan_bg] Scan restituito vuoto")
     except Exception as e:

@@ -477,7 +477,7 @@ def _ticker_currency(ticker: str) -> str:
     return "USD"
 
 
-def scan_cheap_stocks(max_price: float = 200.0, top_n: int = 10, universe: list = None) -> list:
+def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, universe: list = None) -> list:
     """Scansiona il mercato in 2 fasi quando l'universo è grande (es. ~6.000 titoli):
     Fase 1 — pre-filtro rapido per prezzo (batch 2d): scarta tutto ciò che è sopra max_price.
     Fase 2 — analisi tecnica completa solo per i candidati rimasti.
@@ -680,7 +680,7 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int = 10, universe: list 
             continue
 
     risultati.sort(key=lambda x: x["score"], reverse=True)
-    return risultati[:top_n]
+    return risultati if top_n is None else risultati[:top_n]
 
 
 # ─── Analisi arricchita (report mattutino) ───────────────────────────────────
