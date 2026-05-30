@@ -1,6 +1,8 @@
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
+import time
+import re
 
 
 # ─── Analisi standard ────────────────────────────────────────────────────────
@@ -406,6 +408,62 @@ def _sign(v: float) -> str:
 
 # ─── Scanner mercato ─────────────────────────────────────────────────────────
 
+# ── Universo dinamico US: cache in RAM (scaricato una volta al giorno) ────────
+_US_UNIVERSE_CACHE: list | None = None
+_US_UNIVERSE_TS: float = 0.0
+_US_UNIVERSE_TTL = 86400  # 24 h
+
+
+def _get_full_us_universe() -> list:
+    """Scarica tutti i ticker azionari NASDAQ+NYSE in tempo reale (cache in RAM 24h).
+    Fonte: ftp.nasdaqtrader.com — file pubblici, aggiornati ogni sera.
+    Esclude automaticamente: ETF, warrant, preferred share, test issue, simboli speciali."""
+    global _US_UNIVERSE_CACHE, _US_UNIVERSE_TS
+    import urllib.request, io, csv
+
+    if _US_UNIVERSE_CACHE and (time.time() - _US_UNIVERSE_TS) < _US_UNIVERSE_TTL:
+        return _US_UNIVERSE_CACHE
+
+    tickers: list[str] = []
+    _URLS = [
+        "https://ftp.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt",   # NASDAQ
+        "https://ftp.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt",    # NYSE / AMEX / altri
+    ]
+    # Solo simboli puri: 1-5 lettere, opzionalmente .X per classe (es. BRK.B)
+    _VALID = re.compile(r'^[A-Z]{1,5}(\.[A-Z])?$')
+
+    for url in _URLS:
+        try:
+            with urllib.request.urlopen(url, timeout=15) as resp:
+                content = resp.read().decode("utf-8")
+            reader = csv.DictReader(io.StringIO(content), delimiter="|")
+            for row in reader:
+                sym = (row.get("Symbol") or row.get("ACT Symbol") or "").strip()
+                if not sym or not _VALID.match(sym):
+                    continue
+                if row.get("ETF", "N") == "Y":
+                    continue
+                if row.get("Test Issue", "N") == "Y":
+                    continue
+                tickers.append(sym)
+        except Exception as e:
+            print(f"[universe] Errore download {url}: {e}")
+
+    tickers = list(dict.fromkeys(tickers))  # dedup mantenendo ordine
+
+    if tickers:
+        _US_UNIVERSE_CACHE = tickers
+        _US_UNIVERSE_TS = time.time()
+        print(f"[universe] {len(tickers)} ticker US scaricati (NASDAQ+NYSE+AMEX)")
+    else:
+        print("[universe] Download fallito — fallback lista statica da config")
+        from config import REVOLUT_UNIVERSE
+        _US_UNIVERSE_CACHE = REVOLUT_UNIVERSE
+        _US_UNIVERSE_TS = time.time()
+
+    return _US_UNIVERSE_CACHE
+
+
 _CURRENCY_BY_SUFFIX = {
     "MI": "EUR", "PA": "EUR", "DE": "EUR", "AS": "EUR",
     "MC": "EUR", "BR": "EUR", "LS": "EUR", "VI": "EUR",
@@ -419,10 +477,57 @@ def _ticker_currency(ticker: str) -> str:
     return "USD"
 
 
-def scan_cheap_stocks(max_price: float = 60.0, top_n: int = 10, universe: list = None) -> list:
-    from config import REVOLUT_UNIVERSE
+def scan_cheap_stocks(max_price: float = 200.0, top_n: int = 10, universe: list = None) -> list:
+    """Scansiona il mercato in 2 fasi quando l'universo è grande (es. ~6.000 titoli):
+    Fase 1 — pre-filtro rapido per prezzo (batch 2d): scarta tutto ciò che è sopra max_price.
+    Fase 2 — analisi tecnica completa solo per i candidati rimasti.
+    Se viene passato un universo esplicito (es. ETF_UNIVERSE) viene usata una sola fase."""
+    from config import EUROPEAN_UNIVERSE
 
-    tickers = universe if universe is not None else REVOLUT_UNIVERSE
+    if universe is not None:
+        # Universo esplicito piccolo (ETF, watchlist…): analisi diretta, una fase
+        tickers = universe
+        use_two_phase = False
+    else:
+        # Universo dinamico completo: NASDAQ+NYSE+AMEX + mercati europei
+        us = _get_full_us_universe()
+        tickers = list(dict.fromkeys(us + EUROPEAN_UNIVERSE))
+        use_two_phase = True
+
+    # ── Fase 1: pre-filtro rapido per prezzo (solo se universo grande) ─────────
+    if use_two_phase and len(tickers) > 500:
+        t0 = time.time()
+        candidates: list[str] = []
+        chunks_p1 = [tickers[i:i+100] for i in range(0, len(tickers), 100)]
+
+        for chunk in chunks_p1:
+            try:
+                raw = yf.download(
+                    chunk, period="2d", interval="1d",
+                    auto_adjust=True, progress=False
+                )
+                if raw.empty or not isinstance(raw.columns, pd.MultiIndex):
+                    continue
+                close_df = raw["Close"]
+                for t in chunk:
+                    if t not in close_df.columns:
+                        continue
+                    vals = close_df[t].dropna()
+                    if not len(vals):
+                        continue
+                    price = float(vals.iloc[-1])
+                    if 0 < price <= max_price:
+                        candidates.append(t)
+            except Exception as e:
+                print(f"[scan_p1] errore chunk: {e}")
+                continue
+
+        elapsed = time.time() - t0
+        print(f"[scan] Fase 1: {len(candidates)}/{len(tickers)} candidati "
+              f"<= ${max_price:.0f} in {elapsed:.1f}s")
+        tickers = candidates
+
+    # ── Fase 2: analisi tecnica completa ──────────────────────────────────────
     risultati = []
     chunks = [tickers[i:i+50] for i in range(0, len(tickers), 50)]
 
@@ -438,7 +543,6 @@ def scan_cheap_stocks(max_price: float = 60.0, top_n: int = 10, universe: list =
             if raw.empty:
                 continue
 
-            # Normalizza colonne (batch vs singolo ticker)
             if isinstance(raw.columns, pd.MultiIndex):
                 close_df = raw["Close"]
                 volume_df = raw["Volume"]
@@ -488,7 +592,7 @@ def scan_cheap_stocks(max_price: float = 60.0, top_n: int = 10, universe: list =
                         sma20 = float(close.rolling(20).mean().iloc[-1])
                         above_sma20 = current_price > sma20
 
-                    # Punteggio momento — tracked per component
+                    # Punteggio
                     score = 0
                     rsi_pts = 0
                     if rsi < 35:      rsi_pts = 3
@@ -523,10 +627,9 @@ def scan_cheap_stocks(max_price: float = 60.0, top_n: int = 10, universe: list =
                     else:
                         risk_level, risk_emoji = "Alto", "🔴"
 
-                    # Normalizza score grezzo (-5..10) → 0-10
                     score_10 = round(min(10.0, max(0.0, (score + 5) / 15 * 10)), 1)
 
-                    # Trade setup matematico ("Cosa farei io")
+                    # Trade setup
                     daily_vol_pct = volatility / (252 ** 0.5) / 100
                     daily_vol_dollar = current_price * daily_vol_pct
                     stop_mult = 1.5 if volatility < 30 else (2.0 if volatility < 60 else 2.5)
@@ -566,7 +669,7 @@ def scan_cheap_stocks(max_price: float = 60.0, top_n: int = 10, universe: list =
                 except Exception:
                     continue
         except Exception as e:
-            print(f"[scan] Errore chunk: {e}")
+            print(f"[scan_p2] Errore chunk: {e}")
             continue
 
     risultati.sort(key=lambda x: x["score"], reverse=True)
