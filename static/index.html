@@ -236,6 +236,7 @@ header{
 /* Chips */
 .chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
 .chip{font-size:.68rem;padding:2px 8px;border-radius:100px;border:1px solid var(--border);color:var(--text-dim);background:var(--surf-v)}
+.chip-ai{font-size:.68rem;padding:2px 8px;border-radius:100px;font-weight:700;letter-spacing:.02em;background:linear-gradient(90deg,rgba(99,102,241,.18),rgba(168,85,247,.18));border:1px solid rgba(139,92,246,.45);color:#a78bfa}
 
 /* Sparkline */
 .sparkline-wrap{height:42px;margin:4px -2px 0}
@@ -2340,6 +2341,7 @@ function buildCard(d, rank){
   const div=document.createElement('div');
   div.className='card';
   const chipsHTML=[
+    d.is_ai?`<span class="chip-ai">🤖 AI</span>`:'',
     d.risk_emoji?`<span class="chip">${d.risk_emoji} ${d.risk_level??''}</span>`:'',
     d.news_sentiment_emoji?`<span class="chip">${d.news_sentiment_emoji} ${d.news_sentiment_label??'Neutre'}</span>`:'',
     d.next_earnings_str?`<span class="chip">📅 ${d.next_earnings_str}</span>`:'',

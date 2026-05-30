@@ -482,7 +482,8 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int = 10, universe: list 
     Fase 1 — pre-filtro rapido per prezzo (batch 2d): scarta tutto ciò che è sopra max_price.
     Fase 2 — analisi tecnica completa solo per i candidati rimasti.
     Se viene passato un universo esplicito (es. ETF_UNIVERSE) viene usata una sola fase."""
-    from config import EUROPEAN_UNIVERSE
+    from config import EUROPEAN_UNIVERSE, AI_UNIVERSE
+    _AI_SET = set(AI_UNIVERSE)   # lookup O(1)
 
     if universe is not None:
         # Universo esplicito piccolo (ETF, watchlist…): analisi diretta, una fase
@@ -627,6 +628,11 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int = 10, universe: list 
                     else:
                         risk_level, risk_emoji = "Alto", "🔴"
 
+                    # Bonus AI: piccolo boost per aziende AI-focused
+                    is_ai = ticker in _AI_SET
+                    if is_ai:
+                        score += 1
+
                     score_10 = round(min(10.0, max(0.0, (score + 5) / 15 * 10)), 1)
 
                     # Trade setup
@@ -658,6 +664,7 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int = 10, universe: list 
                         "risk_emoji": risk_emoji,
                         "risk_level": risk_level,
                         "volatility": volatility,
+                        "is_ai": is_ai,
                         "score_breakdown": {
                             "rsi": rsi_pts,
                             "momentum": mom_pts,
