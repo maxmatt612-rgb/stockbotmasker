@@ -838,6 +838,81 @@ async def api_report_evening():
     )
 
 
+@app.get("/api/stock/{ticker}/insider")
+async def api_insider(ticker: str):
+    """Ultime transazioni insider (Form 4) via yfinance — cache 1h."""
+    t = ticker.upper()
+    key = f"insider:{t}"
+    if (c := _cached(key, 3600)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        try:
+            df = yf.Ticker(t).insider_transactions
+            if df is None or df.empty:
+                return []
+            rows = []
+            for _, row in df.head(15).iterrows():
+                rows.append({
+                    "date":        str(row.get("Start Date", ""))[:10],
+                    "insider":     str(row.get("Insider", ""))[:40],
+                    "relation":    str(row.get("Relationship", ""))[:30],
+                    "transaction": str(row.get("Transaction", "")),
+                    "shares":      int(row.get("Shares", 0) or 0),
+                    "value":       float(row.get("Value", 0) or 0),
+                })
+            return rows
+        except Exception as e:
+            print(f"[insider] {t}: {e}")
+            return []
+
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return _clean(data)
+
+
+@app.get("/api/stock/{ticker}/reddit")
+async def api_reddit(ticker: str):
+    """Mention count e sentiment su r/wallstreetbets — cache 30 min."""
+    t = ticker.upper()
+    key = f"reddit:{t}"
+    if (c := _cached(key, 1800)) is not None:
+        return c
+
+    def _get():
+        import urllib.request, json as _j
+        url = (f"https://www.reddit.com/r/wallstreetbets/search.json"
+               f"?q={t}&sort=new&restrict_sr=true&t=week&limit=25")
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "MaskerStockBot/1.0"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = _j.loads(resp.read())
+            posts = data.get("data", {}).get("children", [])
+            pos_w = {"moon","bull","buy","calls","long","squeeze","rocket","up","win","profit","gain","pump"}
+            neg_w = {"bear","put","short","crash","dump","sell","down","loss","rekt","fail","drop","red"}
+            pos = neg = 0
+            titles = []
+            for p in posts[:10]:
+                title = p.get("data", {}).get("title", "")
+                titles.append(title[:90])
+                tl = title.lower()
+                for w in pos_w:
+                    if w in tl: pos += 1
+                for w in neg_w:
+                    if w in tl: neg += 1
+            sentiment = "bullish" if pos > neg else ("bearish" if neg > pos else "neutral")
+            return {"mentions": len(posts), "sentiment": sentiment,
+                    "pos_signals": pos, "neg_signals": neg, "posts": titles}
+        except Exception as e:
+            print(f"[reddit] {t}: {e}")
+            return {"mentions": 0, "sentiment": "neutral", "pos_signals": 0, "neg_signals": 0, "posts": []}
+
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return _clean(data)
+
+
 @app.get("/api/report/status")
 async def api_report_status():
     """Restituisce lo stato dei PDF disponibili."""

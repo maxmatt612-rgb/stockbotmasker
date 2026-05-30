@@ -628,6 +628,36 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                     else:
                         risk_level, risk_emoji = "Alto", "🔴"
 
+                    # ── Volatilità anomala: ultimi 5gg vs mese intero ─────────
+                    recent_vol = float(returns.iloc[-5:].std() * (252**0.5) * 100) if len(returns) >= 5 else volatility
+                    low_vol_alert = (recent_vol < volatility * 0.45) and (volatility > 25)
+
+                    # ── Giorno della settimana: rendimento medio Mon-Fri ──────
+                    dow_ret: dict[int, list] = {0:[], 1:[], 2:[], 3:[], 4:[]}
+                    for i in range(1, len(close)):
+                        try:
+                            d = close.index[i].weekday()
+                            r = float((close.iloc[i] - close.iloc[i-1]) / close.iloc[i-1] * 100)
+                            if 0 <= d <= 4 and not pd.isna(r):
+                                dow_ret[d].append(r)
+                        except Exception:
+                            pass
+                    dow_avg = {d: round(sum(v)/len(v), 2) if v else 0.0 for d, v in dow_ret.items()}
+
+                    # ── Doppio segnale ────────────────────────────────────────
+                    bull_sigs = 0
+                    bear_sigs = 0
+                    if rsi < 40:            bull_sigs += 1
+                    elif rsi > 65:          bear_sigs += 1
+                    if vol_ratio > 1.5:
+                        if day_change_pct > 0: bull_sigs += 1
+                        else:                  bear_sigs += 1
+                    if day_change_pct > 1:  bull_sigs += 1
+                    elif day_change_pct < -1: bear_sigs += 1
+                    if above_sma20:         bull_sigs += 1
+                    else:                   bear_sigs += 1
+                    double_signal = "bull" if bull_sigs >= 2 else ("bear" if bear_sigs >= 2 else "")
+
                     # Bonus AI: piccolo boost per aziende AI-focused
                     is_ai = ticker in _AI_SET
                     if is_ai:
@@ -665,6 +695,11 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                         "risk_level": risk_level,
                         "volatility": volatility,
                         "is_ai": is_ai,
+                        "low_vol_alert": low_vol_alert,
+                        "double_signal": double_signal,
+                        "bull_signals": bull_sigs,
+                        "bear_signals": bear_sigs,
+                        "dow_avg": dow_avg,
                         "score_breakdown": {
                             "rsi": rsi_pts,
                             "momentum": mom_pts,

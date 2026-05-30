@@ -237,6 +237,17 @@ header{
 .chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
 .chip{font-size:.68rem;padding:2px 8px;border-radius:100px;border:1px solid var(--border);color:var(--text-dim);background:var(--surf-v)}
 .chip-ai{font-size:.68rem;padding:2px 8px;border-radius:100px;font-weight:700;letter-spacing:.02em;background:linear-gradient(90deg,rgba(99,102,241,.18),rgba(168,85,247,.18));border:1px solid rgba(139,92,246,.45);color:#a78bfa}
+.chip-ds{font-size:.68rem;padding:2px 8px;border-radius:100px;font-weight:700}
+.chip-ds.bull{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.4);color:#10b981}
+.chip-ds.bear{background:rgba(239,68,68,.13);border:1px solid rgba(239,68,68,.35);color:#ef4444}
+.chip-lv{font-size:.68rem;padding:2px 8px;border-radius:100px;font-weight:700;background:rgba(245,158,11,.13);border:1px solid rgba(245,158,11,.4);color:#f59e0b}
+.extra-section{margin:14px 0;padding:12px 0;border-top:1px solid var(--border)}
+.extra-hd{font-size:.68rem;font-weight:700;color:var(--text-dim);letter-spacing:.07em;margin-bottom:2px}
+.insider-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:.75rem;gap:8px}
+.insider-buy{color:#10b981;font-weight:700}.insider-sell{color:#ef4444;font-weight:700}
+.reddit-sent-bull{color:#10b981;font-weight:700}.reddit-sent-bear{color:#ef4444;font-weight:700}.reddit-sent-neu{color:var(--text-dim);font-weight:700}
+.dow-bar-wrap{display:flex;flex-direction:column;align-items:center;flex:1;gap:2px}
+.dow-bar{width:100%;border-radius:3px 3px 0 0;min-height:3px;transition:height .3s}
 /* ── Screening panel ─────────────────────────────────────────────────────── */
 .screen-bar{display:flex;align-items:center;gap:8px;padding:4px 20px 8px;flex-wrap:wrap}
 .screen-toggle-btn{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 13px;font-size:.75rem;font-weight:600;color:var(--text-dim);cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .2s;font-family:inherit}
@@ -1784,6 +1795,7 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   <div class="stat-chip">Azioni <b id="s-total">—</b></div>
   <div class="stat-chip">Score medio <b id="s-avg">—</b></div>
   <div class="stat-chip">Top mover <b id="s-top">—</b></div>
+  <div class="stat-chip" id="streak-chip" style="display:none">🔥 Streak <b id="s-streak">0</b></div>
 </div>
 
 <!-- ── Screening ── -->
@@ -2007,6 +2019,29 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
     <div class="news-section">
       <div class="news-hd">📰 ULTIME NOTIZIE</div>
       <div id="m-news-body"><div class="news-empty">⏳ Caricamento notizie…</div></div>
+    </div>
+
+    <!-- Giorno della settimana -->
+    <div class="extra-section" id="m-dow-wrap" style="display:none">
+      <div class="extra-hd">📅 RENDIMENTO PER GIORNO DELLA SETTIMANA</div>
+      <div id="m-dow-bars" style="display:flex;gap:6px;margin-top:8px;align-items:flex-end;height:56px"></div>
+      <div id="m-dow-labels" style="display:flex;gap:6px;margin-top:4px;font-size:.65rem;color:var(--text-dim);text-align:center"></div>
+    </div>
+
+    <!-- Insider transactions -->
+    <div class="extra-section">
+      <div class="extra-hd" style="cursor:pointer" onclick="_toggleInsider()">🏦 INSIDER TRANSACTIONS <span id="insider-toggle-arrow">▸</span></div>
+      <div id="m-insider-body" style="display:none;margin-top:8px">
+        <div style="color:var(--text-dim);font-size:.78rem">⏳ Caricamento…</div>
+      </div>
+    </div>
+
+    <!-- Reddit WSB -->
+    <div class="extra-section">
+      <div class="extra-hd" style="cursor:pointer" onclick="_toggleReddit()">🚀 SENTIMENT r/wallstreetbets <span id="reddit-toggle-arrow">▸</span></div>
+      <div id="m-reddit-body" style="display:none;margin-top:8px">
+        <div style="color:var(--text-dim);font-size:.78rem">⏳ Caricamento…</div>
+      </div>
     </div>
 
     <!-- Note personali -->
@@ -2442,8 +2477,14 @@ function buildCard(d, rank){
   const score=d.score_10??5;
   const div=document.createElement('div');
   div.className='card';
+  const dsLabel = d.double_signal==='bull'
+    ? `<span class="chip-ds bull">⚡ ${d.bull_signals||2} segnali bull</span>`
+    : d.double_signal==='bear'
+    ? `<span class="chip-ds bear">⚠️ ${d.bear_signals||2} segnali bear</span>` : '';
+  const lvLabel = d.low_vol_alert ? `<span class="chip-lv">🔇 Calma anomala</span>` : '';
   const chipsHTML=[
     d.is_ai?`<span class="chip-ai">🤖 AI</span>`:'',
+    dsLabel, lvLabel,
     d.risk_emoji?`<span class="chip">${d.risk_emoji} ${d.risk_level??''}</span>`:'',
     d.news_sentiment_emoji?`<span class="chip">${d.news_sentiment_emoji} ${d.news_sentiment_label??'Neutre'}</span>`:'',
     d.next_earnings_str?`<span class="chip">📅 ${d.next_earnings_str}</span>`:'',
@@ -2804,6 +2845,12 @@ async function openModal(stock){
   const _noteEl=document.getElementById('m-note');
   _noteEl.value=_loadNotes()[stock.ticker]||'';
   _noteEl.oninput=()=>_saveNote(stock.ticker,_noteEl.value.trim());
+
+  // ── Feature extra: Insider, Reddit, DoW, Streak ──────────────────────────
+  _loadInsider(stock.ticker);
+  _loadReddit(stock.ticker);
+  _renderDow(stock.dow_avg || null);
+  _renderStreak();
 }
 
 async function _loadForecast(ticker){
@@ -3037,6 +3084,7 @@ async function loadData(){
           const idx = cardsData.findIndex(c=>c.ticker===d.ticker);
           if(idx>=0) cardsData[idx]={...cardsData[idx],...d};
         });
+        _updateStreakFromEvening(ev);
         applyAndRender();
         _setEveningLabel();
         _markRefreshOk();
@@ -3184,6 +3232,137 @@ function _markRefreshOk(){
   if(label) label.style.color='';
   if(btn) btn.style.display='none';
 }
+// ── Streak previsioni ─────────────────────────────────────────────────────────
+function _streakKey(){ return 'masker_streak'; }
+function _getStreak(){ try{ return JSON.parse(localStorage.getItem(_streakKey())||'{"streak":0,"history":[]}'); }catch(_){ return {streak:0,history:[]}; } }
+function _saveStreak(obj){ try{ localStorage.setItem(_streakKey(), JSON.stringify(obj)); }catch(_){} }
+
+function _updateStreakFromEvening(data){
+  // Chiamata quando arrivano i dati serali — confronta bias mattutino con risultato reale
+  const obj = _getStreak();
+  const today = new Date().toISOString().slice(0,10);
+  if(obj.lastDate === today) return; // già aggiornato oggi
+  let correct = 0, total = 0;
+  data.forEach(d => {
+    if(d.delta_from_morning == null || d.score_10 == null) return;
+    const bias = d.score_10 >= 7 ? 'RIALZO' : d.score_10 >= 5 ? 'LATERALE' : 'RIBASSO';
+    const delta = d.delta_from_morning;
+    const isOk = bias==='RIALZO' ? delta>0.3 : bias==='RIBASSO' ? delta<-0.3 : Math.abs(delta)<=2;
+    if(isOk) correct++;
+    total++;
+  });
+  if(total === 0) return;
+  const accuracy = correct / total;
+  const won = accuracy >= 0.6; // 60%+ = streak continua
+  obj.streak = won ? (obj.streak||0) + 1 : 0;
+  obj.lastDate = today;
+  obj.history = [...(obj.history||[]).slice(-29), {date:today, correct, total, accuracy: Math.round(accuracy*100)}];
+  _saveStreak(obj);
+  _renderStreak();
+}
+
+function _renderStreak(){
+  const obj = _getStreak();
+  const streak = obj.streak || 0;
+  const chip = document.getElementById('streak-chip');
+  const val = document.getElementById('s-streak');
+  if(!chip) return;
+  if(streak > 0){
+    chip.style.display='';
+    val.textContent = streak + (streak>=3?' 🔥':'');
+    chip.title = `${streak} giorni consecutivi con ≥60% previsioni corrette`;
+  } else {
+    chip.style.display='none';
+  }
+}
+
+// ── Giorno della settimana ────────────────────────────────────────────────────
+function _renderDow(dowAvg){
+  const wrap = document.getElementById('m-dow-wrap');
+  const bars = document.getElementById('m-dow-bars');
+  const labels = document.getElementById('m-dow-labels');
+  if(!wrap || !bars || !labels) return;
+  if(!dowAvg || Object.keys(dowAvg).length === 0){ wrap.style.display='none'; return; }
+  wrap.style.display='';
+  const days = ['Lun','Mar','Mer','Gio','Ven'];
+  const vals = [0,1,2,3,4].map(d => dowAvg[d] ?? 0);
+  const maxAbs = Math.max(...vals.map(Math.abs), 0.1);
+  const midH = 28;
+  bars.innerHTML = vals.map((v,i) => {
+    const h = Math.round(Math.abs(v) / maxAbs * midH);
+    const col = v >= 0 ? '#10b981' : '#ef4444';
+    const sign = v >= 0 ? '+' : '';
+    return `<div class="dow-bar-wrap" title="${days[i]}: ${sign}${v.toFixed(2)}%">
+      <div style="font-size:.6rem;color:${col};font-weight:700">${sign}${v.toFixed(1)}%</div>
+      <div class="dow-bar" style="height:${Math.max(h,3)}px;background:${col}"></div>
+    </div>`;
+  }).join('');
+  labels.innerHTML = days.map(d => `<div style="flex:1;text-align:center">${d}</div>`).join('');
+}
+
+// ── Insider transactions ──────────────────────────────────────────────────────
+let _insiderLoaded = false;
+function _toggleInsider(){
+  const body = document.getElementById('m-insider-body');
+  const arrow = document.getElementById('insider-toggle-arrow');
+  const open = body.style.display === 'block';
+  body.style.display = open ? 'none' : 'block';
+  if(arrow) arrow.textContent = open ? '▸' : '▾';
+}
+async function _loadInsider(ticker){
+  _insiderLoaded = false;
+  document.getElementById('m-insider-body').innerHTML='<div style="color:var(--text-dim);font-size:.78rem">⏳ Caricamento…</div>';
+  try{
+    const data = await fetch('/api/stock/'+ticker+'/insider').then(r=>r.ok?r.json():[]);
+    if(!data.length){
+      document.getElementById('m-insider-body').innerHTML='<div style="color:var(--text-dim);font-size:.78rem">Nessuna transazione insider recente trovata.</div>';
+      return;
+    }
+    const rows = data.map(r => {
+      const isBuy = (r.transaction||'').toLowerCase().includes('purchase') || (r.transaction||'').toLowerCase().includes('buy');
+      const cls = isBuy ? 'insider-buy' : 'insider-sell';
+      const sign = isBuy ? '▲ Acquisto' : '▼ Vendita';
+      const val = r.value > 0 ? '$'+Math.round(r.value).toLocaleString() : '—';
+      return `<div class="insider-row">
+        <div style="flex:1"><div style="font-weight:600;font-size:.78rem">${r.insider||'—'}</div><div style="color:var(--text-dim);font-size:.68rem">${r.relation||''}</div></div>
+        <div style="text-align:right"><div class="${cls}">${sign}</div><div style="color:var(--text-dim);font-size:.68rem">${r.date||''} · ${val}</div></div>
+      </div>`;
+    }).join('');
+    document.getElementById('m-insider-body').innerHTML=rows;
+    _insiderLoaded = true;
+  }catch(e){ document.getElementById('m-insider-body').innerHTML='<div style="color:var(--text-dim);font-size:.78rem">⚠️ Dati non disponibili.</div>'; }
+}
+
+// ── Reddit WSB ────────────────────────────────────────────────────────────────
+let _redditLoaded = false;
+function _toggleReddit(){
+  const body = document.getElementById('m-reddit-body');
+  const arrow = document.getElementById('reddit-toggle-arrow');
+  const open = body.style.display === 'block';
+  body.style.display = open ? 'none' : 'block';
+  if(arrow) arrow.textContent = open ? '▸' : '▾';
+}
+async function _loadReddit(ticker){
+  _redditLoaded = false;
+  document.getElementById('m-reddit-body').innerHTML='<div style="color:var(--text-dim);font-size:.78rem">⏳ Caricamento…</div>';
+  try{
+    const d = await fetch('/api/stock/'+ticker+'/reddit').then(r=>r.ok?r.json():null);
+    if(!d){ document.getElementById('m-reddit-body').innerHTML='<div style="color:var(--text-dim);font-size:.78rem">⚠️ Dati non disponibili.</div>'; return; }
+    const sentCls = d.sentiment==='bullish'?'reddit-sent-bull':d.sentiment==='bearish'?'reddit-sent-bear':'reddit-sent-neu';
+    const sentLabel = d.sentiment==='bullish'?'🟢 Bullish':d.sentiment==='bearish'?'🔴 Bearish':'⚪ Neutro';
+    const posts = (d.posts||[]).slice(0,5).map(p=>`<div style="font-size:.72rem;color:var(--text-dim);padding:3px 0;border-bottom:1px solid var(--border)">• ${p}</div>`).join('');
+    document.getElementById('m-reddit-body').innerHTML=`
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <div style="font-size:1.1rem;font-weight:700">${d.mentions}</div>
+        <div style="font-size:.75rem;color:var(--text-dim)">post questa settimana</div>
+        <div class="${sentCls}" style="margin-left:auto">${sentLabel}</div>
+      </div>
+      ${posts||'<div style="color:var(--text-dim);font-size:.72rem">Nessun post recente trovato.</div>'}`;
+    _redditLoaded = true;
+  }catch(e){ document.getElementById('m-reddit-body').innerHTML='<div style="color:var(--text-dim);font-size:.78rem">⚠️ Dati non disponibili.</div>'; }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ── Screening ─────────────────────────────────────────────────────────────────
 const _scF = { rsi:'all', chg:'all', vol:'all', score:'0', risk:'', ai_only:false };
 let _scOpen = false, _scTimer = null;
