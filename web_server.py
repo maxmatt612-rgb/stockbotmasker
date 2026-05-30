@@ -643,25 +643,32 @@ async def _pdf_scheduler():
 
 
 async def _refresh_scan_background(top: int):
-    """Aggiorna il scan in background senza bloccare la risposta."""
+    """Aggiorna il scan in background senza bloccare la risposta.
+    Scansiona sempre top 100 per avere un pool completo per lo screening;
+    il display mostra solo i primi `top` (default 10)."""
     global _scan_in_progress
     if _scan_in_progress:
         return  # già in corso, skip
     _scan_in_progress = True
     try:
-        print(f"[scan_bg] Avvio scan top={top}…")
-        results = await asyncio.to_thread(scan_cheap_stocks, 200.0, top)
+        _POOL = 100   # pool per screening — sempre 100 anche se display è 10
+        print(f"[scan_bg] Avvio scan pool={_POOL} display={top}…")
+        results = await asyncio.to_thread(scan_cheap_stocks, 200.0, _POOL)
         clean = _clean(results or [])
         if clean:
+            # Annota morning_price su tutti i titoli del pool
+            for s in clean:
+                s['morning_price'] = s.get('current_price')
+            # Pool completo disponibile per lo screening (/api/scan/screen)
+            _store("scan:full", clean)
+            # Slice display (top N per la view principale)
+            display = clean[:top]
             if top == 10:
-                # Annota morning_price (prezzo al momento della scansione)
-                for s in clean:
-                    s['morning_price'] = s.get('current_price')
                 global _morning_data
-                _morning_data = list(clean)
-                _save_scan_to_disk(clean)
-            _store(f"scan:{top}", clean)
-            print(f"[scan_bg] Completato: {len(clean)} titoli")
+                _morning_data = list(display)
+                _save_scan_to_disk(display)
+            _store(f"scan:{top}", display)
+            print(f"[scan_bg] Completato: pool={len(clean)} display={len(display)}")
         else:
             print("[scan_bg] Scan restituito vuoto")
     except Exception as e:
@@ -697,6 +704,48 @@ async def api_scan_force():
     if not _scan_in_progress:
         asyncio.create_task(_refresh_scan_background(10))
     return {"ok": True, "scan_in_progress": _scan_in_progress}
+
+
+@app.get("/api/scan/screen")
+async def api_scan_screen(
+    rsi_max: float = 100,
+    rsi_min: float = 0,
+    price_max: float = 200,
+    price_min: float = 0,
+    day_change_min: float = -100,
+    vol_min: float = 0,
+    score_min: float = 0,
+    ai_only: bool = False,
+    risk: str = "",
+):
+    """Filtra il pool mattutino (top 100) con i parametri specificati.
+    Restituisce fino a 30 titoli che soddisfano tutti i criteri."""
+    full = (_cache.get("scan:full") or {}).get("data") or []
+    if not full:
+        # Pool non ancora pronto (scan in corso)
+        return JSONResponse([], status_code=202)
+
+    filtered = []
+    for s in full:
+        if ai_only and not s.get("is_ai"):
+            continue
+        rsi = s.get("rsi", 50) or 50
+        if rsi > rsi_max or rsi < rsi_min:
+            continue
+        price = s.get("current_price", 0) or 0
+        if price > price_max or (price_min > 0 and price < price_min):
+            continue
+        if (s.get("day_change_pct", 0) or 0) < day_change_min:
+            continue
+        if (s.get("vol_ratio", 1) or 1) < vol_min:
+            continue
+        if (s.get("score_10", 5) or 5) < score_min:
+            continue
+        if risk and s.get("risk_level") != risk:
+            continue
+        filtered.append(s)
+
+    return _clean(filtered[:30])
 
 
 @app.get("/api/scan/etf")

@@ -237,6 +237,28 @@ header{
 .chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
 .chip{font-size:.68rem;padding:2px 8px;border-radius:100px;border:1px solid var(--border);color:var(--text-dim);background:var(--surf-v)}
 .chip-ai{font-size:.68rem;padding:2px 8px;border-radius:100px;font-weight:700;letter-spacing:.02em;background:linear-gradient(90deg,rgba(99,102,241,.18),rgba(168,85,247,.18));border:1px solid rgba(139,92,246,.45);color:#a78bfa}
+/* ── Screening panel ─────────────────────────────────────────────────────── */
+.screen-bar{display:flex;align-items:center;gap:8px;padding:4px 20px 8px;flex-wrap:wrap}
+.screen-toggle-btn{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 13px;font-size:.75rem;font-weight:600;color:var(--text-dim);cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .2s;font-family:inherit}
+.screen-toggle-btn:hover{border-color:var(--primary);color:var(--primary)}
+.screen-toggle-btn.active{border-color:var(--primary);color:#fff;background:var(--primary)}
+#screening-panel{padding:0 20px 18px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.screen-sec{margin-bottom:12px}
+.screen-lbl{font-size:.64rem;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px}
+.sc-chips{display:flex;flex-wrap:wrap;gap:5px}
+.sc{padding:4px 11px;border-radius:100px;border:1px solid var(--border);font-size:.72rem;font-weight:600;color:var(--text-dim);background:var(--surf-v);cursor:pointer;transition:all .15s;user-select:none}
+.sc:hover{border-color:var(--primary);color:var(--primary)}
+.sc.on{background:var(--primary);border-color:var(--primary);color:#fff}
+.sc.ai-on{background:linear-gradient(90deg,#6366f1,#a855f7);border-color:#7c3aed;color:#fff}
+.sc-row{display:flex;gap:16px;flex-wrap:wrap}
+.sc-row .screen-sec{flex:1;min-width:130px}
+.sc-inputs{display:flex;align-items:center;gap:6px}
+.sc-inp{background:var(--surf-v);border:1px solid var(--border);border-radius:8px;padding:5px 9px;font-size:.78rem;color:var(--text);width:74px;outline:none;font-family:inherit}
+.sc-inp:focus{border-color:var(--primary)}
+.sc-res{display:flex;align-items:center;justify-content:space-between;padding:8px 0 4px;font-size:.73rem;color:var(--text-dim)}
+.sc-count{font-weight:700;color:var(--primary);font-size:.85rem}
+.sc-reset{background:none;border:none;color:var(--text-dim);font-size:.7rem;cursor:pointer;font-family:inherit;text-decoration:underline;padding:0}
+#screen-grid{margin-top:10px}
 
 /* Sparkline */
 .sparkline-wrap{height:42px;margin:4px -2px 0}
@@ -1764,6 +1786,86 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   <div class="stat-chip">Top mover <b id="s-top">—</b></div>
 </div>
 
+<!-- ── Screening ── -->
+<div class="screen-bar">
+  <button class="screen-toggle-btn" id="screen-toggle-btn" onclick="toggleScreening()">🔍 Screening</button>
+  <span id="screen-active-tag" style="display:none;font-size:.7rem;color:var(--primary);font-weight:600"></span>
+</div>
+<div id="screening-panel" style="display:none">
+  <div class="screen-sec">
+    <div class="screen-lbl">RSI</div>
+    <div class="sc-chips">
+      <span class="sc on" data-f="rsi" data-v="all"   onclick="setScFilter('rsi','all',this)">Tutti</span>
+      <span class="sc"    data-f="rsi" data-v="os"    onclick="setScFilter('rsi','os',this)">Ipervenduto &lt;35</span>
+      <span class="sc"    data-f="rsi" data-v="neu"   onclick="setScFilter('rsi','neu',this)">Neutro 35–65</span>
+      <span class="sc"    data-f="rsi" data-v="ob"    onclick="setScFilter('rsi','ob',this)">Ipercomprato &gt;65</span>
+    </div>
+  </div>
+  <div class="sc-row">
+    <div class="screen-sec">
+      <div class="screen-lbl">Variazione oggi</div>
+      <div class="sc-chips">
+        <span class="sc on" data-f="chg" data-v="all" onclick="setScFilter('chg','all',this)">Qualsiasi</span>
+        <span class="sc"    data-f="chg" data-v="0"   onclick="setScFilter('chg','0',this)">&gt; 0%</span>
+        <span class="sc"    data-f="chg" data-v="1"   onclick="setScFilter('chg','1',this)">&gt; +1%</span>
+        <span class="sc"    data-f="chg" data-v="3"   onclick="setScFilter('chg','3',this)">&gt; +3%</span>
+      </div>
+    </div>
+    <div class="screen-sec">
+      <div class="screen-lbl">Volume</div>
+      <div class="sc-chips">
+        <span class="sc on" data-f="vol" data-v="all" onclick="setScFilter('vol','all',this)">Tutti</span>
+        <span class="sc"    data-f="vol" data-v="1.2" onclick="setScFilter('vol','1.2',this)">&gt; 1.2×</span>
+        <span class="sc"    data-f="vol" data-v="1.5" onclick="setScFilter('vol','1.5',this)">&gt; 1.5×</span>
+        <span class="sc"    data-f="vol" data-v="2"   onclick="setScFilter('vol','2',this)">&gt; 2×</span>
+        <span class="sc"    data-f="vol" data-v="3"   onclick="setScFilter('vol','3',this)">&gt; 3×</span>
+      </div>
+    </div>
+  </div>
+  <div class="sc-row">
+    <div class="screen-sec">
+      <div class="screen-lbl">Score minimo</div>
+      <div class="sc-chips">
+        <span class="sc on" data-f="score" data-v="0" onclick="setScFilter('score','0',this)">Tutti</span>
+        <span class="sc"    data-f="score" data-v="5" onclick="setScFilter('score','5',this)">≥ 5</span>
+        <span class="sc"    data-f="score" data-v="6" onclick="setScFilter('score','6',this)">≥ 6</span>
+        <span class="sc"    data-f="score" data-v="7" onclick="setScFilter('score','7',this)">≥ 7</span>
+        <span class="sc"    data-f="score" data-v="8" onclick="setScFilter('score','8',this)">≥ 8</span>
+      </div>
+    </div>
+    <div class="screen-sec">
+      <div class="screen-lbl">Rischio</div>
+      <div class="sc-chips">
+        <span class="sc on" data-f="risk" data-v=""      onclick="setScFilter('risk','',this)">Tutti</span>
+        <span class="sc"    data-f="risk" data-v="Basso" onclick="setScFilter('risk','Basso',this)">🟢 Basso</span>
+        <span class="sc"    data-f="risk" data-v="Medio" onclick="setScFilter('risk','Medio',this)">🟡 Medio</span>
+        <span class="sc"    data-f="risk" data-v="Alto"  onclick="setScFilter('risk','Alto',this)">🔴 Alto</span>
+      </div>
+    </div>
+  </div>
+  <div class="sc-row">
+    <div class="screen-sec">
+      <div class="screen-lbl">Prezzo ($)</div>
+      <div class="sc-inputs">
+        <input class="sc-inp" id="sc-pmin" type="number" placeholder="Min" min="0" oninput="runScreen()">
+        <span style="color:var(--text-dim)">—</span>
+        <input class="sc-inp" id="sc-pmax" type="number" placeholder="Max" min="0" oninput="runScreen()">
+      </div>
+    </div>
+    <div class="screen-sec">
+      <div class="screen-lbl">Solo AI</div>
+      <div class="sc-chips">
+        <span class="sc" id="sc-ai" onclick="toggleScAi(this)">🤖 Aziende AI</span>
+      </div>
+    </div>
+  </div>
+  <div class="sc-res">
+    <span>Trovati: <span class="sc-count" id="sc-count">—</span> titoli nel pool mattutino</span>
+    <button class="sc-reset" onclick="resetScreen()">✕ Reset filtri</button>
+  </div>
+  <div class="grid" id="screen-grid"></div>
+</div>
+
 <!-- ── Grid ── -->
 <div class="grid" id="grid">
   <div id="loading-msg" style="grid-column:1/-1;text-align:center;padding:28px 0 14px;color:var(--text-dim);font-size:.83rem;animation:shimmer 1.8s infinite">⏳ &nbsp;Scansione mercato in corso — prima richiesta ~30 sec…</div>
@@ -3082,6 +3184,96 @@ function _markRefreshOk(){
   if(label) label.style.color='';
   if(btn) btn.style.display='none';
 }
+// ── Screening ─────────────────────────────────────────────────────────────────
+const _scF = { rsi:'all', chg:'all', vol:'all', score:'0', risk:'', ai_only:false };
+let _scOpen = false, _scTimer = null;
+
+function toggleScreening() {
+  _scOpen = !_scOpen;
+  const panel = document.getElementById('screening-panel');
+  const btn   = document.getElementById('screen-toggle-btn');
+  panel.style.display = _scOpen ? 'block' : 'none';
+  btn.classList.toggle('active', _scOpen);
+  if (_scOpen) runScreen();
+}
+
+function setScFilter(key, val, el) {
+  _scF[key] = val;
+  document.querySelectorAll(`.sc[data-f="${key}"]`).forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  runScreen();
+}
+
+function toggleScAi(el) {
+  _scF.ai_only = !_scF.ai_only;
+  el.classList.toggle('ai-on', _scF.ai_only);
+  runScreen();
+}
+
+function resetScreen() {
+  Object.assign(_scF, { rsi:'all', chg:'all', vol:'all', score:'0', risk:'', ai_only:false });
+  document.querySelectorAll('.sc[data-f]').forEach(c => c.classList.remove('on','ai-on'));
+  document.querySelectorAll('.sc[data-v="all"]').forEach(c => c.classList.add('on'));
+  document.querySelectorAll('.sc[data-f="risk"][data-v=""]').forEach(c => c.classList.add('on'));
+  document.querySelectorAll('.sc[data-f="score"][data-v="0"]').forEach(c => c.classList.add('on'));
+  document.getElementById('sc-pmin').value='';
+  document.getElementById('sc-pmax').value='';
+  runScreen();
+}
+
+async function runScreen() {
+  if (!_scOpen) return;
+  clearTimeout(_scTimer);
+  _scTimer = setTimeout(async () => {
+    const p = new URLSearchParams();
+    const f = _scF;
+    // RSI
+    if (f.rsi==='os')  { p.set('rsi_max','35'); }
+    else if (f.rsi==='neu') { p.set('rsi_min','35'); p.set('rsi_max','65'); }
+    else if (f.rsi==='ob')  { p.set('rsi_min','65'); }
+    // Variazione
+    if (f.chg!=='all') p.set('day_change_min', f.chg);
+    // Volume
+    if (f.vol!=='all') p.set('vol_min', f.vol);
+    // Score
+    if (f.score!=='0') p.set('score_min', f.score);
+    // Rischio
+    if (f.risk) p.set('risk', f.risk);
+    // AI
+    if (f.ai_only) p.set('ai_only','true');
+    // Prezzo
+    const pMin=document.getElementById('sc-pmin').value;
+    const pMax=document.getElementById('sc-pmax').value;
+    if (pMin) p.set('price_min', pMin);
+    if (pMax) p.set('price_max', pMax);
+
+    const grid = document.getElementById('screen-grid');
+    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--text-dim);font-size:.8rem;padding:14px">⏳ Ricerca…</div>';
+    document.getElementById('sc-count').textContent='…';
+
+    try {
+      const resp = await fetch('/api/scan/screen?'+p);
+      if (resp.status===202) {
+        grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--text-dim);font-size:.8rem;padding:14px">⏳ Scan mattutino ancora in corso — riprova tra qualche minuto</div>';
+        document.getElementById('sc-count').textContent='0';
+        return;
+      }
+      const data = await resp.json();
+      document.getElementById('sc-count').textContent = data.length;
+      if (!data.length) {
+        grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--text-dim);font-size:.8rem;padding:14px">Nessun titolo corrisponde ai filtri selezionati</div>';
+        return;
+      }
+      grid.innerHTML='';
+      data.forEach((d,i)=>{ grid.appendChild(buildCard(d,i+1)); });
+      animateBars(grid);
+      const tks=data.map(d=>d.ticker).join(',');
+      fetch('/api/sparklines?tickers='+tks).then(r=>r.json()).then(sp=>{ if(sp) renderSparklines(grid,sp,data); }).catch(()=>{});
+    } catch(e) { console.error('[screen]',e); }
+  }, 280);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function forceRefresh(){
   const btn=document.getElementById('force-refresh-btn');
   if(btn){btn.textContent='⏳';btn.disabled=true;}
