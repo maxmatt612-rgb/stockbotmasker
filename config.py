@@ -275,6 +275,67 @@ REVOLUT_UPPER = [
     "POST",   # Post Holdings
 ]
 
+# ── AI Universe — copertura ampliata ────────────────────────────────────────
+AI_UNIVERSE = [
+    # ── AI Infrastruttura & Data Center ──
+    "SMCI",   # Super Micro Computer — server AI leader mondiale
+    "VRT",    # Vertiv Holdings — raffreddamento & power AI data center
+    "DELL",   # Dell Technologies — server PowerEdge AI
+    "POWL",   # Powell Industries — distribuzione energia data center
+    "ANET",   # Arista Networks — networking AI data center
+    # ── AI Chip Edge / Vision / Sensing ──
+    "LSCC",   # Lattice Semiconductor — AI inference edge (low power)
+    "AMBA",   # Ambarella — AI vision chip (auto, IoT, sicurezza)
+    "CEVA",   # CEVA Inc. — IP chip DSP/AI (royalties)
+    "ALGM",   # Allegro MicroSystems — AI power & sensing chips
+    "MBLY",   # Mobileye Global — AI guida autonoma
+    "MKSI",   # MKS Instruments — AI semiconductor equipment
+    "UCTT",   # Ultra Clean Holdings — componenti chip AI
+    "AEHR",   # Aehr Test Systems — test wafer chip AI
+    "FORM",   # FormFactor — semiconductor testing AI
+    # ── AI Software & Workflow Automation ──
+    "APPN",   # Appian Corporation — AI low-code workflow
+    "PEGA",   # Pegasystems — AI decisioning & automation
+    "BRZE",   # Braze Inc. — AI customer engagement
+    "ZETA",   # Zeta Global — AI marketing cloud
+    "AMPL",   # Amplitude — AI product analytics
+    "TASK",   # TaskUs — AI business process outsourcing
+    "MTTR",   # Matterport — AI 3D digital twin
+    "VEEV",   # Veeva Systems — AI cloud per pharma/life sciences
+    "NICE",   # NICE Systems — AI enterprise customer experience
+    "TTEC",   # TTEC Holdings — AI CX outsourcing
+    # ── AI Advertising & Data ──
+    "TTD",    # The Trade Desk — AI programmatic advertising
+    "IAS",    # Integral Ad Science — AI brand safety
+    "DV",     # DoubleVerify — AI ad verification & fraud
+    "MGNI",   # Magnite — AI SSP advertising
+    "PUBM",   # PubMatic — AI programmatic supply chain
+    # ── AI Cybersecurity ──
+    "TENB",   # Tenable Holdings — AI vulnerability management
+    "VRNS",   # Varonis Systems — AI data security & governance
+    "QLYS",   # Qualys — AI cloud security posture
+    "RPD",    # Rapid7 — AI security operations
+    # ── AI Healthcare & Drug Discovery ──
+    "GH",     # Guardant Health — AI liquid biopsy (cancer)
+    "EXAS",   # Exact Sciences — AI multi-cancer screening
+    "ILMN",   # Illumina — AI genomics sequencing
+    "NTRA",   # Natera — AI genetic testing
+    "SDGR",   # Schrödinger — AI molecular simulation (drug design)
+    "ABSI",   # Absci Corp — AI generativa per drug design
+    "SEER",   # Seer Inc. — AI proteomics discovery
+    "CDXS",   # Codexis — AI enzyme engineering
+    "NRIX",   # Nurix Therapeutics — AI targeted protein degradation
+    # ── AI Autonomous & Mobility ──
+    "AUR",    # Aurora Innovation — AI self-driving trucks (Uber spin-off)
+    "LAZR",   # Luminar Technologies — AI lidar per automotive
+    "ARBE",   # Arbe Robotics — AI radar 4D perception
+    "ACVA",   # ACV Auctions — AI auto remarketing
+    # ── AI Education & Productivity ──
+    "COUR",   # Coursera — AI learning platform
+    # ── AI Database / Big Data ──
+    "MDB",    # MongoDB — database AI-native (vector search)
+]
+
 # ── Azioni $100–$200 — big del mercato ─────────────────────────────────────
 REVOLUT_PREMIUM = [
     # ── Mega cap tech ($100–$200) ──
@@ -356,9 +417,9 @@ REVOLUT_PREMIUM = [
     "MARA",   # già in lista, skip
 ]
 
-# Universo completo = US base + $60-100 + $100-200 + Europa
+# Universo completo = US base + $60-100 + $100-200 + AI + Europa
 REVOLUT_UNIVERSE = list(dict.fromkeys(
-    REVOLUT_UNIVERSE + REVOLUT_UPPER + REVOLUT_PREMIUM + EUROPEAN_UNIVERSE
+    REVOLUT_UNIVERSE + REVOLUT_UPPER + REVOLUT_PREMIUM + AI_UNIVERSE + EUROPEAN_UNIVERSE
 ))
 
 # ── ETF Universe ─────────────────────────────────────────────────────────────
