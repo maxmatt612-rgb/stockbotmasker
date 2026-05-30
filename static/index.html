@@ -2451,7 +2451,7 @@ function buildCard(d, rank){
 
   // "Cosa farei io" — trade setup (solo se score>=6)
   let tradeHTML='';
-  if(score>=6 && d.trade_setup){
+  if(d.trade_setup){
     const ts=d.trade_setup;
     tradeHTML=`
     <div class="trade-setup">
