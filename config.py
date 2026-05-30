@@ -143,8 +143,223 @@ EUROPEAN_UNIVERSE = [
     "TEF.MC",    # Telefónica
 ]
 
-# Universo completo = US + Europa
-REVOLUT_UNIVERSE = REVOLUT_UNIVERSE + EUROPEAN_UNIVERSE
+# ── Azioni $60–$100 — copertura ampliata Revolut ────────────────────────────
+REVOLUT_UPPER = [
+    # ── Blue chip / Large cap sub-$100 ──
+    "DIS",    # Walt Disney
+    "WMT",    # Walmart
+    "BAC",    # Bank of America
+    "C",      # Citigroup
+    "WFC",    # Wells Fargo
+    "KO",     # Coca-Cola
+    "PYPL",   # PayPal
+    "EBAY",   # eBay
+    "INTC",   # Intel
+    "MU",     # Micron Technology
+    "CSCO",   # Cisco Systems
+    "GM",     # General Motors
+    "FCX",    # Freeport-McMoRan (rame)
+    "NEM",    # Newmont (oro)
+    "HPQ",    # HP Inc.
+    "HPE",    # Hewlett Packard Enterprise
+    "STX",    # Seagate Technology
+    "WDC",    # Western Digital
+    # ── Tech / SaaS ($40–$100) ──
+    "UBER",   # Uber Technologies
+    "ROKU",   # Roku
+    "TWLO",   # Twilio
+    "DOCN",   # DigitalOcean
+    "BILL",   # Bill.com
+    "PATH",   # UiPath
+    "CFLT",   # Confluent
+    "ESTC",   # Elastic NV
+    "ZI",     # ZoomInfo Technologies
+    "GTLB",   # GitLab
+    "TOST",   # Toast Inc
+    "S",      # SentinelOne
+    "NET",    # Cloudflare
+    "DDOG",   # Datadog
+    "ZS",     # Zscaler
+    "CIEN",   # Ciena
+    "PSTG",   # Pure Storage
+    "NCNO",   # nCino
+    "ALTR",   # Altair Engineering
+    "FRSH",   # Freshworks
+    # ── Semiconduttori ──
+    "ON",     # ON Semiconductor
+    "SWKS",   # Skyworks Solutions
+    "QRVO",   # Qorvo
+    "WOLF",   # Wolfspeed
+    "COHU",   # Cohu Inc.
+    "ACLS",   # Axcelis Technologies
+    "POWI",   # Power Integrations
+    "DIOD",   # Diodes Incorporated
+    # ── Consumer / Retail ──
+    "CHWY",   # Chewy
+    "ETSY",   # Etsy
+    "YELP",   # Yelp
+    "CAVA",   # CAVA Group
+    "SHAK",   # Shake Shack
+    "BJ",     # BJ's Wholesale Club
+    "FIVE",   # Five Below
+    "SFM",    # Sprouts Farmers Market
+    "JACK",   # Jack in the Box
+    "CELH",   # Celsius Holdings
+    "FIZZ",   # National Beverage
+    # ── Finance / Fintech ──
+    "NU",     # Nu Holdings (Nubank)
+    "LC",     # LendingClub
+    "RELY",   # Remitly Global
+    "FLYW",   # Flywire
+    "STEP",   # StepStone Group
+    "ENVA",   # Enova International
+    # ── Healthcare / Biotech ($60–$100) ──
+    "OSCR",   # Oscar Health
+    "HQY",    # HealthEquity
+    "PRVA",   # Privia Health
+    "GMED",   # Globus Medical
+    "ACMR",   # ACM Research
+    "CCXI",   # ChemoCentryx
+    "INMD",   # InMode Ltd
+    "MELI",   # MercadoLibre (ADR Latam)
+    # ── Energia ──
+    "OXY",    # Occidental Petroleum
+    "DVN",    # Devon Energy
+    "MTDR",   # Matador Resources
+    "AR",     # Antero Resources
+    "CIVI",   # Civitas Resources
+    "MGY",    # Magnolia Oil & Gas
+    "PR",     # Permian Resources
+    "CHRD",   # Chord Energy
+    # ── Industriali / Metalli ──
+    "X",      # U.S. Steel
+    "CLF",    # Cleveland-Cliffs
+    "MT",     # ArcelorMittal ADR
+    "TREX",   # Trex Company
+    "STLD",   # Steel Dynamics
+    "KTOS",   # Kratos Defense
+    "SYM",    # Symbotic
+    # ── Airlines ──
+    "DAL",    # Delta Air Lines
+    "UAL",    # United Airlines
+    "ALK",    # Alaska Air
+    "SKYW",   # SkyWest
+    # ── REITs ──
+    "NLY",    # Annaly Capital
+    "AGNC",   # AGNC Investment
+    "MPW",    # Medical Properties Trust
+    "ABR",    # Arbor Realty Trust
+    "RITM",   # Rithm Capital
+    "LADR",   # Ladder Capital
+    # ── Gaming / Intrattenimento ──
+    "PENN",   # PENN Entertainment
+    "CZR",    # Caesars Entertainment
+    "MGM",    # MGM Resorts
+    "WYNN",   # Wynn Resorts
+    # ── China ADR ($60–$100) ──
+    "BABA",   # Alibaba
+    "JD",     # JD.com
+    "BIDU",   # Baidu
+    "NTES",   # NetEase
+    "TME",    # Tencent Music
+    "TAL",    # TAL Education
+    "EDU",    # New Oriental Education
+    # ── Media ──
+    "NYT",    # New York Times
+    "LYV",    # Live Nation Entertainment
+    "SEAT",   # Vivid Seats
+    # ── Altro ──
+    "VST",    # Vistra Energy
+    "ACM",    # AECOM
+    "FLEX",   # Flex Ltd
+    "POST",   # Post Holdings
+]
+
+# ── Azioni $100–$200 — big del mercato ─────────────────────────────────────
+REVOLUT_PREMIUM = [
+    # ── Mega cap tech ($100–$200) ──
+    "NVDA",   # NVIDIA (post-split 10:1, giugno 2024)
+    "AMD",    # Advanced Micro Devices
+    "GOOGL",  # Alphabet / Google
+    "AMZN",   # Amazon
+    "AAPL",   # Apple
+    "ORCL",   # Oracle
+    "QCOM",   # Qualcomm
+    "TXN",    # Texas Instruments
+    "AMAT",   # Applied Materials
+    "TSM",    # Taiwan Semiconductor ADR
+    "AVGO",   # Broadcom
+    "ARM",    # ARM Holdings
+    # ── Tech / SaaS ($100–$200) ──
+    "SNOW",   # Snowflake
+    "DDOG",   # Datadog
+    "DASH",   # DoorDash
+    "ABNB",   # Airbnb
+    "EXPE",   # Expedia Group
+    "EA",     # Electronic Arts
+    "TTWO",   # Take-Two Interactive
+    "PANW",   # Palo Alto Networks
+    "OKTA",   # Okta
+    "COIN",   # Coinbase Global
+    "ZM",     # Zoom Video
+    "CRWD",   # CrowdStrike
+    "SPLK",   # Splunk (acquisizione Cisco in corso)
+    # ── Semiconduttori ($100–$200) ──
+    "MRVL",   # Marvell Technology
+    "MPWR",   # Monolithic Power Systems
+    "ENTG",   # Entegris
+    "ONTO",   # Onto Innovation
+    # ── Healthcare / Pharma ($100–$200) ──
+    "JNJ",    # Johnson & Johnson
+    "ABBV",   # AbbVie
+    "BIIB",   # Biogen
+    "GILD",   # Gilead Sciences
+    "MRK",    # Merck & Co.
+    "BMY",    # Bristol-Myers Squibb
+    "DXCM",   # Dexcom
+    "PODD",   # Insulet Corporation
+    # ── Energia ($100–$200) ──
+    "XOM",    # ExxonMobil
+    "CVX",    # Chevron
+    "COP",    # ConocoPhillips
+    "EOG",    # EOG Resources
+    "VLO",    # Valero Energy
+    "MPC",    # Marathon Petroleum
+    "PSX",    # Phillips 66
+    "WMB",    # Williams Companies
+    # ── Finance ($100–$200) ──
+    "MS",     # Morgan Stanley
+    "COF",    # Capital One Financial
+    "IBKR",   # Interactive Brokers
+    "BX",     # Blackstone Inc
+    "KKR",    # KKR & Co.
+    "APO",    # Apollo Global Management
+    "FDS",    # FactSet Research
+    # ── Consumer ($100–$200) ──
+    "TGT",    # Target Corporation
+    "ROST",   # Ross Stores
+    "TJX",    # TJX Companies
+    "SBUX",   # Starbucks (sotto $100 a volte, incluso per sicurezza)
+    # ── Difesa / Aerospazio ($100–$200) ──
+    "RTX",    # RTX Corporation (Raytheon)
+    "SAIC",   # Science Applications International
+    "BAH",    # Booz Allen Hamilton
+    "HII",    # Huntington Ingalls Industries
+    # ── Industriali ($100–$200) ──
+    "HON",    # Honeywell International
+    "EMR",    # Emerson Electric
+    "ROK",    # Rockwell Automation
+    "IR",     # Ingersoll Rand
+    "XYL",    # Xylem Inc.
+    # ── Crypto / Alternative ──
+    "MSTR",   # MicroStrategy (Bitcoin proxy, molto volatile)
+    "MARA",   # già in lista, skip
+]
+
+# Universo completo = US base + $60-100 + $100-200 + Europa
+REVOLUT_UNIVERSE = list(dict.fromkeys(
+    REVOLUT_UNIVERSE + REVOLUT_UPPER + REVOLUT_PREMIUM + EUROPEAN_UNIVERSE
+))
 
 # ── ETF Universe ─────────────────────────────────────────────────────────────
 ETF_UNIVERSE = [
