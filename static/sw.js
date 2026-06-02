@@ -1,4 +1,4 @@
-const CACHE = 'masker-v48';
+const CACHE = 'masker-v49';
 const IMMUTABLE = ['/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', e => {
@@ -64,6 +64,10 @@ self.addEventListener('notificationclick', e => {
 
 // ── Messaggio dalla pagina: mostra notifica immediata ────────────────────────
 self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
+  }
   if (e.data && e.data.type === 'SHOW_NOTIFICATION') {
     const { title, body, icon } = e.data;
     self.registration.showNotification(title, {
