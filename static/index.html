@@ -5,61 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Masker — Stock Intelligence</title>
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#6366F1">
+<meta name="theme-color" content="#060b14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="/icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#F5F7FB;--surf:#FFFFFF;--surf-v:#EEF1F8;--surf-hi:#E4E9F4;
-  --primary:#6366F1;--primary-dim:rgba(99,102,241,.08);
-  --secondary:#10B981;--gold:#F59E0B;--green:#10B981;--red:#EF4444;
-  --text:#0F172A;--text-dim:#64748B;
-  --border:rgba(15,23,42,.08);--border-hi:rgba(15,23,42,.16);
-  --shadow-sm:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
-  --shadow-md:0 4px 16px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.04);
-  --shadow-lg:0 20px 48px rgba(0,0,0,.1),0 8px 16px rgba(0,0,0,.06);
-  --r-xl:20px;--r-lg:16px;--r-md:10px;--r-sm:6px;
-  --header-bg:#fff;--tape-bg:#fff;
+  --bg:#060b14;--surf:#0d1421;--surf-v:#0f1929;--surf-hi:#162440;
+  --primary:#2979ff;--primary-dim:rgba(41,121,255,.09);
+  --secondary:#00b37d;--gold:#f0b429;--green:#00b37d;--red:#e84a5f;
+  --green-b:#00d9a3;--red-b:#ff4d6d;
+  --text:#c9d4e8;--text-dim:#3d5475;--text-label:#4a6080;
+  --border:#162038;--border-hi:#1e3050;
+  --shadow-sm:none;--shadow-md:none;
+  --shadow-lg:0 0 80px rgba(0,0,0,.95),0 0 0 1px #162038;
+  --r-xl:2px;--r-lg:2px;--r-md:2px;--r-sm:1px;
+  --header-bg:#060b14;--tape-bg:#060b14;
+  --mono:'JetBrains Mono',monospace;
+  --sans:'IBM Plex Sans Condensed','Barlow Condensed',sans-serif;
 }
 html{scroll-behavior:smooth}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;transition:background .25s,color .25s}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;letter-spacing:.01em}
 #bg-canvas{display:none}
 .app{position:relative;z-index:1}
 
-/* ── Dark mode ── */
-body.dark{
-  --bg:#06061A;--surf:#0D0D26;--surf-v:#131336;--surf-hi:#1C1C4A;
-  --primary:#818CF8;--primary-dim:rgba(129,140,248,.12);
-  --text:#E6E1EF;--text-dim:#8E8A9E;
-  --border:rgba(255,255,255,.08);--border-hi:rgba(255,255,255,.18);
-  --shadow-sm:0 1px 4px rgba(0,0,0,.4);
-  --shadow-md:0 4px 20px rgba(0,0,0,.5);
-  --shadow-lg:0 20px 60px rgba(0,0,0,.7);
-  --header-bg:#0D0D26;--tape-bg:#0D0D26;
-}
-body.dark header{background:var(--header-bg)}
-body.dark .indices-tape{background:var(--tape-bg)}
-body.dark .tab-nav{background:var(--surf)}
-body.dark .card{background:var(--surf);box-shadow:none}
-body.dark .port-stat{background:var(--surf);box-shadow:none}
-body.dark .port-pie-card{background:var(--surf);box-shadow:none}
-body.dark .movers-region{background:var(--surf);box-shadow:none}
-body.dark .modal-sheet{background:var(--surf)}
-body.dark .refresh-pill{background:var(--surf)}
-body.dark .detail-cell{background:var(--surf-v)}
-body.dark .skel-card{background:var(--surf)}
-body.dark .chat-bubble.ai{background:var(--surf)}
-body.dark .disc-banner{background:rgba(245,158,11,.05);border-color:rgba(245,158,11,.12)}
-body.dark .risk-card{background:var(--surf);box-shadow:none}
-body.dark .rebal-table{background:var(--surf)}
-body.dark .alert-panel{background:var(--surf)}
-body.dark .eco-item{background:var(--surf-v)}
-body.dark .alert-item{background:var(--surf-v)}
-body.dark #ai-chat-view{background:var(--bg)}
+/* dark mode is the only mode — nothing to override */
 
 /* ── Dark toggle button ── */
 .theme-toggle{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--surf-v);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;transition:all .2s;flex-shrink:0}
@@ -1163,6 +1137,200 @@ footer{text-align:center;padding:18px 24px;color:var(--text-dim);font-size:.72re
   .modal-sheet{padding:18px}
   .ctrl-div{display:none}
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TERMINAL REDESIGN — Bloomberg/TradingView trader aesthetic
+   Override block: vince sempre (ultimo nel foglio). Stile denso, squadrato,
+   numeri monospace, palette navy+blu, verde/rosso solo sui prezzi.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+body{font-family:var(--sans)!important;background:var(--bg)!important;color:var(--text)!important;-webkit-font-smoothing:antialiased}
+
+/* ── Squadra tutto, elimina ombre ─────────────────────────────────────────── */
+*{box-shadow:none!important;text-shadow:none!important}
+header,.tab-nav,.indices-tape,.card,.skel-card,.modal-sheet,.refresh-pill,.stat-chip,
+.chip,.chip-ai,.chip-ds,.chip-lv,.price-chg,.ctrl-btn,.screen-toggle-btn,.sc,.sc-inp,
+.detail-cell,.trade-setup,.ts-cell,.movers-region,.port-stat,.port-pie-card,.risk-card,
+.rebal-table,.alert-panel,.eco-item,.earnings-item,.chat-bubble,.hcard,.hcard-pct,
+.vport-cash,.vport-pos-card,.lb-col,.port-input,.port-add-btn,.tg-login-btn,.fx-toggle,
+.theme-toggle,.alert-btn,.auth-user-chip,.date-pill,.chart-tf-btn,.ind-btn,.why-today-btn,
+.trade-setup-rr,.score-text,.note-section,.news-section,.forecast-section,.bh-wrap,
+.screener-panel,.screener-card,.diary-input,.diary-select,.mkt-pill,.search-dropdown,
+.header-search,.chat-input,.cmp-box,.cmp-chip,.app-toast,.score-hist-wrap,
+.accuracy-chip,.sb-row,.wl-judge-card,.backtest-panel,.bt-card,.extra-section,
+input,textarea,select,button{border-radius:2px!important}
+.live-dot,.mkt-pill-dot,.port-pie-dot,.sb-dot,.cmp-legend-dot,.auth-avatar,.auth-avatar-ph,
+.modal-close,.chat-send-btn,.cmp-close{border-radius:50%!important}
+
+/* ── Superfici: via i bianchi hardcoded ───────────────────────────────────── */
+header,.tab-nav,.indices-tape,.refresh-pill{background:var(--header-bg)!important;border-color:var(--border)!important}
+.card,.skel-card,.modal-sheet,.port-stat,.port-pie-card,.movers-region,.risk-card,
+.rebal-table,.alert-panel,.eco-item,.chat-bubble.ai,.screener-panel,.screener-card,
+.backtest-panel,.backtest-header,.backtest-body,.wl-judge-card,.compare-panel,
+.hcard,.vport-cash,.lb-col{background:var(--surf)!important;border-color:var(--border)!important;background-image:none!important}
+.detail-cell,.trade-setup,.ts-cell,.stat-chip,.chip,.fund-cell,.diary-stat,.sb-row,
+.vport-pos-card,.sc,.sc-inp,.note-area,.bh-wrap,.score-hist-wrap,.bt-card,
+.accuracy-chip,.earnings-item,.mkt-pill{background:var(--surf-v)!important}
+.disc-banner{background:#0a0f18!important;border-color:var(--border)!important;color:var(--text-dim)!important}
+.disc-banner b{color:var(--gold)!important}
+body,.app{background:var(--bg)!important}
+
+/* ── Numeri in MONOSPACE (tabular) ────────────────────────────────────────── */
+.card-ticker,.price-val,.price-chg,.score-num,.tape-price,.tape-chg,.mkt-pill-time,
+.modal-ticker,.modal-price,.detail-cell-val,.ts-cell-val,.stat-chip b,.hcard-ticker,
+.hcard-pct,.hcard-perf-price,.hcard-score-val,.port-stat-val,.port-ticker-cell,
+.risk-value,.bt-avg,.mover-ticker,.mover-chg,.mover-price,.sc-count,.accuracy-chip-val,
+.lt-cagr-val,.lt-proj-base,.lt-proj-bull,.lt-proj-bear,.forecast-price-val,.forecast-pct,
+.sb-val,.vport-cash-val,.vport-pos-pl,.vport-pos-detail,.cmp-stat-val,.lb-pct,.lb-ticker,
+.tape-name,.fund-cell-val,.diary-stat-val,.eco-date,.earnings-date,.bh-label,
+.tax-val,.sim-result-val,.sim-stat-val,.mkt-pill-label,.briefing-idx-val,
+input,textarea,.sc-inp,.port-input,.chart-tf-btn,.cmp-stat-sub{
+  font-family:var(--mono)!important;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+
+/* ── Label UI uppercase condensed ─────────────────────────────────────────── */
+.card-rank,.score-label,.detail-cell-label,.ts-cell-label,.extra-hd,.trade-setup-hd,
+.screen-lbl,.port-stat-label,.risk-label,.movers-col-hd,.pview-title,.tab-btn,
+.briefing-section-hd,.bt-card-label,.sb-label{text-transform:uppercase;letter-spacing:.08em!important}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+header{height:52px;border-bottom:1px solid var(--border)!important}
+.logo{font-family:var(--sans);font-weight:700;letter-spacing:.02em}
+.header-search{background:var(--surf-v)!important;border:1px solid var(--border)!important}
+.header-search input{font-family:var(--sans)!important}
+.live-badge{font-family:var(--mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em}
+
+/* ── Ticker tape ──────────────────────────────────────────────────────────── */
+.indices-tape{height:34px;border-bottom:1px solid var(--border)!important}
+.tape-scroll-wrap,.tape-marquee,.tape-item{height:34px}
+.mkt-pill{height:34px;border-right:1px solid var(--border)!important}
+.tape-item{border-right:1px solid var(--border)!important;padding:0 16px}
+.tape-name{font-size:.6rem;letter-spacing:.06em}
+.tape-price{font-size:.78rem;font-weight:600;color:var(--text)}
+.tape-chg{font-size:.68rem;font-weight:600}
+.pos{color:var(--green-b)!important}.neg{color:var(--red-b)!important}
+
+/* ── Hero: via ────────────────────────────────────────────────────────────── */
+.hero{display:none!important}
+
+/* ── Tab nav: stile terminale ─────────────────────────────────────────────── */
+.tab-nav{background:var(--bg)!important;border-bottom:1px solid var(--border)!important;gap:0;padding-top:0}
+.tab-btn{font-family:var(--sans)!important;font-size:.74rem;font-weight:600;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--text-dim);padding:11px 16px;border-radius:0!important;border-bottom:2px solid transparent}
+.tab-btn:hover{color:var(--text);background:var(--surf-v)}
+.tab-btn.active{color:var(--primary);border-bottom-color:var(--primary);background:transparent}
+
+/* ── Controls / stats bar ─────────────────────────────────────────────────── */
+.controls-bar{padding-top:12px}
+.ctrl-btn{background:var(--surf-v)!important;border:1px solid var(--border)!important;color:var(--text-dim);font-family:var(--sans)}
+.ctrl-btn.active{background:var(--primary-dim)!important;border-color:var(--primary)!important;color:var(--primary)}
+.stats-bar{justify-content:flex-start;padding-left:28px;gap:0;border-bottom:1px solid var(--border);margin-bottom:0}
+.stat-chip{background:transparent!important;border:none!important;border-right:1px solid var(--border)!important;
+  padding:9px 18px;font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim)}
+.stat-chip b{color:var(--text)!important;font-weight:700;font-size:.92rem;margin-left:5px}
+
+/* ── GRID denso ───────────────────────────────────────────────────────────── */
+.grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1px;background:var(--border);
+  padding:1px 0 96px;border-top:1px solid var(--border)}
+@media(min-width:900px){.grid{padding:1px 28px 96px}}
+
+/* ── CARD: tile da terminale ──────────────────────────────────────────────── */
+.card{background:var(--surf)!important;border:none!important;border-radius:0!important;
+  padding:13px 15px 12px!important;position:relative;animation:none!important;transition:background .12s}
+.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--border-hi)}
+.card:hover{background:var(--surf-hi)!important;transform:none!important}
+.card.up::before,.card:has(.chg-pos)::before{background:var(--green)}
+.card.down::before,.card:has(.chg-neg)::before{background:var(--red)}
+.card-rank{font-family:var(--mono);font-size:.6rem;color:var(--text-dim);letter-spacing:.1em;margin-bottom:4px;opacity:.7}
+.card-row{margin-bottom:9px;align-items:center}
+.card-ticker{font-family:var(--sans)!important;font-size:1.35rem;font-weight:700;letter-spacing:0}
+.card-name{font-size:.66rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.03em}
+.price-val{font-size:1.1rem;font-weight:600;color:var(--text)}
+.price-chg{background:transparent!important;padding:0!important;margin-top:2px;font-size:.74rem;font-weight:600}
+.chg-pos{color:var(--green-b)!important}.chg-neg{color:var(--red-b)!important}
+.ev-up{color:var(--green-b)!important;background:transparent!important;padding:0!important}
+.ev-down{color:var(--red-b)!important;background:transparent!important;padding:0!important}
+
+/* score: barra piatta blu */
+.score-wrap{margin-bottom:9px;gap:7px}
+.score-label{font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text-dim)}
+.score-track{height:3px;background:var(--surf-hi)!important;border-radius:0!important}
+.score-bar{background:var(--primary)!important;border-radius:0!important}
+.score-num{font-family:var(--mono);color:var(--text)}
+
+/* chips squadrati piatti */
+.chips{gap:4px;margin-bottom:9px}
+.chip{background:var(--surf-v)!important;border:1px solid var(--border)!important;color:var(--text-dim);
+  font-size:.62rem;text-transform:uppercase;letter-spacing:.04em;padding:1px 6px}
+.chip-ai{background:rgba(41,121,255,.12)!important;border:1px solid rgba(41,121,255,.4)!important;color:#5b9dff!important}
+.chip-ds.bull{background:rgba(0,179,125,.12)!important;border:1px solid rgba(0,179,125,.4)!important;color:var(--green-b)!important}
+.chip-ds.bear{background:rgba(232,74,95,.12)!important;border:1px solid rgba(232,74,95,.4)!important;color:var(--red-b)!important}
+.chip-lv{background:rgba(240,180,41,.1)!important;border:1px solid rgba(240,180,41,.35)!important;color:var(--gold)!important}
+
+/* trade setup */
+.trade-setup{background:var(--surf-v)!important;border:1px solid var(--border)!important;padding:8px 10px}
+.trade-setup-hd{font-size:.6rem;letter-spacing:.07em;color:var(--text-dim)}
+.ts-cell{background:var(--bg)!important;border:1px solid var(--border)}
+.ts-cell-label{font-size:.52rem}
+.ts-cell-val{font-size:.76rem}
+.ts-cell.entry .ts-cell-val{color:var(--primary)!important}
+.ts-cell.stop .ts-cell-val{color:var(--red-b)!important}
+.ts-cell.target .ts-cell-val{color:var(--green-b)!important}
+.trade-setup-rr{color:var(--text-dim)}.trade-setup-rr strong{color:var(--text)}
+.verdict{border-left:2px solid var(--primary);color:var(--text-dim)}
+.score-text{background:var(--surf-v)!important;border-left:2px solid var(--primary)!important;color:var(--text-dim)}
+.why-today-btn{background:var(--surf-v)!important;border:1px solid var(--border)!important;color:var(--text-dim);
+  text-transform:uppercase;letter-spacing:.05em;font-size:.62rem}
+.why-today-btn:hover{border-color:var(--primary)!important;color:var(--primary)!important;background:var(--surf-hi)!important}
+
+/* ── Screening panel ──────────────────────────────────────────────────────── */
+.screen-toggle-btn{background:var(--surf-v)!important;border:1px solid var(--border)!important;color:var(--text-dim);
+  text-transform:uppercase;letter-spacing:.05em;font-size:.68rem}
+.screen-toggle-btn.active{background:var(--primary)!important;border-color:var(--primary)!important;color:#fff}
+.screen-lbl{color:var(--text-dim)}
+.sc{background:var(--surf-v)!important;border:1px solid var(--border)!important;color:var(--text-dim)}
+.sc.on{background:var(--primary)!important;border-color:var(--primary)!important;color:#fff}
+.sc.ai-on{background:rgba(41,121,255,.2)!important;border-color:var(--primary)!important;color:#5b9dff!important}
+.sc-inp{background:var(--surf-v)!important;border:1px solid var(--border)!important;color:var(--text)}
+.sc-count{color:var(--primary)}
+
+/* ── Modal: pannello Bloomberg ────────────────────────────────────────────── */
+.modal-overlay{background:rgba(2,5,10,.78);backdrop-filter:blur(3px)}
+.modal-sheet{background:var(--surf)!important;border:1px solid var(--border-hi)!important;
+  box-shadow:0 0 0 1px var(--border),0 30px 90px rgba(0,0,0,.8)!important}
+.modal-ticker{font-family:var(--sans)!important;font-weight:700}
+.modal-close{background:var(--surf-v)!important;border:1px solid var(--border)!important}
+.detail-cell{background:var(--surf-v)!important;border:1px solid var(--border)}
+.detail-cell-label{color:var(--text-dim)}
+.modal-verdict{border-left:2px solid var(--primary)}
+
+/* ── Refresh pill ─────────────────────────────────────────────────────────── */
+.refresh-pill{background:var(--surf)!important;border:1px solid var(--border-hi)!important;border-radius:2px!important;
+  font-family:var(--mono);font-size:.66rem;text-transform:uppercase;letter-spacing:.04em}
+
+/* ── Movers / Mercati ─────────────────────────────────────────────────────── */
+.movers-region{background:var(--surf)!important;border:1px solid var(--border)!important}
+.mover-ticker{font-family:var(--sans)!important}
+.mover-pos,.movers-col-top .movers-col-hd{color:var(--green-b)!important}
+.mover-neg,.movers-col-bot .movers-col-hd{color:var(--red-b)!important}
+
+/* ── Tabelle (portfolio, diary, rebal) ────────────────────────────────────── */
+.port-table th,.diary-table th,.rebal-table th{text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);background:var(--surf-v)}
+.port-pl-pos{color:var(--green-b)!important}.port-pl-neg{color:var(--red-b)!important}
+
+/* ── Chat ─────────────────────────────────────────────────────────────────── */
+.chat-bubble.user{background:var(--primary)!important;border-radius:2px!important}
+.chat-bubble.ai{background:var(--surf)!important;border:1px solid var(--border)!important;border-radius:2px!important}
+.chat-input{background:var(--surf-v)!important;border:1px solid var(--border)!important;border-radius:2px!important}
+.chat-send-btn{background:var(--primary)!important}
+
+/* ── Scrollbar terminale ──────────────────────────────────────────────────── */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--surf-hi);border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:var(--border-hi)}
+
+/* selezione testo */
+::selection{background:rgba(41,121,255,.3);color:#fff}
 </style>
 </head>
 <body>
@@ -2476,7 +2644,7 @@ function buildCard(d, rank){
   const isPos=dispPct>=0;
   const score=d.score_10??5;
   const div=document.createElement('div');
-  div.className='card';
+  div.className='card '+(isPos?'up':'down');
   const dsLabel = d.double_signal==='bull'
     ? `<span class="chip-ds bull">⚡ ${d.bull_signals||2} segnali bull</span>`
     : d.double_signal==='bear'
