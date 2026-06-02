@@ -1340,6 +1340,24 @@ header{height:52px;border-bottom:1px solid var(--border)!important}
 .ms-v{font-family:var(--mono);font-size:.82rem;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
 .ms-v.hi{color:var(--green-b)}.ms-v.lo{color:var(--gold)}
 
+/* ── Score ring circolare (come la reference) ─────────────────────────────── */
+.card-row{align-items:flex-start!important}
+.card-id{display:flex;flex-direction:column;gap:1px;min-width:0}
+.card-price-line{display:flex;align-items:baseline;gap:8px;margin-top:5px}
+.card-price-line .price-val{font-size:1.15rem}
+.card-price-line .price-chg{margin-top:0!important}
+.score-ring{position:relative;width:50px;height:50px;border-radius:50%;flex-shrink:0;
+  background:conic-gradient(var(--rc) calc(var(--p)*1%),var(--border-hi) 0)}
+.score-ring::after{content:'';position:absolute;inset:3px;border-radius:50%;background:var(--surf)}
+.card:hover .score-ring::after{background:var(--surf-hi)}
+.score-ring-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-weight:700;font-size:1.02rem;color:var(--text);z-index:1;padding-top:3px}
+.score-ring-lbl{position:absolute;bottom:7px;left:0;right:0;text-align:center;z-index:1;
+  font-family:var(--sans);font-size:.42rem;font-weight:700;letter-spacing:.12em;color:var(--text-dim)}
+.score-ring.s-hi{--rc:var(--green-b)}
+.score-ring.s-mid{--rc:var(--gold)}
+.score-ring.s-lo{--rc:var(--red-b)}
+
 /* ── Atmosfera: griglia di sfondo sottile come un terminale ───────────────── */
 body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
@@ -1365,10 +1383,39 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Refresh pill: indicatore live ────────────────────────────────────────── */
 .refresh-pill .live-dot{background:var(--green-b)}
 
+/* ── Signals blotter table ────────────────────────────────────────────────── */
+.signals-panel{margin:0 0 40px;border-top:1px solid var(--border)}
+@media(min-width:900px){.signals-panel{margin:0 28px 40px}}
+.signals-panel-hd{display:flex;align-items:baseline;justify-content:space-between;padding:14px 14px 10px}
+.signals-panel-title{font-family:var(--sans);font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text)}
+.signals-panel-sub{font-family:var(--mono);font-size:.66rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em}
+.signals-table-wrap{overflow-x:auto;border:1px solid var(--border);background:var(--surf)}
+.signals-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.74rem}
+.signals-table thead th{position:sticky;top:0;background:var(--surf-v);color:var(--text-dim);
+  font-family:var(--sans);font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  text-align:left;padding:8px 11px;border-bottom:1px solid var(--border-hi);white-space:nowrap}
+.signals-table th.num,.signals-table td.num{text-align:right;font-variant-numeric:tabular-nums}
+.signals-table tbody td{padding:7px 11px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap}
+.signals-table tbody tr{cursor:pointer;transition:background .1s}
+.signals-table tbody tr:hover{background:var(--surf-hi)}
+.signals-table td.dim{color:var(--text-dim)}
+.signals-table td.up{color:var(--green-b)}.signals-table td.down{color:var(--red-b)}
+.sig-tk{font-family:var(--sans);font-weight:700;font-size:.82rem;letter-spacing:.02em}
+.sig-ai{margin-left:5px;font-family:var(--sans);font-size:.52rem;font-weight:700;letter-spacing:.06em;
+  color:#5b9dff;border:1px solid rgba(41,121,255,.4);padding:0 3px;vertical-align:middle}
+.sig-score{display:inline-block;min-width:30px;text-align:center;font-weight:700;padding:1px 5px;border:1px solid}
+.sig-score.sig-hi{color:var(--green-b);border-color:rgba(0,217,163,.4);background:rgba(0,179,125,.1)}
+.sig-score.sig-mid{color:var(--gold);border-color:rgba(240,180,41,.35);background:rgba(240,180,41,.08)}
+.sig-score.sig-lo{color:var(--red-b);border-color:rgba(255,77,109,.35);background:rgba(232,74,95,.1)}
+.sig-tag{font-family:var(--sans);font-size:.6rem;font-weight:700;letter-spacing:.05em;padding:2px 7px;border:1px solid}
+.sig-tag.bull{color:var(--green-b);border-color:rgba(0,217,163,.4)}
+.sig-tag.bear{color:var(--red-b);border-color:rgba(255,77,109,.4)}
+.sig-tag.neu{color:var(--text-dim);border-color:var(--border-hi)}
+
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v49';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v50';color:var(--primary);opacity:.7}
 </style>
 </head>
 <body>
@@ -2095,6 +2142,27 @@ footer::after{content:' · BUILD v49';color:var(--primary);opacity:.7}
   <div class="skel-card"><div class="skel-line" style="height:13px;width:38%"></div><div class="skel-line" style="height:34px;width:52%"></div><div class="skel-line" style="height:11px;width:100%"></div><div class="skel-line" style="height:11px;width:70%"></div></div>
 </div>
 
+<!-- ── Tabella segnali (blotter) ── -->
+<section class="signals-panel" id="signals-panel" style="display:none">
+  <div class="signals-panel-hd">
+    <span class="signals-panel-title">▦ Top Signals — Blotter</span>
+    <span class="signals-panel-sub" id="signals-count">—</span>
+  </div>
+  <div class="signals-table-wrap">
+    <table class="signals-table">
+      <thead>
+        <tr>
+          <th style="width:32px">#</th><th>Ticker</th><th class="num">Prezzo</th>
+          <th class="num">Var%</th><th class="num">RSI</th><th class="num">Score</th>
+          <th class="num">Entry</th><th class="num">Stop</th><th class="num">Target</th>
+          <th class="num">R/R</th><th>Segnale</th>
+        </tr>
+      </thead>
+      <tbody id="signals-tbody"></tbody>
+    </table>
+  </div>
+</section>
+
 </div><!-- #live-view -->
 </div><!-- .app -->
 
@@ -2681,6 +2749,7 @@ function buildCard(d, rank){
     : (d.change_since_analysis != null ? d.change_since_analysis : d.day_change_pct);
   const isPos=dispPct>=0;
   const score=d.score_10??5;
+  const sCls=score>=7?'s-hi':score>=5?'s-mid':'s-lo';
   const div=document.createElement('div');
   div.className='card '+(isPos?'up':'down');
   const dsLabel = d.double_signal==='bull'
@@ -2724,14 +2793,18 @@ function buildCard(d, rank){
   div.innerHTML=`
     <div class="card-rank"># ${rank}</div>
     <div class="card-row">
-      <div>
+      <div class="card-id">
         <div class="card-ticker">${d.ticker}</div>
         <div class="card-name">${d.name??d.ticker}</div>
-      </div>
-      <div class="price-block">
-        <div class="price-val">${fmtPCcy(displayPrice, d.currency)}</div>
-        <div class="price-chg ${isPos?'chg-pos':'chg-neg'}" title="${isEvening?'Variazione dalla mattina':(d.change_since_analysis!=null?'Variazione dall\'analisi mattutina':'Variazione giornaliera')}">${fmtC(dispPct)}</div>
+        <div class="card-price-line">
+          <span class="price-val">${fmtPCcy(displayPrice, d.currency)}</span>
+          <span class="price-chg ${isPos?'chg-pos':'chg-neg'}" title="${isEvening?'Variazione dalla mattina':(d.change_since_analysis!=null?'Variazione dall\'analisi mattutina':'Variazione giornaliera')}">${fmtC(dispPct)}</span>
+        </div>
         ${isEvening?`<div class="ev-delta ${isPos?'ev-up':'ev-down'}">${isPos?'▲':'▼'} ${Math.abs(dispPct).toFixed(2)}% · 🌅 ${fmtPCcy(d.morning_price??d.current_price, d.currency)}</div>`:''}
+      </div>
+      <div class="score-ring ${sCls}" style="--p:${Math.round(score*10)}">
+        <span class="score-ring-num">${score}</span>
+        <span class="score-ring-lbl">SCORE</span>
       </div>
     </div>
     <div class="metrics-strip">
@@ -2739,11 +2812,6 @@ function buildCard(d, rank){
       <div class="ms-cell"><span class="ms-k">VOL</span><span class="ms-v ${(d.vol_ratio??1)>1.5?'hi':''}">${d.vol_ratio!=null?d.vol_ratio.toFixed(1)+'×':'—'}</span></div>
       <div class="ms-cell"><span class="ms-k">VLT</span><span class="ms-v">${d.volatility!=null?d.volatility.toFixed(0)+'%':'—'}</span></div>
       <div class="ms-cell"><span class="ms-k">RNG</span><span class="ms-v">${d.trade_setup?Math.abs(d.trade_setup.stop_pct)+'/'+d.trade_setup.target_pct:'—'}</span></div>
-    </div>
-    <div class="score-wrap">
-      <span class="score-label">Score</span>
-      <div class="score-track"><div class="score-bar" data-s="${score}"></div></div>
-      <span class="score-num">${score}<span style="font-weight:400;color:var(--text-dim)">/10</span></span>
     </div>
     ${(()=>{const t=scoreToText(d);return t?`<div class="score-text">${t}</div>`:''})()}
     ${chipsHTML?`<div class="chips">${chipsHTML}</div>`:''}
@@ -2805,6 +2873,42 @@ function renderCards(data){
   grid.appendChild(frag);
   animateBars(grid);
   loadSparklines(data.map(d=>d.ticker).join(','),data);
+  renderSignalsTable(data);
+}
+
+function renderSignalsTable(data){
+  const panel=document.getElementById('signals-panel');
+  const tbody=document.getElementById('signals-tbody');
+  if(!panel||!tbody) return;
+  if(!data.length){ panel.style.display='none'; return; }
+  panel.style.display='block';
+  document.getElementById('signals-count').textContent=data.length+' titoli';
+  tbody.innerHTML=data.map((d,i)=>{
+    const isEv=d.evening_price!=null&&d.delta_from_morning!=null;
+    const pct=isEv?d.delta_from_morning:(d.change_since_analysis!=null?d.change_since_analysis:d.day_change_pct);
+    const pos=pct>=0;
+    const sc=d.score_10??5;
+    const sCls=sc>=7?'sig-hi':sc>=5?'sig-mid':'sig-lo';
+    const ts=d.trade_setup;
+    const ccy=d.currency;
+    const sig=d.double_signal==='bull'?'<span class="sig-tag bull">▲ BULL</span>'
+      :d.double_signal==='bear'?'<span class="sig-tag bear">▼ BEAR</span>'
+      :'<span class="sig-tag neu">— FLAT</span>';
+    const ai=d.is_ai?'<span class="sig-ai">AI</span>':'';
+    return `<tr onclick="(cardsData.find(c=>c.ticker==='${d.ticker}')&&openModal(cardsData.find(c=>c.ticker==='${d.ticker}')))">
+      <td class="num dim">${i+1}</td>
+      <td><span class="sig-tk">${d.ticker}</span>${ai}</td>
+      <td class="num">${fmtPCcy(isEv?d.evening_price:d.current_price,ccy)}</td>
+      <td class="num ${pos?'up':'down'}">${(pos?'+':'')+pct.toFixed(2)}%</td>
+      <td class="num">${d.rsi!=null?d.rsi.toFixed(0):'—'}</td>
+      <td class="num"><span class="sig-score ${sCls}">${sc}</span></td>
+      <td class="num">${ts?fmtPCcy(ts.entry,ccy):'—'}</td>
+      <td class="num down">${ts?fmtPCcy(ts.stop,ccy):'—'}</td>
+      <td class="num up">${ts?fmtPCcy(ts.target,ccy):'—'}</td>
+      <td class="num dim">${ts?'1:'+ts.rr:'—'}</td>
+      <td>${sig}</td>
+    </tr>`;
+  }).join('');
 }
 
 // Controls
