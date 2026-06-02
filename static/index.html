@@ -1383,6 +1383,45 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Refresh pill: indicatore live ────────────────────────────────────────── */
 .refresh-pill .live-dot{background:var(--green-b)}
 
+/* ── COMMAND CENTER ───────────────────────────────────────────────────────── */
+#cmd-center{padding:14px 14px 0;position:relative;z-index:1}
+@media(min-width:900px){#cmd-center{padding:16px 28px 0}}
+.cmd-stats{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);
+  border:1px solid var(--border);margin-bottom:14px}
+@media(max-width:760px){.cmd-stats{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:440px){.cmd-stats{grid-template-columns:repeat(2,1fr)}}
+.cstat{background:var(--surf);padding:10px 14px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.cstat-k{font-family:var(--sans);font-size:.56rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-dim)}
+.cstat-v{font-family:var(--mono);font-size:1.3rem;font-weight:700;color:var(--text);line-height:1.05;overflow:hidden;text-overflow:ellipsis}
+.cstat-v.tk{font-family:var(--sans);letter-spacing:.02em}
+.cstat-v.up{color:var(--green-b)}.cstat-v.down{color:var(--red-b)}
+.cstat-unit{font-size:.66rem;color:var(--text-dim);font-weight:400}
+.cstat-sub{font-family:var(--mono);font-size:.6rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cstat-sub.up{color:var(--green-b)}.cstat-sub.down{color:var(--red-b)}
+.cstat.bias .cstat-v{font-family:var(--sans);font-size:1.05rem;font-weight:800;letter-spacing:.05em}
+.cstat.bias.bull{background:rgba(0,179,125,.07)}.cstat.bias.bull .cstat-v{color:var(--green-b)}
+.cstat.bias.bear{background:rgba(232,74,95,.07)}.cstat.bias.bear .cstat-v{color:var(--red-b)}
+.cstat.bias.neu .cstat-v{color:var(--gold)}
+
+.cmd-main{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:14px}
+@media(min-width:1000px){.cmd-main{grid-template-columns:1.7fr 1fr}}
+.cmd-chart-panel,.cmd-strat-panel{border:1px solid var(--border);background:var(--surf);display:flex;flex-direction:column;min-width:0}
+.cmd-panel-hd{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--surf-v)}
+.cmd-panel-title{font-family:var(--sans);font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.cmd-panel-title b{color:var(--primary);font-family:var(--mono)}
+.cmd-tf{display:flex;gap:2px;margin-left:auto;flex-shrink:0}
+.cmd-tf button{font-family:var(--mono);font-size:.62rem;font-weight:600;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);padding:3px 7px;cursor:pointer;border-radius:1px}
+.cmd-tf button.on{background:var(--primary);border-color:var(--primary);color:#fff}
+.cmd-detail-btn{font-family:var(--sans);font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;background:transparent;border:1px solid var(--border-hi);color:var(--text-dim);padding:4px 8px;cursor:pointer;flex-shrink:0;border-radius:1px}
+.cmd-detail-btn:hover{border-color:var(--primary);color:var(--primary)}
+.cmd-chart{height:380px;width:100%;position:relative}
+.cmd-chart-load{height:380px;display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:.76rem;font-family:var(--sans)}
+/* la griglia card diventa la lista strategia (1 colonna, scrollabile) */
+.cmd-strat-panel #grid{padding:0!important;gap:1px!important;background:var(--border)!important;
+  grid-template-columns:1fr!important;border-top:none!important;overflow-y:auto;max-height:412px}
+.cmd-strat-panel .card.sel{background:var(--surf-hi)!important}
+.cmd-strat-panel .card.sel::before{width:3px;background:var(--primary)!important}
+
 /* ── Signals blotter table ────────────────────────────────────────────────── */
 .signals-panel{margin:0 0 40px;border-top:1px solid var(--border)}
 @media(min-width:900px){.signals-panel{margin:0 28px 40px}}
@@ -1415,7 +1454,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v50';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v51';color:var(--primary);opacity:.7}
 </style>
 </head>
 <body>
@@ -2131,6 +2170,29 @@ footer::after{content:' · BUILD v50';color:var(--primary);opacity:.7}
   <div class="grid" id="screen-grid"></div>
 </div>
 
+<!-- ── Command Center ── -->
+<section id="cmd-center">
+  <div class="cmd-stats" id="cmd-stats">
+    <div class="cstat"><div class="cstat-k">In attesa dati</div><div class="cstat-v">—</div><div class="cstat-sub">scansione…</div></div>
+  </div>
+  <div class="cmd-main">
+    <div class="cmd-chart-panel">
+      <div class="cmd-panel-hd">
+        <span class="cmd-panel-title">📈 Grafico Live · <b id="cmd-chart-ticker">—</b></span>
+        <div class="cmd-tf" id="cmd-tf">
+          <button data-p="5d" data-i="15m">5G</button>
+          <button data-p="1mo" data-i="1d" class="on">1M</button>
+          <button data-p="3mo" data-i="1d">3M</button>
+          <button data-p="6mo" data-i="1d">6M</button>
+          <button data-p="1y" data-i="1d">1A</button>
+        </div>
+        <button class="cmd-detail-btn" onclick="openSelectedModal()">Dettaglio ▸</button>
+      </div>
+      <div id="cmd-chart" class="cmd-chart"><div class="cmd-chart-load">Seleziona un titolo dalla lista →</div></div>
+    </div>
+    <div class="cmd-strat-panel">
+      <div class="cmd-panel-hd"><span class="cmd-panel-title">🤖 Strategia AI · Top Signals</span></div>
+
 <!-- ── Grid ── -->
 <div class="grid" id="grid">
   <div id="loading-msg" style="grid-column:1/-1;text-align:center;padding:28px 0 14px;color:var(--text-dim);font-size:.83rem;animation:shimmer 1.8s infinite">⏳ &nbsp;Scansione mercato in corso — prima richiesta ~30 sec…</div>
@@ -2141,6 +2203,9 @@ footer::after{content:' · BUILD v50';color:var(--primary);opacity:.7}
   <div class="skel-card"><div class="skel-line" style="height:13px;width:38%"></div><div class="skel-line" style="height:34px;width:52%"></div><div class="skel-line" style="height:11px;width:100%"></div><div class="skel-line" style="height:11px;width:70%"></div></div>
   <div class="skel-card"><div class="skel-line" style="height:13px;width:38%"></div><div class="skel-line" style="height:34px;width:52%"></div><div class="skel-line" style="height:11px;width:100%"></div><div class="skel-line" style="height:11px;width:70%"></div></div>
 </div>
+    </div><!-- cmd-strat-panel -->
+  </div><!-- cmd-main -->
+</section>
 
 <!-- ── Tabella segnali (blotter) ── -->
 <section class="signals-panel" id="signals-panel" style="display:none">
@@ -2823,8 +2888,8 @@ function buildCard(d, rank){
     </button>
     <div class="why-today-result" id="why-${d.ticker}" style="display:none"></div>
   `;
-  div.addEventListener('click',()=>openModal(d));
-  addTilt(div);
+  div.dataset.ticker=d.ticker;
+  div.addEventListener('click',()=>{ if(typeof selectStock==='function'){selectStock(d);} else {openModal(d);} });
   return div;
 }
 
@@ -2874,7 +2939,74 @@ function renderCards(data){
   animateBars(grid);
   loadSparklines(data.map(d=>d.ticker).join(','),data);
   renderSignalsTable(data);
+  // Command center: auto-seleziona il top se non c'è già una selezione valida
+  if(data.length && typeof selectStock==='function'){
+    if(!_cmdSel || !data.some(c=>c.ticker===_cmdSel.ticker)){ selectStock(data[0]); }
+    else { updateCmdStats(_cmdSel); document.querySelectorAll('#grid .card').forEach(c=>c.classList.toggle('sel',c.dataset.ticker===_cmdSel.ticker)); }
+  }
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Command Center — selezione titolo, stat strip, grafico candlestick
+// ══════════════════════════════════════════════════════════════════════════════
+let _cmdSel=null, _cmdTf={p:'1mo',i:'1d'}, _cmdChart=null, _cmdSeries=null;
+
+function selectStock(d){
+  _cmdSel=d;
+  updateCmdStats(d);
+  loadCmdChart(d.ticker);
+  document.querySelectorAll('#grid .card').forEach(c=>c.classList.toggle('sel',c.dataset.ticker===d.ticker));
+}
+function openSelectedModal(){ if(_cmdSel) openModal(_cmdSel); }
+
+function updateCmdStats(d){
+  const el=document.getElementById('cmd-stats'); if(!el||!d) return;
+  const isEv=d.evening_price!=null && d.delta_from_morning!=null;
+  const price=isEv?d.evening_price:d.current_price;
+  const pct=isEv?d.delta_from_morning:(d.change_since_analysis!=null?d.change_since_analysis:d.day_change_pct);
+  const pos=(pct??0)>=0, sc=d.score_10??5;
+  let bias='NEUTRO',biasCls='neu';
+  if(cardsData.length){
+    const avg=cardsData.reduce((a,c)=>a+(c.score_10??5),0)/cardsData.length;
+    const ups=cardsData.filter(c=>{const p=c.delta_from_morning??c.change_since_analysis??c.day_change_pct??0;return p>=0;}).length;
+    if(avg>=6 && ups>=cardsData.length/2){bias='BULLISH';biasCls='bull';}
+    else if(avg<5 || ups<cardsData.length*0.4){bias='BEARISH';biasCls='bear';}
+  }
+  const rsiTxt=d.rsi==null?'—':(d.rsi<35?'ipervenduto':d.rsi>65?'ipercomprato':'neutro');
+  el.innerHTML=`
+    <div class="cstat"><div class="cstat-k">Titolo</div><div class="cstat-v tk">${d.ticker}</div><div class="cstat-sub">${(d.name||d.ticker).slice(0,20)}</div></div>
+    <div class="cstat"><div class="cstat-k">Prezzo</div><div class="cstat-v">${fmtPCcy(price,d.currency)}</div><div class="cstat-sub ${pos?'up':'down'}">${(pos?'+':'')+(pct??0).toFixed(2)}%</div></div>
+    <div class="cstat"><div class="cstat-k">Score AI</div><div class="cstat-v ${sc>=7?'up':sc<5?'down':''}">${sc}<span class="cstat-unit">/10</span></div><div class="cstat-sub">${d.risk_level||'—'}</div></div>
+    <div class="cstat"><div class="cstat-k">RSI 14</div><div class="cstat-v">${d.rsi!=null?d.rsi.toFixed(0):'—'}</div><div class="cstat-sub">${rsiTxt}</div></div>
+    <div class="cstat"><div class="cstat-k">Setup R/R</div><div class="cstat-v">${d.trade_setup?'1:'+d.trade_setup.rr:'—'}</div><div class="cstat-sub">${d.trade_setup?'tgt +'+d.trade_setup.target_pct+'%':''}</div></div>
+    <div class="cstat bias ${biasCls}"><div class="cstat-k">Market Bias</div><div class="cstat-v">${bias}</div><div class="cstat-sub">${cardsData.length} titoli</div></div>`;
+}
+
+async function loadCmdChart(ticker){
+  const el=document.getElementById('cmd-chart'); if(!el) return;
+  const tkEl=document.getElementById('cmd-chart-ticker'); if(tkEl)tkEl.textContent=ticker;
+  if(_cmdChart){try{_cmdChart.remove();}catch(e){} _cmdChart=null; _cmdSeries=null;}
+  el.innerHTML='<div class="cmd-chart-load">⏳ Caricamento grafico…</div>';
+  try{
+    const ohlc=await fetch(`/api/stock/${ticker}/ohlc?period=${_cmdTf.p}&interval=${_cmdTf.i}`).then(r=>r.ok?r.json():[]);
+    if(!Array.isArray(ohlc)||!ohlc.length){ el.innerHTML='<div class="cmd-chart-load">Dati grafico non disponibili</div>'; return; }
+    el.innerHTML='';
+    _cmdChart=LightweightCharts.createChart(el,{..._lwOpts,width:el.offsetWidth,height:el.offsetHeight||380});
+    const up='#00d9a3',dn='#ff4d6d';
+    _cmdSeries=_cmdChart.addCandlestickSeries({upColor:up,downColor:dn,borderUpColor:up,borderDownColor:dn,wickUpColor:up,wickDownColor:dn});
+    _cmdSeries.setData(ohlc.map(o=>({time:o.time,open:o.open,high:o.high,low:o.low,close:o.close})));
+    _cmdChart.timeScale().fitContent();
+  }catch(e){ el.innerHTML='<div class="cmd-chart-load">Errore caricamento grafico</div>'; }
+}
+
+document.getElementById('cmd-tf')?.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#cmd-tf button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  _cmdTf={p:b.dataset.p,i:b.dataset.i};
+  if(_cmdSel) loadCmdChart(_cmdSel.ticker);
+});
+window.addEventListener('resize',()=>{ if(_cmdChart){const el=document.getElementById('cmd-chart'); if(el)_cmdChart.applyOptions({width:el.offsetWidth});} });
 
 function renderSignalsTable(data){
   const panel=document.getElementById('signals-panel');
