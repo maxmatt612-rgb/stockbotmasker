@@ -1451,6 +1451,18 @@ header{border-top:2px solid var(--primary)!important}
 .sig-tag.bear{color:var(--red-b);border-color:rgba(255,77,109,.4)}
 .sig-tag.neu{color:var(--text-dim);border-color:var(--border-hi)}
 
+/* ── Ordine vista Live: barra strumenti compatta sopra il centro di comando ── */
+.controls-bar{padding:9px 14px 7px;gap:6px;border-bottom:1px solid var(--border)}
+@media(min-width:900px){.controls-bar{padding:9px 28px 7px}}
+.screen-bar{padding:7px 14px;border-bottom:1px solid var(--border)}
+@media(min-width:900px){.screen-bar{padding:7px 28px}}
+.stats-bar{padding:0!important;border-bottom:1px solid var(--border)}
+#cmd-center{padding-top:14px}
+.cmd-strat-panel{max-height:none}
+@media(min-width:1000px){.cmd-strat-panel #grid{max-height:420px}}
+/* nasconde i residui non più raggiungibili */
+.sim-fab,.print-header{display:none!important}
+
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
@@ -1570,11 +1582,7 @@ footer::after{content:' · BUILD v51';color:var(--primary);opacity:.7}
   <button class="tab-btn active" data-tab="live"      onclick="switchTab('live')">📊 Live</button>
   <button class="tab-btn" data-tab="heatmap"   onclick="switchTab('heatmap')">📈 Mercati</button>
   <button class="tab-btn" data-tab="history"   onclick="switchTab('history')">📅 Storico</button>
-  <button class="tab-btn" data-tab="portfolio" onclick="switchTab('portfolio')">💼 Portfolio</button>
-  <button class="tab-btn" data-tab="watchlist" onclick="switchTab('watchlist')">⭐ Watchlist</button>
-  <button class="tab-btn" data-tab="ai-chat"   onclick="switchTab('ai-chat')">🤖 AI Chat</button>
   <button class="tab-btn" data-tab="briefing"  onclick="switchTab('briefing')">📰 Briefing</button>
-  <button class="tab-btn" data-tab="calendar"  onclick="switchTab('calendar')">🗓 Calendario</button>
 </div>
 
 <!-- ── History view (nascosta di default) ── -->
