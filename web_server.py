@@ -764,11 +764,17 @@ async def api_scan_etf():
 
 @app.get("/api/scan/evening")
 async def api_scan_evening():
-    """Stesso set di stock mattutino con prezzi live — usato dalla vista serale (≥22:00).
-    Restituisce gli stessi titoli in ordine identico, con evening_price e delta_from_morning."""
+    """Stesso set di stock mattutino con PREZZI LIVE — usato sia di giorno che alla sera.
+    Restituisce gli stessi titoli in ordine identico, con evening_price (live) e delta_from_morning.
+    Cache 60s per non sovraccaricare yfinance (rate limiting)."""
     morning = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
     if not morning:
         return JSONResponse([], status_code=404)
+
+    # Cache 60s: i prezzi live vengono aggiornati al massimo una volta al minuto
+    cached = _cached("scan:live", 60)
+    if cached is not None:
+        return cached
 
     tickers = [s["ticker"] for s in morning]
     closing: dict = {}
@@ -776,7 +782,7 @@ async def api_scan_evening():
         import yfinance as yf
         import pandas as pd
         raw = await asyncio.to_thread(
-            lambda: yf.download(tickers, period="1d", progress=False, auto_adjust=True)
+            lambda: yf.download(tickers, period="1d", progress=False, auto_adjust=False)
         )
         if not raw.empty:
             if isinstance(raw.columns, pd.MultiIndex):
@@ -801,7 +807,9 @@ async def api_scan_evening():
         delta = round((ep - mp) / mp * 100, 2) if mp > 0 else 0
         enriched.append({**s, "evening_price": round(ep, 4), "delta_from_morning": delta})
 
-    return _clean(enriched)
+    result = _clean(enriched)
+    _store("scan:live", result)
+    return result
 
 
 @app.get("/api/report/morning")

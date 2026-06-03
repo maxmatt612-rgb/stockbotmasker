@@ -1467,7 +1467,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v53';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v54';color:var(--primary);opacity:.7}
 </style>
 </head>
 <body>
@@ -3532,8 +3532,8 @@ async function loadData(){
   const todayIso = new Date().toISOString().slice(0,10);
   const isEvening = new Date().getHours() >= 22;
 
-  // ── Modalità serale: già abbiamo i dati mattutini → aggiorna solo i prezzi ──
-  if(isEvening && hasCards){
+  // ── Abbiamo già i titoli del mattino → aggiorna solo i PREZZI LIVE ──
+  if(hasCards){
     try{
       const ev = await fetch('/api/scan/evening').then(r=>r.ok?r.json():null);
       if(Array.isArray(ev) && ev.length){
@@ -3541,9 +3541,9 @@ async function loadData(){
           const idx = cardsData.findIndex(c=>c.ticker===d.ticker);
           if(idx>=0) cardsData[idx]={...cardsData[idx],...d};
         });
-        _updateStreakFromEvening(ev);
+        if(isEvening) _updateStreakFromEvening(ev);
         applyAndRender();
-        _setEveningLabel();
+        if(isEvening) _setEveningLabel(); else _setLiveLabel();
         _markRefreshOk();
         return 'ok';
       }
@@ -3600,18 +3600,16 @@ async function loadData(){
       try{ localStorage.setItem(lsKey,JSON.stringify(data)); }catch(_){}
     }
 
-    // 3. Se sera: sovrapponi prezzi live mantenendo ordine mattutino
-    if(isEvening){
-      try{
-        const ev=await fetch('/api/scan/evening').then(r=>r.ok?r.json():null);
-        if(Array.isArray(ev)&&ev.length){
-          ev.forEach(d=>{
-            const idx=data.findIndex(c=>c.ticker===d.ticker);
-            if(idx>=0) data[idx]={...data[idx],...d};
-          });
-        }
-      }catch(_){}
-    }
+    // 3. Sovrapponi sempre i PREZZI LIVE mantenendo l'ordine/selezione del mattino
+    try{
+      const ev=await fetch('/api/scan/evening').then(r=>r.ok?r.json():null);
+      if(Array.isArray(ev)&&ev.length){
+        ev.forEach(d=>{
+          const idx=data.findIndex(c=>c.ticker===d.ticker);
+          if(idx>=0) data[idx]={...data[idx],...d};
+        });
+      }
+    }catch(_){}
 
     cardsData=data;
     const avg=(data.reduce((s,d)=>s+(d.score_10??5),0)/data.length).toFixed(1);
@@ -3627,7 +3625,7 @@ async function loadData(){
 
     applyAndRender();
     _markRefreshOk();
-    if(isEvening) _setEveningLabel();
+    if(isEvening) _setEveningLabel(); else _setLiveLabel();
     tryShowScanNotification(data);
 
     // Enrich progressivo (nome + segnali)
@@ -3951,21 +3949,26 @@ function startCountdown(initial=60){
     }, 300000);
     return;
   }
-  // Modalità mattutina: label fissa + controlla ogni minuto il passaggio alle 22:00
-  const label = document.getElementById('refresh-label');
-  if(label) label.innerHTML = 'Analisi del <b>' + new Date().toLocaleDateString('it-IT',{day:'2-digit',month:'short'}) + '</b> — 07:30';
+  // Modalità giorno: prezzi LIVE aggiornati ogni 90s, passa a serale alle 22:00
+  _setLiveLabel();
   cdTimer=setInterval(()=>{
     if(new Date().getHours() >= 22){
       clearInterval(cdTimer);
-      // Scatta la modalità serale: carica prezzi aggiornati
       loadData().then(r=>startCountdown(r==='retry'?3:300));
+    } else {
+      loadData().then(r=>{ if(r==='retry') startCountdown(3); });
     }
-  }, 60000); // controlla ogni minuto
+  }, 90000); // aggiorna i prezzi live ogni 90 secondi
 }
 
 function _setEveningLabel(){
   const label = document.getElementById('refresh-label');
   if(label) label.innerHTML = 'Chiusura del <b>' + new Date().toLocaleDateString('it-IT',{day:'2-digit',month:'short'}) + '</b> — 22:00';
+}
+
+function _setLiveLabel(){
+  const label = document.getElementById('refresh-label');
+  if(label) label.innerHTML = '<b style="color:var(--green-b)">● LIVE</b> · prezzi agg. ' + now();
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
