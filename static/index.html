@@ -1317,8 +1317,11 @@ header{position:fixed!important;top:0!important;left:0;right:0;width:100%;height
 .mover-neg,.movers-col-bot .movers-col-hd{color:var(--red-b)!important}
 
 /* ── Tabelle (portfolio, diary, rebal) ────────────────────────────────────── */
-.port-table th,.diary-table th,.rebal-table th{text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);background:var(--surf-v)}
+.port-table th,.diary-table th,.rebal-table th{text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);background:var(--surf-v);font-family:var(--sans)}
 .port-pl-pos{color:var(--green-b)!important}.port-pl-neg{color:var(--red-b)!important}
+.port-add-btn,.diary-add-btn,.vport-buy-btn,.vport-sell-btn,.screener-btn,.rebal-input,.port-del-btn{font-family:var(--sans)!important}
+.port-ticker-cell,.port-table td{font-family:var(--mono)}
+.port-name-cell{font-family:var(--sans)}
 
 /* ── Chat ─────────────────────────────────────────────────────────────────── */
 .chat-bubble.user{background:var(--primary)!important;border-radius:2px!important}
@@ -1424,17 +1427,28 @@ header{border-top:2px solid var(--primary)!important}
   grid-template-columns:1fr!important;border-top:none!important;overflow-y:auto;max-height:412px}
 .cmd-strat-panel .card.sel{background:var(--surf-hi)!important}
 .cmd-strat-panel .card.sel::before{width:3px;background:var(--primary)!important}
-/* card compatte nel pannello laterale (lista scansionabile, no scroll infinito) */
-.cmd-strat-panel .card{padding:10px 12px!important}
+/* card DENSE nel pannello laterale (riga watchlist scansionabile) */
+.cmd-strat-panel .card{padding:8px 12px!important}
 .cmd-strat-panel .card .sparkline-wrap,
 .cmd-strat-panel .card .trade-setup,
 .cmd-strat-panel .card .why-today-btn,
 .cmd-strat-panel .card .why-today-result,
 .cmd-strat-panel .card .score-text,
-.cmd-strat-panel .card .verdict{display:none!important}
-.cmd-strat-panel .card .card-row{padding-bottom:7px;margin-bottom:7px}
-.cmd-strat-panel .card .metrics-strip{margin-bottom:7px}
-.cmd-strat-panel .card .chips{margin-bottom:0}
+.cmd-strat-panel .card .verdict,
+.cmd-strat-panel .card .card-name,
+.cmd-strat-panel .card .card-rank{display:none!important}
+.cmd-strat-panel .card .card-row{padding-bottom:6px;margin-bottom:6px;align-items:center!important}
+.cmd-strat-panel .card .card-ticker{font-size:1.05rem}
+.cmd-strat-panel .card .card-price-line{margin-top:2px}
+.cmd-strat-panel .card .card-price-line .price-val{font-size:.95rem}
+.cmd-strat-panel .card .score-ring{width:38px;height:38px}
+.cmd-strat-panel .card .score-ring-num{font-size:.78rem}
+.cmd-strat-panel .card .score-ring-lbl{display:none}
+.cmd-strat-panel .card .metrics-strip{margin-bottom:6px}
+.cmd-strat-panel .card .ms-cell{padding:3px 6px}
+.cmd-strat-panel .card .ms-v{font-size:.74rem}
+.cmd-strat-panel .card .chips{margin-bottom:0;gap:3px}
+.cmd-strat-panel .card .chip,.cmd-strat-panel .card .chip-ai,.cmd-strat-panel .card .chip-ds,.cmd-strat-panel .card .chip-lv{font-size:.58rem;padding:0 5px}
 
 /* ── Signals blotter table ────────────────────────────────────────────────── */
 .signals-panel{margin:0 0 40px;border-top:1px solid var(--border)}
@@ -1513,7 +1527,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v60';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v61';color:var(--primary);opacity:.7}
 </style>
 </head>
 <body>
