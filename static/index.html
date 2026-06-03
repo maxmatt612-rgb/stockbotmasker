@@ -1466,10 +1466,43 @@ header{border-top:2px solid var(--primary)!important}
 /* nasconde i residui non più raggiungibili */
 .sim-fab,.print-header{display:none!important}
 
+/* ── Radar VIP ────────────────────────────────────────────────────────────── */
+.radar-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 14px 12px;border-bottom:1px solid var(--border)}
+@media(min-width:900px){.radar-head{padding:18px 28px 14px}}
+.radar-title{font-family:var(--sans);font-size:1rem;font-weight:700;letter-spacing:.02em}
+.radar-sub{font-size:.72rem;color:var(--text-dim);margin-top:4px;max-width:660px;line-height:1.5}
+.radar-refresh{background:var(--surf-v);border:1px solid var(--border)!important;color:var(--text-dim);padding:6px 13px;font-size:.7rem;font-weight:600;cursor:pointer;font-family:var(--sans);text-transform:uppercase;letter-spacing:.05em;flex-shrink:0}
+.radar-refresh:hover{border-color:var(--primary)!important;color:var(--primary)}
+#radar-body{padding:0 0 60px}
+@media(min-width:900px){#radar-body{padding:0 28px 60px}}
+.radar-loading,.radar-empty{text-align:center;padding:50px 20px;color:var(--text-dim);font-size:.85rem}
+.radar-item{display:grid;grid-template-columns:185px 1fr 120px;gap:14px;align-items:center;padding:13px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+.radar-item:hover{background:var(--surf-v)}
+.radar-fig{display:flex;align-items:center;gap:10px;min-width:0}
+.radar-fig-emoji{font-size:1.45rem;flex-shrink:0;line-height:1}
+.radar-fig-name{font-family:var(--sans);font-weight:700;font-size:.85rem;line-height:1.1}
+.radar-fig-role{font-size:.62rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;margin-top:1px}
+.radar-mid{min-width:0}
+.radar-quote{font-size:.83rem;line-height:1.45;color:var(--text);margin-bottom:6px}
+.radar-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.66rem}
+.radar-tk{font-family:var(--mono);font-weight:700;color:#5b9dff;border:1px solid rgba(41,121,255,.4);padding:1px 7px;letter-spacing:.02em}
+.radar-time{color:var(--text-dim);font-family:var(--mono)}
+.radar-src{color:var(--text-dim);text-decoration:none}
+.radar-src:hover{color:var(--primary)}
+.radar-impact{text-align:right;flex-shrink:0}
+.radar-impact-lbl{font-size:.54rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim)}
+.radar-impact-val{font-family:var(--mono);font-size:1.12rem;font-weight:700;line-height:1.1}
+.radar-impact-val.up{color:var(--green-b)}.radar-impact-val.down{color:var(--red-b)}
+.radar-impact-price{font-family:var(--mono);font-size:.66rem;color:var(--text-dim)}
+@media(max-width:760px){
+  .radar-item{grid-template-columns:1fr auto}
+  .radar-fig{grid-column:1/-1;margin-bottom:2px}
+}
+
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v56';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v57';color:var(--primary);opacity:.7}
 </style>
 </head>
 <body>
@@ -1583,6 +1616,7 @@ footer::after{content:' · BUILD v56';color:var(--primary);opacity:.7}
 <!-- ── Tab navigation ── -->
 <div class="tab-nav">
   <button class="tab-btn active" data-tab="live"      onclick="switchTab('live')">📊 Live</button>
+  <button class="tab-btn" data-tab="radar"     onclick="switchTab('radar')">📡 Radar VIP</button>
   <button class="tab-btn" data-tab="portfolio" onclick="switchTab('portfolio')">💼 Portfolio</button>
   <button class="tab-btn" data-tab="history"   onclick="switchTab('history')">📅 Storico</button>
   <button class="tab-btn" data-tab="briefing"  onclick="switchTab('briefing')">📰 Briefing</button>
@@ -1934,6 +1968,20 @@ footer::after{content:' · BUILD v56';color:var(--primary);opacity:.7}
   </div>
   <div id="br-body">
     <div class="briefing-loading">🤖 Generazione briefing in corso…</div>
+  </div>
+</div>
+
+<!-- ── Radar VIP view ── -->
+<div id="radar-view" style="display:none">
+  <div class="radar-head">
+    <div>
+      <div class="radar-title">📡 Radar VIP — Dichiarazioni di figure pubbliche</div>
+      <div class="radar-sub">Menzioni di titoli da parte di figure influenti, con orario e impatto sul prezzo. Fonte: news finanziarie · aggiornato ogni 8 min.</div>
+    </div>
+    <button class="radar-refresh" onclick="loadRadar(true)">↻ Aggiorna</button>
+  </div>
+  <div id="radar-body">
+    <div class="radar-loading">📡 Scansione dichiarazioni in corso…</div>
   </div>
 </div>
 
@@ -2489,7 +2537,7 @@ let _lastNotifTicker = null;
 // switchTab — definita subito così onclick="switchTab(...)" funziona sempre
 window._tabLoaded = {};
 window.switchTab = function(tab) {
-  const VIEWS = ['live','history','heatmap','portfolio','watchlist','calendar','ai-chat','briefing'];
+  const VIEWS = ['live','radar','history','heatmap','portfolio','watchlist','calendar','ai-chat','briefing'];
   document.querySelectorAll('.tab-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === tab);
   });
@@ -2500,6 +2548,7 @@ window.switchTab = function(tab) {
   });
   if (!window._tabLoaded[tab]) {
     window._tabLoaded[tab] = true;
+    if (tab === 'radar')     loadRadar();
     if (tab === 'history')   loadHistoryDates();
     if (tab === 'heatmap')   loadHeatmap();
     if (tab === 'portfolio') renderPortfolio();
@@ -2508,6 +2557,95 @@ window.switchTab = function(tab) {
     if (tab === 'briefing')  _loadBriefing(false);
   }
 };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Radar VIP — dichiarazioni di figure pubbliche sui titoli
+// ══════════════════════════════════════════════════════════════════════════════
+let _radarTimer=null;
+async function loadRadar(force){
+  const body=document.getElementById('radar-body');
+  if(!body) return;
+  if(force) body.innerHTML='<div class="radar-loading">📡 Aggiornamento in corso…</div>';
+  else if(!body.querySelector('.radar-item')) body.innerHTML='<div class="radar-loading">📡 Scansione dichiarazioni in corso…</div>';
+  try{
+    const url='/api/influence'+(force?('?r='+Date.now()):'');
+    const data=await fetch(url).then(r=>r.ok?r.json():[]);
+    renderRadar(data);
+  }catch(e){
+    body.innerHTML='<div class="radar-loading" style="color:var(--red-b)">⚠️ Errore nel caricamento del radar.</div>';
+  }
+  // auto-refresh ogni 3 min mentre la tab è aperta
+  clearInterval(_radarTimer);
+  _radarTimer=setInterval(()=>{ if(document.getElementById('radar-view')?.style.display!=='none') loadRadar(false); }, 180000);
+}
+
+function _radarTimeAgo(iso){
+  if(!iso) return '';
+  const t=new Date(iso).getTime();
+  if(isNaN(t)) return '';
+  const diff=Math.floor((Date.now()-t)/1000);
+  if(diff<60) return 'ora';
+  if(diff<3600) return Math.floor(diff/60)+' min fa';
+  if(diff<86400) return Math.floor(diff/3600)+' h fa';
+  const d=Math.floor(diff/86400);
+  return d+(d===1?' giorno fa':' giorni fa');
+}
+
+function renderRadar(data){
+  const body=document.getElementById('radar-body');
+  if(!body) return;
+  if(!Array.isArray(data)||!data.length){
+    body.innerHTML=`<div class="radar-empty">
+      <div style="font-size:2.2rem;margin-bottom:10px">📡</div>
+      <div style="font-weight:700;margin-bottom:6px">Nessuna dichiarazione rilevata al momento</div>
+      <div style="font-size:.8rem;color:var(--text-dim);line-height:1.6;max-width:480px;margin:0 auto">
+        Il radar monitora le news dei titoli ad alto profilo (NVDA, DELL, PLTR, MRVL, TSLA, AAPL…)
+        cercando menzioni di figure influenti (Trump, Musk, Huang, Powell, Buffett, Pelosi…).
+        Quando una di loro cita un titolo, comparirà qui con l'orario e l'impatto sul prezzo.
+      </div></div>`;
+    return;
+  }
+  body.innerHTML=data.map(d=>{
+    const pos=(d.day_change??0)>=0;
+    const impactCls=pos?'up':'down';
+    const impact=(pos?'+':'')+(d.day_change??0).toFixed(2)+'%';
+    const ago=_radarTimeAgo(d.published);
+    const ccy='$'; // titoli alto profilo USA
+    const ticker=d.ticker;
+    const link=d.link?`<a class="radar-src" href="${d.link}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${d.source||'Fonte'} ↗</a>`:(d.source?`<span class="radar-src">${d.source}</span>`:'');
+    return `<div class="radar-item" onclick="openTickerModal('${ticker}')">
+      <div class="radar-fig">
+        <div class="radar-fig-emoji">${d.emoji||'🎤'}</div>
+        <div>
+          <div class="radar-fig-name">${d.figure}</div>
+          <div class="radar-fig-role">${d.role||''}</div>
+        </div>
+      </div>
+      <div class="radar-mid">
+        <div class="radar-quote">“${d.title}”</div>
+        <div class="radar-meta">
+          <span class="radar-tk">${ticker}</span>
+          ${ago?`<span class="radar-time">🕒 ${ago}</span>`:''}
+          ${link}
+        </div>
+      </div>
+      <div class="radar-impact">
+        <div class="radar-impact-lbl">Impatto oggi</div>
+        <div class="radar-impact-val ${impactCls}">${impact}</div>
+        <div class="radar-impact-price">${ccy}${(d.price??0).toFixed(2)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// apre il modal di dettaglio per un ticker (cerca nei dati o fetch al volo)
+async function openTickerModal(tk){
+  let stock=cardsData.find(c=>c.ticker===tk);
+  if(!stock){
+    try{ stock=await fetch('/api/stock/'+tk).then(r=>r.ok?r.json():null); }catch(_){}
+  }
+  if(stock) openModal(stock);
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Three.js — Particle Network (opzionale — non blocca l'app se CDN fallisce)

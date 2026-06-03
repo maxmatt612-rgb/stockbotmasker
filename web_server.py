@@ -812,6 +812,107 @@ async def api_scan_evening():
     return result
 
 
+# ─── Radar VIP: dichiarazioni di figure pubbliche sui titoli ─────────────────
+_PUBLIC_FIGURES = [
+    {"name": "Donald Trump",      "role": "Presidente USA",        "emoji": "🇺🇸", "keys": ["trump"]},
+    {"name": "Elon Musk",         "role": "CEO Tesla / xAI",       "emoji": "🚀", "keys": ["elon musk", "musk"]},
+    {"name": "Jensen Huang",      "role": "CEO NVIDIA",            "emoji": "🤖", "keys": ["jensen huang", "huang"]},
+    {"name": "Jerome Powell",     "role": "Presidente Fed",        "emoji": "🏦", "keys": ["jerome powell", "powell"]},
+    {"name": "Warren Buffett",    "role": "Berkshire Hathaway",    "emoji": "💰", "keys": ["warren buffett", "buffett"]},
+    {"name": "Nancy Pelosi",      "role": "Congresso USA",         "emoji": "🏛️", "keys": ["pelosi"]},
+    {"name": "Cathie Wood",       "role": "ARK Invest",            "emoji": "📈", "keys": ["cathie wood"]},
+    {"name": "Michael Burry",     "role": "Scion (Big Short)",     "emoji": "🐻", "keys": ["michael burry", "burry"]},
+    {"name": "Bill Ackman",       "role": "Pershing Square",       "emoji": "🎯", "keys": ["ackman"]},
+    {"name": "Tim Cook",          "role": "CEO Apple",             "emoji": "🍎", "keys": ["tim cook"]},
+    {"name": "Mark Zuckerberg",   "role": "CEO Meta",              "emoji": "📱", "keys": ["zuckerberg"]},
+    {"name": "Satya Nadella",     "role": "CEO Microsoft",         "emoji": "🪟", "keys": ["satya nadella", "nadella"]},
+    {"name": "Sam Altman",        "role": "CEO OpenAI",            "emoji": "🧠", "keys": ["sam altman", "altman"]},
+    {"name": "Lisa Su",           "role": "CEO AMD",               "emoji": "⚙️", "keys": ["lisa su"]},
+]
+
+# Titoli ad alto profilo da monitorare per le dichiarazioni
+_INFLUENCE_TICKERS = [
+    "NVDA", "DELL", "PLTR", "MRVL", "TSLA", "AAPL", "AMD", "META", "MSFT",
+    "AMZN", "GOOGL", "SMCI", "COIN", "MSTR", "INTC", "IBM", "ORCL", "AVGO",
+    "ARM", "MU", "QCOM", "TSM", "NFLX", "BABA", "F", "GM", "BA",
+]
+
+
+def _scan_influence() -> list:
+    """Scandaglia le news dei titoli ad alto profilo cercando menzioni di figure pubbliche.
+    Per ogni match: figura, titolo, orario, contesto (headline) e impatto sul prezzo."""
+    import yfinance as yf
+    from datetime import datetime, timezone
+
+    hits = []
+    seen = set()
+    for tk in _INFLUENCE_TICKERS:
+        try:
+            t = yf.Ticker(tk)
+            news = t.news or []
+            if not news:
+                continue
+            # Prezzo + variazione giornaliera (impatto)
+            price = day_chg = 0.0
+            try:
+                fi = t.fast_info
+                price = float(fi.last_price or 0)
+                prev = float(fi.previous_close or price)
+                day_chg = round((price - prev) / prev * 100, 2) if prev else 0.0
+            except Exception:
+                pass
+
+            for item in news[:10]:
+                c = item.get("content") if isinstance(item, dict) else None
+                if not isinstance(c, dict):
+                    c = item if isinstance(item, dict) else {}
+                title = (c.get("title") or "").strip()
+                if not title:
+                    continue
+                tl = title.lower()
+                for fig in _PUBLIC_FIGURES:
+                    if any(k in tl for k in fig["keys"]):
+                        uid = (tk, title[:70])
+                        if uid in seen:
+                            continue
+                        seen.add(uid)
+                        pub = c.get("pubDate") or c.get("displayTime") or ""
+                        link = ""
+                        cu = c.get("canonicalUrl") or c.get("clickThroughUrl") or {}
+                        if isinstance(cu, dict):
+                            link = cu.get("url", "")
+                        provider = ""
+                        pv = c.get("provider") or {}
+                        if isinstance(pv, dict):
+                            provider = pv.get("displayName", "")
+                        hits.append({
+                            "figure": fig["name"], "role": fig["role"], "emoji": fig["emoji"],
+                            "ticker": tk, "title": title[:220],
+                            "published": pub, "source": provider, "link": link,
+                            "price": round(price, 2), "day_change": day_chg,
+                        })
+                        break
+        except Exception:
+            continue
+
+    # Ordina per data pubblicazione (ISO string ordina correttamente), più recenti prima
+    hits.sort(key=lambda x: x.get("published", ""), reverse=True)
+    return hits[:25]
+
+
+@app.get("/api/influence")
+async def api_influence():
+    """Radar VIP: dichiarazioni di figure pubbliche sui titoli + impatto sul prezzo.
+    Cache 8 min (news + rate limiting yfinance)."""
+    cached = _cached("influence:scan", 480)
+    if cached is not None:
+        return cached
+    data = await asyncio.to_thread(_scan_influence)
+    clean = _clean(data)
+    _store("influence:scan", clean)
+    return clean
+
+
 @app.get("/api/report/morning")
 async def api_report_morning():
     """Scarica il PDF analisi mattutina. Se non ancora generato, lo genera ora."""
