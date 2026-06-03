@@ -3255,9 +3255,12 @@ async def pwa_manifest():
     return FileResponse(str(STATIC / "manifest.json"), media_type="application/manifest+json")
 
 
+_NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+
+
 @app.get("/sw.js")
 async def pwa_sw():
-    return FileResponse(str(STATIC / "sw.js"), media_type="application/javascript")
+    return FileResponse(str(STATIC / "sw.js"), media_type="application/javascript", headers=_NO_CACHE)
 
 
 @app.get("/icon.svg")
@@ -3274,7 +3277,7 @@ async def health():
 
 @app.get("/")
 async def root():
-    return FileResponse(str(STATIC / "index.html"))
+    return FileResponse(str(STATIC / "index.html"), headers=_NO_CACHE)
 
 
 @app.get("/landing")
