@@ -28,8 +28,8 @@
   --mono:'JetBrains Mono',monospace;
   --sans:'IBM Plex Sans Condensed','Barlow Condensed',sans-serif;
 }
-html{scroll-behavior:smooth}
-body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;letter-spacing:.01em}
+html{scroll-behavior:smooth;overflow-x:hidden}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;letter-spacing:.01em}
 #bg-canvas{display:none}
 .app{position:relative;z-index:1}
 
@@ -1200,7 +1200,8 @@ header{height:52px;border-bottom:1px solid var(--border)!important}
 .live-badge{font-family:var(--mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em}
 
 /* ── Ticker tape ──────────────────────────────────────────────────────────── */
-.indices-tape{height:34px;border-bottom:1px solid var(--border)!important}
+.indices-tape{height:34px;top:52px!important;border-bottom:1px solid var(--border)!important;z-index:290}
+.mkt-pills,.mkt-pill{height:34px}
 .tape-scroll-wrap,.tape-marquee,.tape-item{height:34px}
 .mkt-pill{height:34px;border-right:1px solid var(--border)!important}
 .tape-item{border-right:1px solid var(--border)!important;padding:0 16px}
@@ -1466,7 +1467,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v51';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v52';color:var(--primary);opacity:.7}
 </style>
 </head>
 <body>
