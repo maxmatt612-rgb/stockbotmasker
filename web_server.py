@@ -58,6 +58,18 @@ async def _startup_load_cache():
         print("[startup] Dati odierni presenti — nessun nuovo scan (analisi fissata dal mattino)")
 
     asyncio.create_task(_pdf_scheduler())
+    asyncio.create_task(_warm_influence())
+
+
+async def _warm_influence():
+    """Pre-riscalda la cache del Radar VIP ~40s dopo l'avvio (così il primo click è istantaneo)."""
+    try:
+        await asyncio.sleep(40)
+        data = await asyncio.to_thread(_scan_influence)
+        _store("influence:scan", _clean(data))
+        print(f"[influence] cache pre-riscaldata: {len(data)} dichiarazioni")
+    except Exception as e:
+        print(f"[influence] warm errore: {e}")
 
 
 app.add_middleware(
@@ -897,77 +909,129 @@ _INFLUENCE_TICKERS = [
 
 def _scan_influence() -> list:
     """Scandaglia le news dei titoli ad alto profilo cercando menzioni di figure pubbliche.
-    Per ogni match: figura, titolo, orario, contesto (headline) e impatto sul prezzo."""
+    OTTIMIZZATO: news scaricate in PARALLELO (thread pool) e prezzi in UN'UNICA chiamata batch
+    solo per i titoli che hanno un match → molto più veloce."""
     import yfinance as yf
-    from datetime import datetime, timezone
+    from concurrent.futures import ThreadPoolExecutor
 
+    # 1. Scarica le news di tutti i titoli IN PARALLELO
+    def _fetch_news(tk):
+        try:
+            return tk, (yf.Ticker(tk).news or [])
+        except Exception:
+            return tk, []
+
+    news_by_tk = {}
+    try:
+        with ThreadPoolExecutor(max_workers=12) as ex:
+            for tk, news in ex.map(_fetch_news, _INFLUENCE_TICKERS):
+                news_by_tk[tk] = news
+    except Exception as e:
+        print(f"[influence] errore fetch news parallelo: {e}")
+
+    # 2. Cerca le menzioni di figure pubbliche
     hits = []
     seen = set()
-    for tk in _INFLUENCE_TICKERS:
-        try:
-            t = yf.Ticker(tk)
-            news = t.news or []
-            if not news:
+    for tk, news in news_by_tk.items():
+        for item in (news or [])[:10]:
+            c = item.get("content") if isinstance(item, dict) else None
+            if not isinstance(c, dict):
+                c = item if isinstance(item, dict) else {}
+            title = (c.get("title") or "").strip()
+            if not title:
                 continue
-            # Prezzo + variazione giornaliera (impatto)
-            price = day_chg = 0.0
-            try:
-                fi = t.fast_info
-                price = float(fi.last_price or 0)
-                prev = float(fi.previous_close or price)
-                day_chg = round((price - prev) / prev * 100, 2) if prev else 0.0
-            except Exception:
-                pass
+            tl = title.lower()
+            for fig in _PUBLIC_FIGURES:
+                if any(k in tl for k in fig["keys"]):
+                    uid = (tk, title[:70])
+                    if uid in seen:
+                        continue
+                    seen.add(uid)
+                    pub = c.get("pubDate") or c.get("displayTime") or ""
+                    link = ""
+                    cu = c.get("canonicalUrl") or c.get("clickThroughUrl") or {}
+                    if isinstance(cu, dict):
+                        link = cu.get("url", "")
+                    provider = ""
+                    pv = c.get("provider") or {}
+                    if isinstance(pv, dict):
+                        provider = pv.get("displayName", "")
+                    hits.append({
+                        "figure": fig["name"], "role": fig["role"], "emoji": fig["emoji"],
+                        "ticker": tk, "title": title[:220],
+                        "published": pub, "source": provider, "link": link,
+                        "price": 0.0, "day_change": 0.0,
+                    })
+                    break
 
-            for item in news[:10]:
-                c = item.get("content") if isinstance(item, dict) else None
-                if not isinstance(c, dict):
-                    c = item if isinstance(item, dict) else {}
-                title = (c.get("title") or "").strip()
-                if not title:
-                    continue
-                tl = title.lower()
-                for fig in _PUBLIC_FIGURES:
-                    if any(k in tl for k in fig["keys"]):
-                        uid = (tk, title[:70])
-                        if uid in seen:
-                            continue
-                        seen.add(uid)
-                        pub = c.get("pubDate") or c.get("displayTime") or ""
-                        link = ""
-                        cu = c.get("canonicalUrl") or c.get("clickThroughUrl") or {}
-                        if isinstance(cu, dict):
-                            link = cu.get("url", "")
-                        provider = ""
-                        pv = c.get("provider") or {}
-                        if isinstance(pv, dict):
-                            provider = pv.get("displayName", "")
-                        hits.append({
-                            "figure": fig["name"], "role": fig["role"], "emoji": fig["emoji"],
-                            "ticker": tk, "title": title[:220],
-                            "published": pub, "source": provider, "link": link,
-                            "price": round(price, 2), "day_change": day_chg,
-                        })
-                        break
-        except Exception:
-            continue
+    # 3. Prezzi: UN'UNICA chiamata batch solo per i titoli trovati
+    matched = list({h["ticker"] for h in hits})
+    prices = {}
+    if matched:
+        try:
+            import pandas as pd
+            raw = yf.download(matched, period="2d", interval="1d",
+                              auto_adjust=False, progress=False)
+            if not raw.empty:
+                close = (raw["Close"] if isinstance(raw.columns, pd.MultiIndex)
+                         else raw[["Close"]].rename(columns={"Close": matched[0]}))
+                for t in matched:
+                    if t in close.columns:
+                        v = close[t].dropna()
+                        if len(v) >= 2:
+                            cur, prev = float(v.iloc[-1]), float(v.iloc[-2])
+                            prices[t] = {"price": round(cur, 2),
+                                         "chg": round((cur - prev) / prev * 100, 2) if prev else 0.0}
+                        elif len(v) == 1:
+                            prices[t] = {"price": round(float(v.iloc[-1]), 2), "chg": 0.0}
+        except Exception as e:
+            print(f"[influence] errore prezzi batch: {e}")
 
-    # Ordina per data pubblicazione (ISO string ordina correttamente), più recenti prima
+    for h in hits:
+        p = prices.get(h["ticker"])
+        if p:
+            h["price"], h["day_change"] = p["price"], p["chg"]
+
     hits.sort(key=lambda x: x.get("published", ""), reverse=True)
     return hits[:25]
 
 
+_influence_refreshing = False
+
+
 @app.get("/api/influence")
 async def api_influence():
-    """Radar VIP: dichiarazioni di figure pubbliche sui titoli + impatto sul prezzo.
-    Cache 8 min (news + rate limiting yfinance)."""
-    cached = _cached("influence:scan", 480)
-    if cached is not None:
-        return cached
-    data = await asyncio.to_thread(_scan_influence)
-    clean = _clean(data)
-    _store("influence:scan", clean)
-    return clean
+    """Radar VIP: dichiarazioni di figure pubbliche + impatto sul prezzo.
+    Stale-while-revalidate: restituisce subito i dati in cache e aggiorna in background
+    (l'utente non aspetta mai la scansione, tranne il primissimo caricamento a freddo)."""
+    global _influence_refreshing
+    entry = _cache.get("influence:scan")
+    fresh = _cached("influence:scan", 480)  # cache fresca 8 min
+    if fresh is not None:
+        return fresh
+
+    async def _refresh_bg():
+        global _influence_refreshing
+        try:
+            data = await asyncio.to_thread(_scan_influence)
+            _store("influence:scan", _clean(data))
+        except Exception as e:
+            print(f"[influence] refresh bg errore: {e}")
+        finally:
+            _influence_refreshing = False
+
+    # Cache scaduta ma presente → restituisci subito i vecchi dati e aggiorna in background
+    if entry is not None:
+        if not _influence_refreshing:
+            _influence_refreshing = True
+            asyncio.create_task(_refresh_bg())
+        return entry["data"]
+
+    # Nessun dato in cache (primo avvio): lancia in background e rispondi 202 (vuoto)
+    if not _influence_refreshing:
+        _influence_refreshing = True
+        asyncio.create_task(_refresh_bg())
+    return JSONResponse([], status_code=202)
 
 
 @app.get("/api/report/morning")

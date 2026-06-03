@@ -1502,7 +1502,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v58';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v59';color:var(--primary);opacity:.7}
 </style>
 </head>
 <body>
@@ -2561,16 +2561,31 @@ window.switchTab = function(tab) {
 // ══════════════════════════════════════════════════════════════════════════════
 // Radar VIP — dichiarazioni di figure pubbliche sui titoli
 // ══════════════════════════════════════════════════════════════════════════════
-let _radarTimer=null;
+let _radarTimer=null, _radarRetry=null;
 async function loadRadar(force){
   const body=document.getElementById('radar-body');
   if(!body) return;
+  const hasItems=!!body.querySelector('.radar-item');
   if(force) body.innerHTML='<div class="radar-loading">📡 Aggiornamento in corso…</div>';
-  else if(!body.querySelector('.radar-item')) body.innerHTML='<div class="radar-loading">📡 Scansione dichiarazioni in corso…</div>';
+  else if(!hasItems) body.innerHTML='<div class="radar-loading">📡 Prima scansione in corso… <span style="color:var(--text-dim)">(può richiedere ~10s)</span></div>';
   try{
     const url='/api/influence'+(force?('?r='+Date.now()):'');
-    const data=await fetch(url).then(r=>r.ok?r.json():[]);
-    renderRadar(data);
+    const resp=await fetch(url);
+    // 202 = scansione in corso, nessun dato ancora → riprova tra poco
+    if(resp.status===202){
+      clearTimeout(_radarRetry);
+      _radarRetry=setTimeout(()=>{ if(document.getElementById('radar-view')?.style.display!=='none') loadRadar(false); }, 7000);
+      return;
+    }
+    const data=resp.ok?await resp.json():[];
+    if(Array.isArray(data)&&!data.length&&!hasItems){
+      // vuoto ma non in scansione: riprova una volta tra 7s, poi mostra "nessuna"
+      clearTimeout(_radarRetry);
+      _radarRetry=setTimeout(()=>{ if(document.getElementById('radar-view')?.style.display!=='none') renderRadar([]); }, 7000);
+      renderRadar(data); // mostra comunque l'empty-state informativo
+    } else {
+      renderRadar(data);
+    }
   }catch(e){
     body.innerHTML='<div class="radar-loading" style="color:var(--red-b)">⚠️ Errore nel caricamento del radar.</div>';
   }
