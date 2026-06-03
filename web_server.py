@@ -814,27 +814,84 @@ async def api_scan_evening():
 
 # ─── Radar VIP: dichiarazioni di figure pubbliche sui titoli ─────────────────
 _PUBLIC_FIGURES = [
+    # ── Politica USA ──
     {"name": "Donald Trump",      "role": "Presidente USA",        "emoji": "🇺🇸", "keys": ["trump"]},
+    {"name": "Joe Biden",         "role": "Ex Presidente USA",     "emoji": "🇺🇸", "keys": ["joe biden", "biden"]},
+    {"name": "JD Vance",          "role": "Vicepresidente USA",    "emoji": "🇺🇸", "keys": ["jd vance", "vance"]},
+    {"name": "Nancy Pelosi",      "role": "Congresso USA",         "emoji": "🏛️", "keys": ["pelosi"]},
+    {"name": "Bernie Sanders",    "role": "Senato USA",            "emoji": "🏛️", "keys": ["bernie sanders", "sanders"]},
+    {"name": "Elizabeth Warren",  "role": "Senato USA",            "emoji": "🏛️", "keys": ["elizabeth warren"]},
+    {"name": "Robert Kennedy Jr", "role": "Segretario Salute USA", "emoji": "🏛️", "keys": ["robert kennedy", "rfk"]},
+    # ── Banche centrali / economia ──
+    {"name": "Jerome Powell",     "role": "Presidente Fed",        "emoji": "🏦", "keys": ["jerome powell", "powell"]},
+    {"name": "Scott Bessent",     "role": "Segretario Tesoro USA", "emoji": "🏦", "keys": ["bessent"]},
+    {"name": "Janet Yellen",      "role": "Ex Segretario Tesoro",  "emoji": "🏦", "keys": ["yellen"]},
+    {"name": "Christine Lagarde", "role": "Presidente BCE",        "emoji": "🇪🇺", "keys": ["lagarde"]},
+    # ── CEO Tech ──
     {"name": "Elon Musk",         "role": "CEO Tesla / xAI",       "emoji": "🚀", "keys": ["elon musk", "musk"]},
     {"name": "Jensen Huang",      "role": "CEO NVIDIA",            "emoji": "🤖", "keys": ["jensen huang", "huang"]},
-    {"name": "Jerome Powell",     "role": "Presidente Fed",        "emoji": "🏦", "keys": ["jerome powell", "powell"]},
-    {"name": "Warren Buffett",    "role": "Berkshire Hathaway",    "emoji": "💰", "keys": ["warren buffett", "buffett"]},
-    {"name": "Nancy Pelosi",      "role": "Congresso USA",         "emoji": "🏛️", "keys": ["pelosi"]},
-    {"name": "Cathie Wood",       "role": "ARK Invest",            "emoji": "📈", "keys": ["cathie wood"]},
-    {"name": "Michael Burry",     "role": "Scion (Big Short)",     "emoji": "🐻", "keys": ["michael burry", "burry"]},
-    {"name": "Bill Ackman",       "role": "Pershing Square",       "emoji": "🎯", "keys": ["ackman"]},
     {"name": "Tim Cook",          "role": "CEO Apple",             "emoji": "🍎", "keys": ["tim cook"]},
     {"name": "Mark Zuckerberg",   "role": "CEO Meta",              "emoji": "📱", "keys": ["zuckerberg"]},
     {"name": "Satya Nadella",     "role": "CEO Microsoft",         "emoji": "🪟", "keys": ["satya nadella", "nadella"]},
-    {"name": "Sam Altman",        "role": "CEO OpenAI",            "emoji": "🧠", "keys": ["sam altman", "altman"]},
+    {"name": "Sundar Pichai",     "role": "CEO Google / Alphabet", "emoji": "🔍", "keys": ["sundar pichai", "pichai"]},
+    {"name": "Andy Jassy",        "role": "CEO Amazon",            "emoji": "📦", "keys": ["andy jassy", "jassy"]},
     {"name": "Lisa Su",           "role": "CEO AMD",               "emoji": "⚙️", "keys": ["lisa su"]},
+    {"name": "Michael Dell",      "role": "CEO Dell",              "emoji": "💻", "keys": ["michael dell"]},
+    {"name": "Pat Gelsinger",     "role": "Ex CEO Intel",          "emoji": "🔧", "keys": ["gelsinger"]},
+    {"name": "Cristiano Amon",    "role": "CEO Qualcomm",          "emoji": "📲", "keys": ["cristiano amon", "amon"]},
+    {"name": "Hock Tan",          "role": "CEO Broadcom",          "emoji": "📡", "keys": ["hock tan"]},
+    {"name": "Marc Benioff",      "role": "CEO Salesforce",        "emoji": "☁️", "keys": ["benioff"]},
+    {"name": "Mary Barra",        "role": "CEO General Motors",    "emoji": "🚗", "keys": ["mary barra", "barra"]},
+    {"name": "Jim Farley",        "role": "CEO Ford",              "emoji": "🚙", "keys": ["jim farley"]},
+    # ── AI ──
+    {"name": "Sam Altman",        "role": "CEO OpenAI",            "emoji": "🧠", "keys": ["sam altman", "altman"]},
+    {"name": "Dario Amodei",      "role": "CEO Anthropic",         "emoji": "🧠", "keys": ["dario amodei", "amodei"]},
+    {"name": "Demis Hassabis",    "role": "CEO Google DeepMind",   "emoji": "🧠", "keys": ["hassabis"]},
+    {"name": "Masayoshi Son",     "role": "CEO SoftBank",          "emoji": "🌐", "keys": ["masayoshi son", "masa son"]},
+    # ── Investitori / Hedge fund ──
+    {"name": "Warren Buffett",    "role": "Berkshire Hathaway",    "emoji": "💰", "keys": ["warren buffett", "buffett"]},
+    {"name": "Cathie Wood",       "role": "ARK Invest",            "emoji": "📈", "keys": ["cathie wood"]},
+    {"name": "Michael Burry",     "role": "Scion (Big Short)",     "emoji": "🐻", "keys": ["michael burry", "burry"]},
+    {"name": "Bill Ackman",       "role": "Pershing Square",       "emoji": "🎯", "keys": ["ackman"]},
+    {"name": "Carl Icahn",        "role": "Icahn Enterprises",     "emoji": "🦈", "keys": ["icahn"]},
+    {"name": "Ray Dalio",         "role": "Bridgewater",           "emoji": "🌊", "keys": ["ray dalio", "dalio"]},
+    {"name": "Stanley Druckenmiller", "role": "Duquesne",         "emoji": "📊", "keys": ["druckenmiller"]},
+    {"name": "David Tepper",      "role": "Appaloosa",             "emoji": "📊", "keys": ["tepper"]},
+    {"name": "Ken Griffin",       "role": "Citadel",               "emoji": "🏰", "keys": ["ken griffin"]},
+    {"name": "Larry Fink",        "role": "CEO BlackRock",         "emoji": "🏦", "keys": ["larry fink", "fink"]},
+    {"name": "Jamie Dimon",       "role": "CEO JPMorgan",          "emoji": "🏦", "keys": ["jamie dimon", "dimon"]},
+    {"name": "Jim Cramer",        "role": "CNBC Mad Money",        "emoji": "📺", "keys": ["jim cramer", "cramer"]},
+    {"name": "Chamath Palihapitiya", "role": "Social Capital",    "emoji": "💸", "keys": ["chamath"]},
+    {"name": "Mark Cuban",        "role": "Investitore / Shark",   "emoji": "🦈", "keys": ["mark cuban", "cuban"]},
+    {"name": "Peter Thiel",       "role": "Founders Fund",         "emoji": "🔮", "keys": ["peter thiel", "thiel"]},
+    {"name": "Marc Andreessen",   "role": "a16z",                  "emoji": "🔮", "keys": ["andreessen"]},
+    # ── Crypto ──
+    {"name": "Michael Saylor",    "role": "Strategy (MSTR)",       "emoji": "₿", "keys": ["saylor"]},
+    {"name": "Brian Armstrong",   "role": "CEO Coinbase",          "emoji": "🪙", "keys": ["brian armstrong", "armstrong"]},
+    {"name": "Changpeng Zhao",    "role": "Binance (CZ)",          "emoji": "🪙", "keys": ["changpeng zhao", " cz "]},
+    {"name": "Vitalik Buterin",   "role": "Ethereum",              "emoji": "💎", "keys": ["vitalik", "buterin"]},
 ]
 
-# Titoli ad alto profilo da monitorare per le dichiarazioni
+# Titoli ad alto profilo da monitorare per le dichiarazioni (~55, set affidabile)
 _INFLUENCE_TICKERS = [
-    "NVDA", "DELL", "PLTR", "MRVL", "TSLA", "AAPL", "AMD", "META", "MSFT",
-    "AMZN", "GOOGL", "SMCI", "COIN", "MSTR", "INTC", "IBM", "ORCL", "AVGO",
-    "ARM", "MU", "QCOM", "TSM", "NFLX", "BABA", "F", "GM", "BA",
+    # Mega cap tech / AI
+    "NVDA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "AVGO",
+    "AMD", "ARM", "TSM", "MU", "QCOM", "INTC", "SMCI", "MRVL", "DELL",
+    "ORCL", "PLTR", "CRM", "SNOW", "NET", "CRWD", "PANW",
+    # AI emergenti / quantum
+    "AI", "SOUN", "IONQ", "BBAI",
+    # Crypto / mining
+    "COIN", "MSTR", "MARA", "RIOT", "HOOD",
+    # Auto / EV
+    "F", "GM", "RIVN", "NIO",
+    # Consumer / internet
+    "NFLX", "DIS", "UBER", "ABNB", "BABA", "PYPL",
+    # Finance / banche
+    "JPM", "BAC", "GS", "V", "SOFI",
+    # Difesa / industriali / energia
+    "BA", "LMT", "GE", "XOM",
+    # Pharma / retail
+    "LLY", "PFE", "GME", "WMT",
 ]
 
 
