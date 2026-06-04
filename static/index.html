@@ -1632,6 +1632,13 @@ header{border-top:2px solid var(--primary)!important}
 .tk-lvl.res .tk-lvl-v{color:var(--red-b)}
 .tk-lvl.sup .tk-lvl-v{color:var(--green-b)}
 .tk-lvl.fib .tk-lvl-k{color:var(--gold);opacity:.85}
+.tk-52w{background:var(--surf);padding:7px 9px;border-bottom:1px solid var(--border)}
+.tk-52w-top{display:flex;justify-content:space-between;font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-bottom:5px}
+.tk-52w-pos{font-family:var(--mono);color:var(--primary);font-weight:700}
+.tk-52w-track{position:relative;height:6px;background:var(--bg);border:1px solid var(--border)}
+.tk-52w-fill{height:100%;background:linear-gradient(90deg,var(--red),var(--gold),var(--green-b))}
+.tk-52w-mark{position:absolute;top:-2px;width:2px;height:10px;background:#fff;transform:translateX(-50%)}
+.tk-52w-ends{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.6rem;color:var(--text-dim);margin-top:3px}
 
 /* ── Analizzatore AI completo (modal) ─────────────────────────────────────── */
 .deep-ai{margin:14px 0;border:1px solid var(--border-hi);background:var(--surf-v);border-left:3px solid var(--primary)}
@@ -1716,7 +1723,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v69';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v70';color:var(--primary);opacity:.7}
 </style>
 </head>
 <body>
@@ -3059,15 +3066,22 @@ function _tkCalc(){
 async function _tkLevels(ticker, price){
   const el=document.getElementById('tk-levels'); if(!el) return;
   try{
-    const ohlc=await fetch(`/api/stock/${ticker}/ohlc?period=3mo&interval=1d`).then(r=>r.ok?r.json():[]);
+    const ohlc=await fetch(`/api/stock/${ticker}/ohlc?period=1y&interval=1d`).then(r=>r.ok?r.json():[]);
     if(!Array.isArray(ohlc)||ohlc.length<10){ el.innerHTML='<div class="tk-load">Dati livelli non disponibili</div>'; return; }
     const highs=ohlc.map(o=>o.high), lows=ohlc.map(o=>o.low);
     const recent=ohlc.slice(-40);
     const resistance=Math.max(...recent.map(o=>o.high));
     const support=Math.min(...recent.map(o=>o.low));
-    const hi=Math.max(...highs), lo=Math.min(...lows);
+    const hi=Math.max(...highs), lo=Math.min(...lows);   // 52 settimane
     const cur=price||ohlc[ohlc.length-1].close;
     const ccy=_tkStock?.currency==='EUR'?'€':_tkStock?.currency==='GBP'?'£':'$';
+    // Posizione nel range 52 settimane
+    const pos52=hi>lo?Math.max(0,Math.min(100,(cur-lo)/(hi-lo)*100)):50;
+    const range52=`<div class="tk-52w">
+      <div class="tk-52w-top"><span>52 sett.</span><span class="tk-52w-pos">${pos52.toFixed(0)}% del range</span></div>
+      <div class="tk-52w-track"><div class="tk-52w-fill" style="width:${pos52}%"></div><div class="tk-52w-mark" style="left:${pos52}%"></div></div>
+      <div class="tk-52w-ends"><span>${ccy}${lo.toFixed(2)}</span><span>${ccy}${hi.toFixed(2)}</span></div>
+    </div>`;
     // Fibonacci retracement (dal minimo al massimo del periodo)
     const fibs=[0.236,0.382,0.5,0.618].map(r=>({r,v:hi-(hi-lo)*r}));
     const lvl=(label,val,cls)=>{
@@ -3075,6 +3089,7 @@ async function _tkLevels(ticker, price){
       return `<div class="tk-lvl ${cls}"><span class="tk-lvl-k">${label}</span><span class="tk-lvl-v">${ccy}${val.toFixed(2)}</span><span class="tk-lvl-d ${dist>=0?'up':'down'}">${dist>=0?'+':''}${dist.toFixed(1)}%</span></div>`;
     };
     el.innerHTML=
+      range52+
       lvl('🔴 Resistenza', resistance, 'res')+
       fibs.filter(f=>f.v>cur).slice(0,1).map(f=>lvl('Fib '+(f.r*100).toFixed(1)+'%', f.v,'fib')).join('')+
       `<div class="tk-lvl cur"><span class="tk-lvl-k">⬤ Prezzo ora</span><span class="tk-lvl-v">${ccy}${cur.toFixed(2)}</span><span class="tk-lvl-d">—</span></div>`+
