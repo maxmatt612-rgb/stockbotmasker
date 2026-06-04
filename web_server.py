@@ -1034,6 +1034,67 @@ async def api_influence():
     return JSONResponse([], status_code=202)
 
 
+@app.get("/api/ai/news")
+async def api_ai_news(ticker: str = "", title: str = ""):
+    """Riassunto AI di una notizia o dichiarazione: cosa significa + impatto + sentiment.
+    Usato sia dal Radar VIP che dalle notizie nel dettaglio titolo. Cache 24h."""
+    title = (title or "").strip()
+    if not title:
+        return JSONResponse({"error": "Titolo mancante"}, status_code=400)
+    if not groq_client:
+        return JSONResponse({"error": "AI non disponibile"}, status_code=503)
+
+    key = "ainews:" + hashlib.md5(f"{ticker}|{title}".encode("utf-8")).hexdigest()
+    if (c := _cached(key, 86400)) is not None:
+        return c
+
+    prompt = (
+        f"Notizia/dichiarazione riguardante il titolo {ticker or 'azionario'}:\n"
+        f"\"{title}\"\n\n"
+        "Spiega in ITALIANO in modo chiaro, concreto e diretto. Formato ESATTO:\n"
+        "SPIEGAZIONE: [2 frasi: cosa significa e perché conta per il titolo]\n"
+        "IMPATTO: [1 frase: probabile effetto sul prezzo, breve termine]\n"
+        "SENTIMENT: RIALZISTA oppure RIBASSISTA oppure NEUTRO\n"
+        "Niente disclaimer, niente premesse."
+    )
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=240,
+            messages=[
+                {"role": "system", "content": "Sei un analista finanziario che spiega notizie di mercato in modo conciso e diretto, in italiano. Vai dritto al punto."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        spiegazione = impatto = ""
+        sentiment = "neutro"
+        for line in text.split("\n"):
+            l = line.strip()
+            lu = l.upper()
+            if lu.startswith("SPIEGAZIONE:"):
+                spiegazione = l.split(":", 1)[1].strip()
+            elif lu.startswith("IMPATTO:"):
+                impatto = l.split(":", 1)[1].strip()
+            elif lu.startswith("SENTIMENT:"):
+                v = l.split(":", 1)[1].strip().upper()
+                if "RIALZ" in v:
+                    sentiment = "rialzista"
+                elif "RIBASS" in v:
+                    sentiment = "ribassista"
+                else:
+                    sentiment = "neutro"
+        result = {
+            "spiegazione": spiegazione or text,
+            "impatto": impatto,
+            "sentiment": sentiment,
+        }
+        _store(key, result)
+        return result
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.get("/api/report/morning")
 async def api_report_morning():
     """Scarica il PDF analisi mattutina. Se non ancora generato, lo genera ora."""

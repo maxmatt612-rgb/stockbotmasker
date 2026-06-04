@@ -1524,6 +1524,29 @@ header{border-top:2px solid var(--primary)!important}
   .radar-fig{grid-column:1/-1;margin-bottom:2px}
 }
 
+/* ── Riassunto AI notizie / dichiarazioni ─────────────────────────────────── */
+.ai-explain-btn{font-family:var(--sans);font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
+  background:linear-gradient(90deg,rgba(41,121,255,.15),rgba(168,85,247,.15));border:1px solid rgba(41,121,255,.4)!important;
+  color:#5b9dff;padding:2px 9px;cursor:pointer;border-radius:2px!important;white-space:nowrap}
+.ai-explain-btn:hover{background:rgba(41,121,255,.28);color:#fff}
+.ai-explain-btn:disabled{opacity:.6;cursor:default}
+.ai-news-result{margin-top:8px}
+.ai-news-loading{font-size:.74rem;color:var(--text-dim);padding:8px 10px;border:1px solid var(--border);background:var(--surf-v);animation:shimmer 1.6s infinite}
+.ai-news-box{border:1px solid var(--border-hi);background:var(--surf-v);padding:10px 12px;border-left:3px solid var(--primary)}
+.ai-news-box.err{border-left-color:var(--red-b);color:var(--text-dim);font-size:.78rem}
+.ai-news-sent{display:inline-block;font-family:var(--sans);font-size:.6rem;font-weight:700;letter-spacing:.06em;padding:2px 8px;margin-bottom:6px;border:1px solid}
+.ai-news-sent.up{color:var(--green-b);border-color:rgba(0,217,163,.4);background:rgba(0,179,125,.1)}
+.ai-news-sent.down{color:var(--red-b);border-color:rgba(255,77,109,.4);background:rgba(232,74,95,.1)}
+.ai-news-sent.neu{color:var(--text-dim);border-color:var(--border-hi)}
+.ai-news-txt{font-size:.82rem;line-height:1.5;color:var(--text)}
+.ai-news-impact{font-size:.76rem;color:var(--text-dim);margin-top:6px;line-height:1.45}
+.ai-news-impact b{color:var(--text)}
+.ai-news-disc{font-size:.58rem;color:var(--text-dim);opacity:.7;margin-top:7px;text-transform:uppercase;letter-spacing:.04em}
+/* news item: il titolo è un link, l'item è un contenitore */
+.news-item .news-title{display:block;color:var(--text);text-decoration:none}
+.news-item .news-title:hover{color:var(--primary)}
+.news-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
@@ -2645,7 +2668,8 @@ function renderRadar(data){
       </div></div>`;
     return;
   }
-  body.innerHTML=data.map(d=>{
+  _radarData=data;
+  body.innerHTML=data.map((d,i)=>{
     const pos=(d.day_change??0)>=0;
     const impactCls=pos?'up':'down';
     const impact=(pos?'+':'')+(d.day_change??0).toFixed(2)+'%';
@@ -2653,8 +2677,8 @@ function renderRadar(data){
     const ccy='$'; // titoli alto profilo USA
     const ticker=d.ticker;
     const link=d.link?`<a class="radar-src" href="${d.link}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${d.source||'Fonte'} ↗</a>`:(d.source?`<span class="radar-src">${d.source}</span>`:'');
-    return `<div class="radar-item" onclick="openTickerModal('${ticker}')">
-      <div class="radar-fig">
+    return `<div class="radar-item">
+      <div class="radar-fig" onclick="openTickerModal('${ticker}')">
         <div class="radar-fig-emoji">${d.emoji||'🎤'}</div>
         <div>
           <div class="radar-fig-name">${d.figure}</div>
@@ -2662,20 +2686,55 @@ function renderRadar(data){
         </div>
       </div>
       <div class="radar-mid">
-        <div class="radar-quote">“${d.title}”</div>
+        <div class="radar-quote" onclick="openTickerModal('${ticker}')">“${d.title}”</div>
         <div class="radar-meta">
           <span class="radar-tk">${ticker}</span>
           ${ago?`<span class="radar-time">🕒 ${ago}</span>`:''}
           ${link}
+          <button class="ai-explain-btn" onclick="explainRadar(${i},this)">🤖 Spiega con AI</button>
         </div>
+        <div class="ai-news-result" id="radar-ai-${i}" style="display:none"></div>
       </div>
-      <div class="radar-impact">
+      <div class="radar-impact" onclick="openTickerModal('${ticker}')">
         <div class="radar-impact-lbl">Impatto oggi</div>
         <div class="radar-impact-val ${impactCls}">${impact}</div>
         <div class="radar-impact-price">${ccy}${(d.price??0).toFixed(2)}</div>
       </div>
     </div>`;
   }).join('');
+}
+
+// ── Riassunto AI di una notizia / dichiarazione ──────────────────────────────
+let _radarData=[];
+function explainRadar(idx, btn){
+  const d=_radarData[idx]; if(!d) return;
+  _doExplainNews(d.ticker, d.title, btn, document.getElementById('radar-ai-'+idx));
+}
+async function _doExplainNews(ticker, title, btn, res){
+  if(!res) return;
+  // toggle se già caricato
+  if(res.dataset.loaded==='1'){ res.style.display=res.style.display==='none'?'block':'none'; return; }
+  res.style.display='block';
+  res.innerHTML='<div class="ai-news-loading">🤖 Analisi AI in corso…</div>';
+  const old=btn?btn.textContent:''; if(btn){btn.disabled=true;}
+  try{
+    const q=new URLSearchParams({ticker:ticker||'', title:title||''});
+    const d=await fetch('/api/ai/news?'+q).then(r=>r.ok?r.json():null);
+    if(!d||d.error){
+      res.innerHTML='<div class="ai-news-box err">⚠️ '+((d&&d.error)||'AI non disponibile')+'</div>';
+    }else{
+      const sCls=d.sentiment==='rialzista'?'up':d.sentiment==='ribassista'?'down':'neu';
+      const sLbl=d.sentiment==='rialzista'?'🟢 RIALZISTA':d.sentiment==='ribassista'?'🔴 RIBASSISTA':'⚪ NEUTRO';
+      res.innerHTML=`<div class="ai-news-box">
+        <div class="ai-news-sent ${sCls}">${sLbl}</div>
+        <div class="ai-news-txt">${d.spiegazione||''}</div>
+        ${d.impatto?`<div class="ai-news-impact"><b>📊 Impatto:</b> ${d.impatto}</div>`:''}
+        <div class="ai-news-disc">Sintesi AI · Groq Llama · non è consulenza finanziaria</div>
+      </div>`;
+      res.dataset.loaded='1';
+    }
+  }catch(e){ res.innerHTML='<div class="ai-news-box err">⚠️ Errore nel riassunto AI</div>'; }
+  if(btn){btn.disabled=false; btn.textContent=old;}
 }
 
 // apre il modal di dettaglio per un ticker (cerca nei dati o fetch al volo)
@@ -5361,6 +5420,7 @@ async function loadHistoryDay(date) {
 // ══════════════════════════════════════════════════════════════════════════════
 // Notizie nel modale
 // ══════════════════════════════════════════════════════════════════════════════
+let _newsData=[];
 async function _loadNews(ticker){
   const el=document.getElementById('m-news-body');
   if(!el) return;
@@ -5368,17 +5428,25 @@ async function _loadNews(ticker){
   try{
     const items=await fetch('/api/stock/'+ticker+'/news').then(r=>r.ok?r.json():[]);
     if(!items.length){el.innerHTML='<div class="news-empty">Nessuna notizia disponibile.</div>';return;}
-    el.innerHTML=items.map(n=>{
+    _newsData=items;
+    el.innerHTML=items.map((n,i)=>{
       const ago=n.time?_newsAgo(n.time):'';
       const s=n.sentiment||'NEUTRO';
       const sCls=s==='POSITIVO'?'pos':s==='NEGATIVO'?'neg':'neu';
       const sTxt=s==='POSITIVO'?'🟢 POS':s==='NEGATIVO'?'🔴 NEG':'⚪ NEU';
-      return `<a class="news-item" href="${n.link||'#'}" target="_blank" rel="noopener">
-        <div class="news-title">${n.title}<span class="news-sentiment ${sCls}">${sTxt}</span></div>
-        <div class="news-meta">${n.publisher||''}${ago?' · '+ago:''}</div>
-      </a>`;
+      return `<div class="news-item">
+        <a class="news-title" href="${n.link||'#'}" target="_blank" rel="noopener">${n.title}<span class="news-sentiment ${sCls}">${sTxt}</span></a>
+        <div class="news-meta">${n.publisher||''}${ago?' · '+ago:''}
+          <button class="ai-explain-btn" onclick="explainNewsItem(${i},'${ticker}',this)">🤖 Spiega</button>
+        </div>
+        <div class="ai-news-result" id="news-ai-${i}" style="display:none"></div>
+      </div>`;
     }).join('');
   }catch(_){el.innerHTML='<div class="news-empty">Errore caricamento notizie.</div>';}
+}
+function explainNewsItem(idx, ticker, btn){
+  const n=_newsData[idx]; if(!n) return;
+  _doExplainNews(ticker, n.title, btn, document.getElementById('news-ai-'+idx));
 }
 function _newsAgo(ts){
   const diff=Math.floor((Date.now()/1000)-(typeof ts==='string'?new Date(ts).getTime()/1000:ts));
