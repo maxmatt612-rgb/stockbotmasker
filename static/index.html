@@ -1338,6 +1338,53 @@ header{position:fixed!important;top:0!important;left:0;right:0;width:100%;height
 /* selezione testo */
 ::selection{background:rgba(41,121,255,.3);color:#fff}
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   RIFINITURA ESTETICA — coerenza pannelli stile terminale Bloomberg
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* Header dei pannelli: accento blu a sinistra, uniforme ovunque */
+.cmd-panel-hd, .sector-hd, .signals-panel-hd, .tk-hd, .deep-ai-hd{position:relative}
+.cmd-panel-hd::before, .sector-hd::before, .signals-panel-hd::before, .tk-hd::before, .deep-ai-hd::before{
+  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:13px;background:var(--primary)}
+.cmd-panel-hd, .sector-hd, .signals-panel-hd, .tk-hd{padding-left:14px!important}
+.deep-ai-hd{padding-left:15px}
+
+/* Pulsanti/chip: transizione fluida */
+.ctrl-btn,.tab-btn,.sc,.chart-tf-btn,.ind-btn,.cmd-tf button,.ai-explain-btn,.deep-comp,.cmd-detail-btn{transition:all .14s ease}
+.ctrl-btn:active,.cmd-tf button:active{transform:translateY(1px)}
+
+/* Header: leggero bagliore sull'accento superiore */
+header{box-shadow:0 1px 0 rgba(41,121,255,.15)!important}
+
+/* Modal: respiro e header più nitido */
+.modal-sheet{padding:22px 22px 26px!important}
+.modal-ticker{letter-spacing:.01em}
+.modal-company{color:var(--text-dim);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em}
+
+/* Card: selezione più evidente + transizione */
+.card{transition:background .12s ease,box-shadow .12s ease}
+.cmd-strat-panel .card.sel{box-shadow:inset 0 0 0 1px rgba(41,121,255,.35)}
+
+/* Score ring: leggero glow secondo lo stato */
+.score-ring.s-hi{box-shadow:0 0 10px rgba(0,217,163,.18)}
+.score-ring.s-lo{box-shadow:0 0 10px rgba(255,77,109,.15)}
+
+/* Tabelle: riga selezionabile più viva */
+.signals-table tbody tr:hover{box-shadow:inset 2px 0 0 var(--primary)}
+
+/* Stat-card del command center: numeri un filo più grandi e nitidi */
+.cstat-v{letter-spacing:-.01em}
+.cstat.bias{position:relative;overflow:hidden}
+.cstat.bias.bull::after,.cstat.bias.bear::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(circle at 80% 50%,rgba(255,255,255,.04),transparent 60%)}
+
+/* Skeleton più elegante */
+.skel-card{background:var(--surf)!important;border:1px solid var(--border)!important}
+.skel-line{background:linear-gradient(90deg,var(--surf-v),var(--surf-hi),var(--surf-v))!important;background-size:200% 100%;animation:skelShine 1.4s infinite}
+@keyframes skelShine{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* Focus accessibile su input */
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:1px solid var(--primary);outline-offset:1px}
+
 /* ── Metrics strip (densità da terminale) ─────────────────────────────────── */
 .metrics-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);
   border:1px solid var(--border);margin:0 0 9px}
@@ -1669,7 +1716,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v68';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v69';color:var(--primary);opacity:.7}
 </style>
 </head>
 <body>
