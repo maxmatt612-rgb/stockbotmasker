@@ -536,7 +536,7 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
         try:
             raw = yf.download(
                 tickers=chunk,
-                period="1mo",
+                period="4mo",
                 interval="1d",
                 auto_adjust=True,
                 progress=False,
@@ -562,7 +562,8 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                         continue
 
                     current_price = float(close.iloc[-1])
-                    if current_price <= 0 or current_price > max_price:
+                    # Floor a $3: sotto è territorio penny stock (raramente "buone")
+                    if current_price < 3.0 or current_price > max_price:
                         continue
 
                     prev_close = float(close.iloc[-2])
@@ -580,43 +581,30 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                     else:
                         rsi = 50.0
 
-                    # Volume ratio
+                    # Volume ratio + LIQUIDITÀ (filtro qualità: scarta penny/junk illiquidi)
                     vol_ratio = 1.0
+                    avg_vol = 0.0
                     if len(volume) >= 5:
-                        avg_vol = float(volume.rolling(10).mean().iloc[-1])
-                        if avg_vol > 0:
-                            vol_ratio = float(volume.iloc[-1]) / avg_vol
+                        avg_vol = float(volume.rolling(min(20, len(volume))).mean().iloc[-1])
+                        last_vol = float(volume.iloc[-1])
+                        avg10 = float(volume.rolling(min(10, len(volume))).mean().iloc[-1])
+                        if avg10 > 0:
+                            vol_ratio = last_vol / avg10
+                    avg_dollar_vol = avg_vol * current_price
+                    # GATE liquidità: sotto ~$3M/giorno di controvalore = troppo illiquido → scarta
+                    if avg_dollar_vol < 3_000_000:
+                        continue
 
-                    # Media mobile 20gg
-                    above_sma20 = False
-                    if len(close) >= 20:
-                        sma20 = float(close.rolling(20).mean().iloc[-1])
-                        above_sma20 = current_price > sma20
+                    # Medie mobili 20 e 50 giorni (qualità del trend)
+                    sma20 = float(close.rolling(min(20, len(close))).mean().iloc[-1])
+                    sma50 = float(close.rolling(50).mean().iloc[-1]) if len(close) >= 50 else sma20
+                    above_sma20 = current_price > sma20
+                    above_sma50 = current_price > sma50
+                    uptrend_align = sma20 > sma50
 
-                    # Punteggio
-                    score = 0
-                    rsi_pts = 0
-                    if rsi < 35:      rsi_pts = 3
-                    elif rsi < 45:    rsi_pts = 2
-                    elif rsi > 70:    rsi_pts = -3
-                    elif rsi > 60:    rsi_pts = -1
-                    score += rsi_pts
-
-                    mom_pts = 0
-                    if day_change_pct > 3:    mom_pts = 3
-                    elif day_change_pct > 1:  mom_pts = 2
-                    elif day_change_pct > 0:  mom_pts = 1
-                    elif day_change_pct < -3: mom_pts = -2
-                    score += mom_pts
-
-                    vol_pts = 0
-                    if vol_ratio > 2.5:   vol_pts = 3
-                    elif vol_ratio > 1.5: vol_pts = 2
-                    elif vol_ratio > 1.2: vol_pts = 1
-                    score += vol_pts
-
-                    trend_pts = 1 if above_sma20 else 0
-                    score += trend_pts
+                    # Rendimenti multi-timeframe (forza COSTANTE, non un singolo pop)
+                    week_return = float((current_price - close.iloc[-6]) / close.iloc[-6] * 100) if len(close) >= 6 else 0.0
+                    month_return = float((current_price - close.iloc[-22]) / close.iloc[-22] * 100) if len(close) >= 22 else 0.0
 
                     # Rischio
                     returns = close.pct_change().dropna()
@@ -627,6 +615,49 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                         risk_level, risk_emoji = "Medio", "🟡"
                     else:
                         risk_level, risk_emoji = "Alto", "🔴"
+
+                    # ════════════════════════════════════════════════════════════
+                    # NUOVO SCORING — premia QUALITÀ del trend e forza costante,
+                    # non il "pop" di un singolo giorno (che spesso è un pump che svanisce)
+                    # ════════════════════════════════════════════════════════════
+                    score = 0
+
+                    # 1) QUALITÀ DEL TREND (la spina dorsale dei titoli buoni) — max +4
+                    trend_pts = 0
+                    if above_sma20:   trend_pts += 1
+                    if above_sma50:   trend_pts += 1
+                    if uptrend_align: trend_pts += 1
+                    if above_sma20 and above_sma50 and uptrend_align: trend_pts += 1  # trend pulito
+                    score += trend_pts
+
+                    # 2) MOMENTUM MULTI-TIMEFRAME (forza costante settimana+mese) — max +4
+                    mom_pts = 0
+                    if week_return > 0:    mom_pts += 1
+                    if week_return > 5:    mom_pts += 1
+                    if month_return > 0:   mom_pts += 1
+                    if month_return > 10:  mom_pts += 1
+                    if month_return < -15: mom_pts -= 1   # downtrend forte = penalità
+                    score += mom_pts
+
+                    # 3) RSI in ZONA SANA (non gli estremi: né ipercomprato né coltello che cade)
+                    rsi_pts = 0
+                    if 45 <= rsi <= 65:    rsi_pts = 2     # zona ideale
+                    elif 40 <= rsi < 45:   rsi_pts = 1     # pullback leggero in trend
+                    elif rsi > 75:         rsi_pts = -3    # esteso / ipercomprato
+                    elif rsi > 70:         rsi_pts = -1
+                    elif rsi < 30:         rsi_pts = -2    # falling knife: penalizza, non premiare
+                    score += rsi_pts
+
+                    # 4) VOLUME come CONFERMA (solo se il prezzo sale) — modesto
+                    vol_pts = 1 if (vol_ratio > 1.5 and day_change_pct > 0) else 0
+                    score += vol_pts
+
+                    # 5) SANITÀ DELLA VOLATILITÀ
+                    if 15 <= volatility <= 50:   score += 1    # volatilità sana
+                    elif volatility > 90:        score -= 2    # territorio pump/junk
+                    elif volatility > 70:        score -= 1
+                    # spike parabolico in un giorno = rischio di inseguire il top
+                    if day_change_pct > 9:       score -= 1
 
                     # ── Volatilità anomala: ultimi 5gg vs mese intero ─────────
                     recent_vol = float(returns.iloc[-5:].std() * (252**0.5) * 100) if len(returns) >= 5 else volatility
@@ -644,26 +675,26 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                             pass
                     dow_avg = {d: round(sum(v)/len(v), 2) if v else 0.0 for d, v in dow_ret.items()}
 
-                    # ── Doppio segnale ────────────────────────────────────────
+                    # ── Doppio segnale (basato su qualità del trend) ──────────
                     bull_sigs = 0
                     bear_sigs = 0
-                    if rsi < 40:            bull_sigs += 1
-                    elif rsi > 65:          bear_sigs += 1
-                    if vol_ratio > 1.5:
-                        if day_change_pct > 0: bull_sigs += 1
-                        else:                  bear_sigs += 1
-                    if day_change_pct > 1:  bull_sigs += 1
-                    elif day_change_pct < -1: bear_sigs += 1
-                    if above_sma20:         bull_sigs += 1
-                    else:                   bear_sigs += 1
-                    double_signal = "bull" if bull_sigs >= 2 else ("bear" if bear_sigs >= 2 else "")
+                    if above_sma20 and above_sma50: bull_sigs += 1
+                    elif not above_sma20 and not above_sma50: bear_sigs += 1
+                    if uptrend_align: bull_sigs += 1
+                    else:             bear_sigs += 1
+                    if week_return > 0 and month_return > 0: bull_sigs += 1
+                    elif week_return < 0 and month_return < 0: bear_sigs += 1
+                    if 45 <= rsi <= 65: bull_sigs += 1
+                    elif rsi > 75 or rsi < 30: bear_sigs += 1
+                    double_signal = "bull" if bull_sigs >= 3 else ("bear" if bear_sigs >= 3 else "")
 
                     # Bonus AI: piccolo boost per aziende AI-focused
                     is_ai = ticker in _AI_SET
                     if is_ai:
                         score += 1
 
-                    score_10 = round(min(10.0, max(0.0, (score + 5) / 15 * 10)), 1)
+                    # Normalizza (range grezzo ~ -7..+13) → 0-10
+                    score_10 = round(min(10.0, max(0.0, (score + 7) / 20 * 10)), 1)
 
                     # Trade setup
                     daily_vol_pct = volatility / (252 ** 0.5) / 100
@@ -700,6 +731,11 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                         "bull_signals": bull_sigs,
                         "bear_signals": bear_sigs,
                         "dow_avg": dow_avg,
+                        "week_return": round(week_return, 1),
+                        "month_return": round(month_return, 1),
+                        "above_sma50": above_sma50,
+                        "uptrend": above_sma20 and above_sma50 and uptrend_align,
+                        "avg_dollar_vol": round(avg_dollar_vol),
                         "score_breakdown": {
                             "rsi": rsi_pts,
                             "momentum": mom_pts,
