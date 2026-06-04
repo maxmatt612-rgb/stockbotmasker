@@ -1529,6 +1529,20 @@ header{border-top:2px solid var(--primary)!important}
   .radar-fig{grid-column:1/-1;margin-bottom:2px}
 }
 
+/* ── Market Sentiment gauge (Fear & Greed) ────────────────────────────────── */
+.sentiment-bar{display:flex;align-items:center;gap:12px;padding:8px 12px;margin-bottom:1px;
+  background:var(--surf);border:1px solid var(--border)}
+.sent-label{font-family:var(--sans);font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-dim);white-space:nowrap;flex-shrink:0}
+.sent-track{position:relative;flex:1;height:8px;min-width:120px;
+  background:linear-gradient(90deg,#e84a5f 0%,#f0b429 35%,#5a6b85 50%,#0fb37d 65%,#00d9a3 100%)}
+.sent-zones{position:absolute;inset:0;background:linear-gradient(90deg,transparent,transparent)}
+.sent-marker{position:absolute;top:-3px;width:3px;height:14px;background:#fff;box-shadow:0 0 6px rgba(255,255,255,.6);transform:translateX(-50%);transition:left .6s ease}
+.sent-verdict{font-family:var(--mono);font-size:.74rem;font-weight:700;white-space:nowrap;flex-shrink:0;min-width:120px;text-align:right}
+.sent-verdict.greed2,.sent-verdict.greed{color:var(--green-b)}
+.sent-verdict.neutral{color:var(--text-dim)}
+.sent-verdict.fear,.sent-verdict.fear2{color:var(--red-b)}
+@media(max-width:640px){.sent-label{display:none}.sent-verdict{min-width:auto;font-size:.68rem}}
+
 /* ── Trader Toolkit (position sizing + livelli) ───────────────────────────── */
 .tk-section{margin:14px 0;border:1px solid var(--border)}
 .tk-hd{font-family:var(--sans);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text);padding:9px 12px;background:var(--surf-v);border-bottom:1px solid var(--border)}
@@ -1642,7 +1656,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v66';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v67';color:var(--primary);opacity:.7}
 </style>
 </head>
 <body>
@@ -2376,6 +2390,15 @@ footer::after{content:' · BUILD v66';color:var(--primary);opacity:.7}
 
 <!-- ── Command Center ── -->
 <section id="cmd-center">
+  <!-- Market Sentiment (Fear & Greed) -->
+  <div class="sentiment-bar" id="sentiment-bar" style="display:none">
+    <div class="sent-label">📊 Sentiment di Mercato</div>
+    <div class="sent-track">
+      <div class="sent-zones"></div>
+      <div class="sent-marker" id="sent-marker"></div>
+    </div>
+    <div class="sent-verdict" id="sent-verdict">—</div>
+  </div>
   <div class="cmd-stats" id="cmd-stats">
     <div class="cstat"><div class="cstat-k">In attesa dati</div><div class="cstat-v">—</div><div class="cstat-sub">scansione…</div></div>
   </div>
@@ -3242,7 +3265,33 @@ async function loadIndices(){
     if(!items) return;
     // Duplica: translateX(-50%) = esattamente un giro, loop seamless
     marquee.innerHTML = items + items;
+    _renderSentiment(d);
   }catch(_){}
+}
+
+// ── Market Sentiment (Fear & Greed) da VIX + momentum indici ─────────────────
+function _renderSentiment(d){
+  const bar=document.getElementById('sentiment-bar'); if(!bar||!d) return;
+  const vix=d.VIX?.price||0;
+  const sp=d.SP500?.chg||0, nq=d.NASDAQ?.chg||0;
+  if(!vix){ return; }
+  // VIX: 12 → avidità (100), 35 → paura (0)
+  const vixScore=Math.max(0,Math.min(100,(35-vix)/(35-12)*100));
+  // Momentum: media variazione SP500/NASDAQ, ±2% → ±30 punti attorno a 50
+  const momScore=Math.max(0,Math.min(100,50+((sp+nq)/2)*15));
+  const sentiment=Math.round(vixScore*0.6+momScore*0.4);
+  let label,cls;
+  if(sentiment>=75){label='AVIDITÀ ESTREMA';cls='greed2';}
+  else if(sentiment>=58){label='AVIDITÀ';cls='greed';}
+  else if(sentiment>=42){label='NEUTRO';cls='neutral';}
+  else if(sentiment>=25){label='PAURA';cls='fear';}
+  else{label='PAURA ESTREMA';cls='fear2';}
+  document.getElementById('sent-marker').style.left=sentiment+'%';
+  const ver=document.getElementById('sent-verdict');
+  ver.textContent=`${sentiment} · ${label}`;
+  ver.className='sent-verdict '+cls;
+  bar.style.display='flex';
+  bar.title=`VIX ${vix.toFixed(1)} · S&P ${sp>=0?'+':''}${sp}% · NASDAQ ${nq>=0?'+':''}${nq}%`;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
