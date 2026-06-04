@@ -1524,6 +1524,24 @@ header{border-top:2px solid var(--primary)!important}
   .radar-fig{grid-column:1/-1;margin-bottom:2px}
 }
 
+/* ── Notifica VIP importante (banner sopra le tab) ────────────────────────── */
+.vip-alert{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;
+  background:linear-gradient(90deg,rgba(232,74,95,.18),rgba(41,121,255,.10) 60%,transparent);
+  border-top:1px solid rgba(255,77,109,.45);border-bottom:1px solid var(--border-hi);
+  font-family:var(--sans);font-size:.82rem;animation:vipIn .4s ease}
+@keyframes vipIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.vip-alert:hover{background:linear-gradient(90deg,rgba(232,74,95,.26),rgba(41,121,255,.14) 60%,transparent)}
+.vip-alert-pulse{width:9px;height:9px;border-radius:50%;background:var(--red-b);flex-shrink:0;animation:vipPulse 1.5s infinite}
+@keyframes vipPulse{0%{box-shadow:0 0 0 0 rgba(255,77,109,.65)}70%{box-shadow:0 0 0 8px rgba(255,77,109,0)}100%{box-shadow:0 0 0 0 rgba(255,77,109,0)}}
+.vip-alert-tag{font-size:.58rem;font-weight:800;letter-spacing:.1em;color:var(--red-b);text-transform:uppercase;flex-shrink:0;border:1px solid rgba(255,77,109,.45);padding:2px 7px}
+.vip-alert-text{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.vip-alert-text b{color:#fff;font-weight:700}
+.vip-alert-impact{font-family:var(--mono);font-weight:700;font-size:.92rem;flex-shrink:0}
+.vip-alert-impact.up{color:var(--green-b)}.vip-alert-impact.down{color:var(--red-b)}
+.vip-alert-close{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:1rem;flex-shrink:0;padding:0 4px;line-height:1}
+.vip-alert-close:hover{color:var(--text)}
+@media(max-width:640px){.vip-alert-tag{display:none}.vip-alert{font-size:.74rem;padding:8px 12px;gap:8px}}
+
 /* ── Riassunto AI notizie / dichiarazioni ─────────────────────────────────── */
 .ai-explain-btn{font-family:var(--sans);font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
   background:linear-gradient(90deg,rgba(41,121,255,.15),rgba(168,85,247,.15));border:1px solid rgba(41,121,255,.4)!important;
@@ -1550,7 +1568,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v61';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v62';color:var(--primary);opacity:.7}
 </style>
 </head>
 <body>
@@ -1659,6 +1677,15 @@ footer::after{content:' · BUILD v61';color:var(--primary);opacity:.7}
   <div class="tape-scroll-wrap">
     <div class="tape-marquee" id="tape-marquee"></div>
   </div>
+</div>
+
+<!-- ── Notifica VIP importante (sopra le tab) ── -->
+<div id="vip-alert" class="vip-alert" style="display:none">
+  <span class="vip-alert-pulse"></span>
+  <span class="vip-alert-tag">📡 RADAR VIP</span>
+  <span class="vip-alert-text" id="vip-alert-text" onclick="_vipAlertClick()"></span>
+  <span class="vip-alert-impact" id="vip-alert-impact" onclick="_vipAlertClick()"></span>
+  <button class="vip-alert-close" onclick="event.stopPropagation();_dismissVipAlert()" title="Nascondi">✕</button>
 </div>
 
 <!-- ── Tab navigation ── -->
@@ -2735,6 +2762,45 @@ async function _doExplainNews(ticker, title, btn, res){
     }
   }catch(e){ res.innerHTML='<div class="ai-news-box err">⚠️ Errore nel riassunto AI</div>'; }
   if(btn){btn.disabled=false; btn.textContent=old;}
+}
+
+// ── Notifica VIP importante sopra le tab ─────────────────────────────────────
+let _vipAlertItem=null;
+async function _checkVipAlert(){
+  try{
+    const data=await fetch('/api/influence').then(r=>r.ok?r.json():[]);
+    if(!Array.isArray(data)||!data.length) return;
+    // scegli la dichiarazione più "importante": maggiore impatto assoluto sul prezzo
+    let best=data[0];
+    data.forEach(d=>{ if(Math.abs(d.day_change??0)>Math.abs(best.day_change??0)) best=d; });
+    // se nessuna muove abbastanza, prendi la più recente (data[0])
+    if(Math.abs(best.day_change??0) < 0.8) best=data[0];
+    const key=best.figure+'|'+best.ticker+'|'+(best.title||'').slice(0,40);
+    if(localStorage.getItem('masker_vip_dismissed')===key) return; // l'utente l'ha chiusa
+    _vipAlertItem=best;
+    _showVipAlert(best);
+  }catch(_){}
+}
+function _showVipAlert(d){
+  const el=document.getElementById('vip-alert'); if(!el) return;
+  const pos=(d.day_change??0)>=0;
+  document.getElementById('vip-alert-text').innerHTML=
+    `<b>${d.emoji||'🎤'} ${d.figure}</b> ha citato <b>${d.ticker}</b> — “${(d.title||'').slice(0,80)}${(d.title||'').length>80?'…':''}”`;
+  const imp=document.getElementById('vip-alert-impact');
+  imp.textContent=(pos?'▲ +':'▼ ')+Math.abs(d.day_change??0).toFixed(2)+'%';
+  imp.className='vip-alert-impact '+(pos?'up':'down');
+  el.style.display='flex';
+}
+function _vipAlertClick(){
+  if(typeof switchTab==='function') switchTab('radar');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function _dismissVipAlert(){
+  const el=document.getElementById('vip-alert'); if(el) el.style.display='none';
+  if(_vipAlertItem){
+    const key=_vipAlertItem.figure+'|'+_vipAlertItem.ticker+'|'+(_vipAlertItem.title||'').slice(0,40);
+    try{ localStorage.setItem('masker_vip_dismissed', key); }catch(_){}
+  }
 }
 
 // apre il modal di dettaglio per un ticker (cerca nei dati o fetch al volo)
@@ -5320,6 +5386,9 @@ loadBacktest();
 initAuth();
 initNotifications();
 _checkReportStatus();
+// Notifica VIP importante sopra le tab — controlla all'avvio e ogni 5 min
+setTimeout(_checkVipAlert, 3500);
+setInterval(_checkVipAlert, 300000);
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Tab switching (5 tab)
