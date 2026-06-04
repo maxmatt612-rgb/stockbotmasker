@@ -15,16 +15,16 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#060b14;--surf:#0d1421;--surf-v:#0f1929;--surf-hi:#162440;
-  --primary:#2979ff;--primary-dim:rgba(41,121,255,.09);
-  --secondary:#00b37d;--gold:#f0b429;--green:#00b37d;--red:#e84a5f;
-  --green-b:#00d9a3;--red-b:#ff4d6d;
-  --text:#c9d4e8;--text-dim:#3d5475;--text-label:#4a6080;
-  --border:#162038;--border-hi:#1e3050;
+  --bg:#070b12;--surf:#0e151f;--surf-v:#121a26;--surf-hi:#1b2738;
+  --primary:#3b82f6;--primary-2:#60a5fa;--primary-dim:rgba(59,130,246,.1);
+  --secondary:#10b981;--gold:#f5b73c;--green:#10b981;--red:#ef4760;
+  --green-b:#1fd99b;--red-b:#ff5d78;
+  --text:#e2e8f4;--text-dim:#7488a6;--text-label:#8a9cb8;
+  --border:#1c2738;--border-hi:#2a3a52;
   --shadow-sm:none;--shadow-md:none;
-  --shadow-lg:0 0 80px rgba(0,0,0,.95),0 0 0 1px #162038;
-  --r-xl:2px;--r-lg:2px;--r-md:2px;--r-sm:1px;
-  --header-bg:#060b14;--tape-bg:#060b14;
+  --shadow-lg:0 24px 70px rgba(0,0,0,.7),0 0 0 1px #2a3a52;
+  --r-xl:3px;--r-lg:3px;--r-md:3px;--r-sm:2px;
+  --header-bg:#0a0f17;--tape-bg:#0a0f17;
   --mono:'JetBrains Mono',monospace;
   --sans:'IBM Plex Sans Condensed','Barlow Condensed',sans-serif;
 }
@@ -1158,7 +1158,7 @@ header,.tab-nav,.indices-tape,.card,.skel-card,.modal-sheet,.refresh-pill,.stat-
 .screener-panel,.screener-card,.diary-input,.diary-select,.mkt-pill,.search-dropdown,
 .header-search,.chat-input,.cmp-box,.cmp-chip,.app-toast,.score-hist-wrap,
 .accuracy-chip,.sb-row,.wl-judge-card,.backtest-panel,.bt-card,.extra-section,
-input,textarea,select,button{border-radius:2px!important}
+input,textarea,select,button{border-radius:3px!important}
 .live-dot,.mkt-pill-dot,.port-pie-dot,.sb-dot,.cmp-legend-dot,.auth-avatar,.auth-avatar-ph,
 .modal-close,.chat-send-btn,.cmp-close{border-radius:50%!important}
 
@@ -1723,7 +1723,94 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v70';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v71';color:var(--primary);opacity:.7}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
+   (ultimo nel foglio: vince sui blocchi precedenti)
+   ═══════════════════════════════════════════════════════════════════════════ */
+body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"tnum" 1}
+.app{background:radial-gradient(ellipse 120% 80% at 50% -10%,rgba(59,130,246,.05),transparent 60%),var(--bg)}
+
+/* ── Header: barra prodotto ───────────────────────────────────────────────── */
+header{height:54px!important;background:linear-gradient(180deg,#0c121d,#0a0f17)!important;
+  border-top:2px solid var(--primary)!important;border-bottom:1px solid var(--border)!important}
+.logo{font-size:1.06rem;letter-spacing:.06em;font-weight:700}
+.header-search{background:#080d15!important;border:1px solid var(--border)!important;border-radius:4px!important;height:34px}
+.header-search:focus-within{border-color:var(--primary)!important;box-shadow:0 0 0 3px var(--primary-dim)!important}
+.live-badge{color:var(--text-dim)}
+
+/* ── Ticker tape ──────────────────────────────────────────────────────────── */
+.indices-tape{background:#0a0f17!important}
+.tape-price{color:var(--text)!important;font-weight:600}
+.mkt-pill-label{color:var(--text)}
+
+/* ── Tab nav: pro ─────────────────────────────────────────────────────────── */
+.tab-nav{background:var(--bg)!important;border-bottom:1px solid var(--border)!important}
+.tab-btn{font-size:.76rem;font-weight:600;padding:12px 18px;color:var(--text-dim);position:relative}
+.tab-btn:hover{color:var(--text);background:rgba(255,255,255,.02)}
+.tab-btn.active{color:#fff;border-bottom-width:2px!important;border-bottom-color:var(--primary)!important}
+
+/* ── Toolbar ──────────────────────────────────────────────────────────────── */
+.ctrl-btn{background:#0b111c!important;border:1px solid var(--border)!important;color:var(--text-dim);font-weight:600;height:30px;display:inline-flex;align-items:center}
+.ctrl-btn:hover{border-color:var(--border-hi)!important;color:var(--text);background:var(--surf-v)!important}
+.ctrl-btn.active{background:var(--primary-dim)!important;border-color:var(--primary)!important;color:var(--primary-2)!important}
+.ctrl-stat b{color:var(--text)}
+
+/* ── Command center: elevazione & header pannelli ─────────────────────────── */
+.cmd-chart-panel,.cmd-strat-panel{box-shadow:inset 0 1px 0 rgba(255,255,255,.025)!important}
+.cmd-panel-hd,.sector-hd,.signals-panel-hd,.tk-hd,.deep-ai-hd{
+  background:linear-gradient(180deg,#15202f,#111927)!important}
+.cmd-panel-title{color:var(--text)}
+.cstat{box-shadow:inset 0 1px 0 rgba(255,255,255,.03)!important;padding:11px 14px}
+.cstat-k{color:var(--text-dim);font-weight:600;font-size:.6rem}
+.cstat-v{font-weight:700;color:var(--text)}
+.cstat-sub{color:var(--text-dim)}
+
+/* ── Card: rifinitura ─────────────────────────────────────────────────────── */
+.card{box-shadow:inset 0 1px 0 rgba(255,255,255,.02)!important}
+.card-name{color:var(--text-dim);font-weight:500}
+.ms-k{color:var(--text-dim)}
+.chip{background:#0b111c!important;border:1px solid var(--border)!important;color:var(--text-label)}
+
+/* ── Tabelle: header e zebra ──────────────────────────────────────────────── */
+.signals-table thead th,.port-table th,.diary-table th,.rebal-table th{
+  background:linear-gradient(180deg,#15202f,#111927)!important;color:var(--text-label)!important}
+.signals-table tbody tr:nth-child(even){background:rgba(255,255,255,.015)}
+.signals-table tbody tr:hover{background:var(--surf-hi)!important}
+.sig-tk{color:var(--text)}
+
+/* ── Modal: premium ───────────────────────────────────────────────────────── */
+.modal-overlay{background:rgba(3,6,11,.82)!important;backdrop-filter:blur(6px) saturate(1.1)!important}
+.modal-sheet{border:1px solid var(--border-hi)!important;
+  box-shadow:0 30px 90px rgba(0,0,0,.78)!important;
+  background:linear-gradient(180deg,#0f1722,#0c121c)!important}
+.modal-ticker{font-size:1.95rem;font-weight:700;color:#fff}
+.modal-price{font-weight:700;color:#fff}
+.detail-cell{background:#0b121d!important}
+.detail-cell-label{color:var(--text-dim)}
+.detail-cell-val{color:var(--text)}
+.deep-ai{box-shadow:inset 0 1px 0 rgba(255,255,255,.03)!important}
+
+/* ── Input pro ────────────────────────────────────────────────────────────── */
+.tk-inp,.port-input,.chat-input,.sc-inp,.diary-input,.diary-select,.cmp-ticker-input,.alert-add-input{
+  background:#080d15!important;border:1px solid var(--border)!important}
+.tk-inp:focus,.port-input:focus,.chat-input:focus,.sc-inp:focus{border-color:var(--primary)!important;box-shadow:0 0 0 2px var(--primary-dim)!important}
+
+/* ── Refresh pill / live dot ──────────────────────────────────────────────── */
+.refresh-pill{background:#0c121d!important;border:1px solid var(--border-hi)!important}
+
+/* ── Empty states più curati ──────────────────────────────────────────────── */
+.empty-state,.history-empty,.radar-empty{color:var(--text-dim)}
+
+/* ── Disclaimer / footer ──────────────────────────────────────────────────── */
+.disc-banner{background:#0a0f17!important;color:var(--text-dim)!important}
+footer{color:var(--text-dim)}
+
+/* ── Scrollbar raffinata ──────────────────────────────────────────────────── */
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-thumb{background:#1e2c40;border:3px solid var(--bg);border-radius:6px}
+::-webkit-scrollbar-thumb:hover{background:#2a3a52}
 </style>
 </head>
 <body>
