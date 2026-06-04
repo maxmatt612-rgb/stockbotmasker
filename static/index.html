@@ -1480,8 +1480,13 @@ header{border-top:2px solid var(--primary)!important}
 .sig-tag.neu{color:var(--text-dim);border-color:var(--border-hi)}
 
 /* ── Ordine vista Live: barra strumenti compatta sopra il centro di comando ── */
-.controls-bar{padding:9px 14px 7px;gap:6px;border-bottom:1px solid var(--border)}
-@media(min-width:900px){.controls-bar{padding:9px 28px 7px}}
+.controls-bar{padding:8px 14px;gap:6px;border-bottom:1px solid var(--border);align-items:center}
+@media(min-width:900px){.controls-bar{padding:8px 28px}}
+.ctrl-stats{margin-left:auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.ctrl-stat{font-family:var(--sans);font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);white-space:nowrap}
+.ctrl-stat b{font-family:var(--mono);color:var(--text);font-weight:700;font-size:.82rem;margin-left:3px}
+#streak-chip b{color:var(--gold)}
+@media(max-width:760px){.ctrl-stats{margin-left:0;width:100%;justify-content:space-between;gap:8px;border-top:1px solid var(--border);padding-top:7px;margin-top:3px}}
 .screen-bar{padding:7px 14px;border-bottom:1px solid var(--border)}
 @media(min-width:900px){.screen-bar{padding:7px 28px}}
 .stats-bar{padding:0!important;border-bottom:1px solid var(--border)}
@@ -1523,6 +1528,22 @@ header{border-top:2px solid var(--primary)!important}
   .radar-item{grid-template-columns:1fr auto}
   .radar-fig{grid-column:1/-1;margin-bottom:2px}
 }
+
+/* ── Track Record ─────────────────────────────────────────────────────────── */
+#track-record{padding:12px 14px 4px;border-bottom:1px solid var(--border)}
+@media(min-width:900px){#track-record{padding:14px 28px 6px}}
+.track-record-hd{font-family:var(--sans);font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);margin-bottom:10px}
+.accuracy-bar{justify-content:flex-start;padding:0}
+
+/* ── Chip avviso earnings (rischio swing) ─────────────────────────────────── */
+.chip-earn{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:1px 7px;
+  color:#ff4d6d;background:rgba(232,74,95,.14);border:1px solid rgba(255,77,109,.5);animation:earnPulse 2s infinite}
+@keyframes earnPulse{0%,100%{border-color:rgba(255,77,109,.5)}50%{border-color:rgba(255,77,109,.95)}}
+
+/* ── "Perché" sulla card (motivo della selezione) ─────────────────────────── */
+.card-why{font-family:var(--mono);font-size:.66rem;color:var(--green-b);letter-spacing:.01em;
+  margin:0 0 8px;padding:5px 8px;background:rgba(0,179,125,.07);border-left:2px solid var(--green-b);line-height:1.35}
+.card.down .card-why{color:var(--text-dim);background:var(--surf-v);border-left-color:var(--border-hi)}
 
 /* ── Notifica VIP importante (banner sopra le tab) ────────────────────────── */
 .vip-alert{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;
@@ -1568,7 +1589,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v63';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v64';color:var(--primary);opacity:.7}
 </style>
 </head>
 <body>
@@ -1627,7 +1648,6 @@ footer::after{content:' · BUILD v63';color:var(--primary);opacity:.7}
   <div class="header-right">
     <button class="fx-toggle" id="fx-toggle" onclick="toggleFX()">$ USD</button>
     <button class="alert-btn" id="alert-btn" onclick="toggleAlertPanel()" title="Price Alerts">🔔<span class="alert-badge" id="alert-badge" style="display:none">0</span></button>
-    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Dark / Light">🌙</button>
     <div id="auth-widget" class="auth-widget"></div>
     <div class="live-badge">
       <div class="live-dot"></div>
@@ -2114,17 +2134,22 @@ footer::after{content:' · BUILD v63';color:var(--primary);opacity:.7}
     <button class="ctrl-btn" data-sort="rsi">📊 RSI</button>
   </div>
   <div class="ctrl-div"></div>
-  <span class="ctrl-label">Strumenti</span>
   <div class="ctrl-group">
     <button class="ctrl-btn" onclick="openComparison()">⚔️ Confronta</button>
     <button class="ctrl-btn" id="etf-scan-btn" onclick="toggleEtfScan()">📦 ETF</button>
+    <button class="ctrl-btn" id="screen-toggle-btn" onclick="toggleScreening()">🔍 Filtri</button>
   </div>
   <div class="ctrl-div"></div>
-  <span class="ctrl-label">Report</span>
   <div class="ctrl-group">
-    <button class="ctrl-btn" id="export-pdf-btn" title="Stampa analisi corrente" onclick="exportPDF()">🖨️ Stampa</button>
-    <button class="ctrl-btn" id="dl-morning-btn" title="PDF analisi mattutina (07:35)" onclick="downloadReport('morning')">🌅 Mattina</button>
-    <button class="ctrl-btn" id="dl-evening-btn" title="PDF recap chiusura USA (22:05)" onclick="downloadReport('evening')">🌆 Sera</button>
+    <button class="ctrl-btn" id="export-pdf-btn" title="Stampa analisi corrente" onclick="exportPDF()">🖨️</button>
+    <button class="ctrl-btn" id="dl-morning-btn" title="PDF analisi mattutina" onclick="downloadReport('morning')">🌅</button>
+    <button class="ctrl-btn" id="dl-evening-btn" title="PDF recap serale" onclick="downloadReport('evening')">🌆</button>
+  </div>
+  <div class="ctrl-stats">
+    <span class="ctrl-stat">Azioni <b id="s-total">—</b></span>
+    <span class="ctrl-stat">Score <b id="s-avg">—</b></span>
+    <span class="ctrl-stat">Top <b id="s-top">—</b></span>
+    <span class="ctrl-stat" id="streak-chip" style="display:none">🔥 <b id="s-streak">0</b></span>
   </div>
 </div>
 
@@ -2193,7 +2218,10 @@ footer::after{content:' · BUILD v63';color:var(--primary);opacity:.7}
 </div>
 
 <!-- ── Accuracy bar ── -->
-<div class="accuracy-bar" id="accuracy-bar" style="display:none"></div>
+<div id="track-record" style="display:none">
+  <div class="track-record-hd">📊 Track Record — affidabilità storica delle previsioni mattutine</div>
+  <div class="accuracy-bar" id="accuracy-bar"></div>
+</div>
 
 <!-- ── Backtest panel ── -->
 <div class="backtest-panel" id="backtest-panel" style="display:none">
@@ -2217,18 +2245,7 @@ footer::after{content:' · BUILD v63';color:var(--primary);opacity:.7}
 </div>
 
 <!-- ── Stats ── -->
-<div class="stats-bar">
-  <div class="stat-chip">Azioni <b id="s-total">—</b></div>
-  <div class="stat-chip">Score medio <b id="s-avg">—</b></div>
-  <div class="stat-chip">Top mover <b id="s-top">—</b></div>
-  <div class="stat-chip" id="streak-chip" style="display:none">🔥 Streak <b id="s-streak">0</b></div>
-</div>
-
-<!-- ── Screening ── -->
-<div class="screen-bar">
-  <button class="screen-toggle-btn" id="screen-toggle-btn" onclick="toggleScreening()">🔍 Screening</button>
-  <span id="screen-active-tag" style="display:none;font-size:.7rem;color:var(--primary);font-weight:600"></span>
-</div>
+<!-- ── Screening (pannello, aperto dal pulsante 🔍 Filtri nella toolbar) ── -->
 <div id="screening-panel" style="display:none">
   <div class="screen-sec">
     <div class="screen-lbl">RSI</div>
@@ -2954,20 +2971,9 @@ function scoreToText(d) {
   } catch(e) { return null; }
 }
 
-// ── Dark/Light toggle ──────────────────────────────────────────────────────
-function toggleTheme(){
-  const isDark=document.body.classList.toggle('dark');
-  localStorage.setItem('masker_theme', isDark?'dark':'light');
-  document.getElementById('theme-toggle').textContent = isDark?'☀️':'🌙';
-}
-(()=>{
-  // Dark è il default — applica light solo se l'utente ha scelto esplicitamente
-  if(localStorage.getItem('masker_theme') !== 'light'){
-    document.body.classList.add('dark');
-    const btn=document.getElementById('theme-toggle');
-    if(btn) btn.textContent='☀️';
-  }
-})();
+// ── Tema: terminale dark-only (toggle rimosso) ─────────────────────────────
+function toggleTheme(){}  // no-op (compat)
+document.body.classList.add('dark');
 async function initFX(){
   if(!_fxActive) return;
   try{const r=await fetch('/api/fx').then(r=>r.json());_fxRate=r.rate||0.92;}catch(_){_fxRate=0.92;}
@@ -3126,6 +3132,27 @@ async function loadSparklines(tickersCsv, data){
 // ══════════════════════════════════════════════════════════════════════════════
 // Build Card
 // ══════════════════════════════════════════════════════════════════════════════
+// ── "Perché" è nel top 10: motivo leggibile dai dati di qualità ──────────────
+function _cardWhy(d){
+  const p=[];
+  if(d.uptrend) p.push('📈 Uptrend solido');
+  else if(d.above_sma50) p.push('Sopra SMA50');
+  if(d.month_return!=null && d.month_return>8) p.push('+'+d.month_return.toFixed(0)+'% mese');
+  else if(d.week_return!=null && d.week_return>4) p.push('+'+d.week_return.toFixed(0)+'% settim.');
+  const rsi=d.rsi??50;
+  if(rsi>=45&&rsi<=65) p.push('RSI sano');
+  else if(rsi>75) p.push('⚠️ ipercomprato');
+  else if(rsi<30) p.push('⚠️ ipervenduto');
+  if((d.volatility??50)<35 && !p.some(x=>x.includes('⚠️'))) p.push('rischio contenuto');
+  if(d.is_ai) p.push('🤖 AI');
+  if(!p.length){
+    if((d.score_10??5)>=7) p.push('Segnali tecnici positivi');
+    else if((d.score_10??5)>=5) p.push('Setup neutro');
+    else p.push('Segnali deboli');
+  }
+  return p.slice(0,3).join(' · ');
+}
+
 function buildCard(d, rank){
   // Modalità serale: mostra il prezzo di chiusura e il delta dal mattino
   const isEvening = d.evening_price != null && d.delta_from_morning != null;
@@ -3142,12 +3169,15 @@ function buildCard(d, rank){
     : d.double_signal==='bear'
     ? `<span class="chip-ds bear">⚠️ ${d.bear_signals||2} segnali bear</span>` : '';
   const lvLabel = d.low_vol_alert ? `<span class="chip-lv">🔇 Calma anomala</span>` : '';
+  const earnChip = d.earnings_today ? `<span class="chip-earn">⚠️ EARNINGS OGGI</span>`
+    : (d.days_to_earnings!=null && d.days_to_earnings>=0 && d.days_to_earnings<=5) ? `<span class="chip-earn">⚠️ Earnings tra ${d.days_to_earnings}g</span>`
+    : (d.next_earnings_str ? `<span class="chip">📅 ${d.next_earnings_str}</span>` : '');
   const chipsHTML=[
+    earnChip,
     d.is_ai?`<span class="chip-ai">🤖 AI</span>`:'',
     dsLabel, lvLabel,
     d.risk_emoji?`<span class="chip">${d.risk_emoji} ${d.risk_level??''}</span>`:'',
     d.news_sentiment_emoji?`<span class="chip">${d.news_sentiment_emoji} ${d.news_sentiment_label??'Neutre'}</span>`:'',
-    d.next_earnings_str?`<span class="chip">📅 ${d.next_earnings_str}</span>`:'',
   ].join('');
 
   // "Cosa farei io" — trade setup (solo se score>=6)
@@ -3198,6 +3228,7 @@ function buildCard(d, rank){
       <div class="ms-cell"><span class="ms-k">VLT</span><span class="ms-v">${d.volatility!=null?d.volatility.toFixed(0)+'%':'—'}</span></div>
       <div class="ms-cell"><span class="ms-k">RNG</span><span class="ms-v">${d.trade_setup?Math.abs(d.trade_setup.stop_pct)+'/'+d.trade_setup.target_pct:'—'}</span></div>
     </div>
+    <div class="card-why">${_cardWhy(d)}</div>
     ${(()=>{const t=scoreToText(d);return t?`<div class="score-text">${t}</div>`:''})()}
     ${chipsHTML?`<div class="chips">${chipsHTML}</div>`:''}
     <div class="sparkline-wrap"><canvas class="sparkline"></canvas></div>
@@ -3958,9 +3989,17 @@ async function loadData(){
           const sig=full.signals?.slice(0,2).join(' · ');
           const vEl=card.querySelector('.verdict');
           if(vEl&&sig){vEl.textContent='🔍 '+sig;vEl.classList.add('show');}
-          if(!card.querySelector('.chips')?.innerHTML.includes('📅')&&full.next_earnings_str){
-            const chips=card.querySelector('.chips');
-            if(chips)chips.innerHTML+=`<span class="chip">📅 ${full.next_earnings_str}</span>`;
+          // Earnings: avviso ROSSO se imminente (rischio #1 per uno swing trade)
+          const cd=cardsData.find(c=>c.ticker===stock.ticker);
+          if(cd){ cd.next_earnings_str=full.next_earnings_str; cd.days_to_earnings=full.days_to_earnings; cd.earnings_today=full.earnings_today; }
+          let chips=card.querySelector('.chips');
+          if(!chips){ chips=document.createElement('div'); chips.className='chips'; (card.querySelector('.card-why')||card.querySelector('.metrics-strip'))?.after(chips); }
+          if(!chips.dataset.earn){
+            let eChip='';
+            if(full.earnings_today) eChip='<span class="chip-earn">⚠️ EARNINGS OGGI</span>';
+            else if(full.days_to_earnings!=null && full.days_to_earnings>=0 && full.days_to_earnings<=5) eChip='<span class="chip-earn">⚠️ Earnings tra '+full.days_to_earnings+'g</span>';
+            else if(full.next_earnings_str) eChip='<span class="chip">📅 '+full.next_earnings_str+'</span>';
+            if(eChip){ chips.insertAdjacentHTML('afterbegin', eChip); chips.dataset.earn='1'; }
           }
         }catch(_){}
       }, i*380);
@@ -6800,7 +6839,8 @@ async function loadAccuracy() {
       </div>
       ${byScoreHTML}
     `;
-    bar.style.display = 'flex';
+    const tr=document.getElementById('track-record');
+    if(tr) tr.style.display='block';
   } catch(e) { /* silenzioso */ }
 }
 

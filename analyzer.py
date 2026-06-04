@@ -765,6 +765,7 @@ def get_enriched_analysis(ticker: str) -> dict | None:
     # ── Earnings oggi + prossima data earnings ──
     earnings_today = False
     next_earnings_str = None
+    days_to_earnings = None
     try:
         stock = yf.Ticker(ticker.upper())
         cal = stock.calendar
@@ -790,6 +791,10 @@ def get_enriched_analysis(ticker: str) -> dict | None:
             _MESI = ["gen", "feb", "mar", "apr", "mag", "giu",
                      "lug", "ago", "set", "ott", "nov", "dic"]
             next_earnings_str = f"{nxt.day} {_MESI[nxt.month - 1]} {nxt.year}"
+            try:
+                days_to_earnings = (nxt - today).days
+            except Exception:
+                days_to_earnings = None
     except Exception:
         pass
 
@@ -845,6 +850,7 @@ def get_enriched_analysis(ticker: str) -> dict | None:
     base.update({
         "earnings_today": earnings_today,
         "next_earnings_str": next_earnings_str,
+        "days_to_earnings": days_to_earnings,
         "news_sentiment": news_sentiment,
         "news_sentiment_emoji": news_emoji,
         "news_sentiment_label": news_label,
