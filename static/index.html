@@ -1529,6 +1529,36 @@ header{border-top:2px solid var(--primary)!important}
   .radar-fig{grid-column:1/-1;margin-bottom:2px}
 }
 
+/* ── Trader Toolkit (position sizing + livelli) ───────────────────────────── */
+.tk-section{margin:14px 0;border:1px solid var(--border)}
+.tk-hd{font-family:var(--sans);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text);padding:9px 12px;background:var(--surf-v);border-bottom:1px solid var(--border)}
+.tk-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+@media(max-width:560px){.tk-grid{grid-template-columns:1fr}}
+.tk-card{background:var(--surf);padding:11px 13px}
+.tk-card-hd{font-family:var(--sans);font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin-bottom:9px}
+.tk-inputs{display:flex;gap:8px;margin-bottom:10px}
+.tk-lab{flex:1;font-size:.58rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);display:flex;flex-direction:column;gap:3px}
+.tk-inp{background:var(--surf-v);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:.82rem;padding:6px 8px;outline:none;border-radius:2px;width:100%}
+.tk-inp:focus{border-color:var(--primary)}
+.tk-out{display:flex;flex-direction:column;gap:5px}
+.tk-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.74rem;color:var(--text-dim)}
+.tk-row b{font-family:var(--mono);color:var(--text);font-weight:700}
+.tk-row.big b{font-size:1.25rem;color:var(--primary)}
+.tk-row b.risk{color:var(--gold)}
+.tk-note{font-size:.62rem;color:var(--gold);margin-top:4px}
+.tk-levels{display:flex;flex-direction:column;gap:1px;background:var(--border);border:1px solid var(--border)}
+.tk-load{padding:10px;font-size:.74rem;color:var(--text-dim);text-align:center}
+.tk-lvl{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:5px 9px;background:var(--surf);font-size:.72rem}
+.tk-lvl-k{color:var(--text-dim)}
+.tk-lvl-v{font-family:var(--mono);font-weight:700;color:var(--text)}
+.tk-lvl-d{font-family:var(--mono);font-size:.66rem;min-width:42px;text-align:right}
+.tk-lvl-d.up{color:var(--green-b)}.tk-lvl-d.down{color:var(--red-b)}
+.tk-lvl.cur{background:var(--surf-hi)}
+.tk-lvl.cur .tk-lvl-v{color:var(--primary)}
+.tk-lvl.res .tk-lvl-v{color:var(--red-b)}
+.tk-lvl.sup .tk-lvl-v{color:var(--green-b)}
+.tk-lvl.fib .tk-lvl-k{color:var(--gold);opacity:.85}
+
 /* ── Analizzatore AI completo (modal) ─────────────────────────────────────── */
 .deep-ai{margin:14px 0;border:1px solid var(--border-hi);background:var(--surf-v);border-left:3px solid var(--primary)}
 .deep-ai-loading{padding:14px;font-size:.82rem;color:var(--text-dim);text-align:center;animation:shimmer 1.6s infinite}
@@ -1612,7 +1642,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v65';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v66';color:var(--primary);opacity:.7}
 </style>
 </head>
 <body>
@@ -2446,6 +2476,8 @@ footer::after{content:' · BUILD v65';color:var(--primary);opacity:.7}
     <div id="rsi-container" style="display:none"></div>
     <div id="macd-container" style="display:none"></div>
     <div class="detail-grid" id="m-details"></div>
+    <!-- Trader Toolkit: position sizing + livelli tecnici -->
+    <div id="m-toolkit"></div>
     <!-- Score breakdown -->
     <div class="score-breakdown" id="m-score-breakdown" style="display:none"></div>
     <!-- Fondamentali -->
@@ -2873,6 +2905,92 @@ async function loadDeepAI(ticker){
       ${d.notizie?`<div class="deep-sec"><div class="deep-sec-k">📰 Notizie & contesto</div><div class="deep-sec-v">${d.notizie}</div></div>`:''}
       <div class="deep-disc">Analisi AI · Groq Llama 70B · non è consulenza finanziaria</div>`;
   }catch(e){ el.innerHTML='<div class="deep-ai-loading" style="color:var(--red-b)">⚠️ Errore analisi AI</div>'; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Trader Toolkit — Position Sizing + Livelli tecnici (S/R + Fibonacci)
+// ══════════════════════════════════════════════════════════════════════════════
+let _tkStock=null;
+function loadToolkit(stock){
+  _tkStock=stock;
+  const el=document.getElementById('m-toolkit'); if(!el) return;
+  const acct=localStorage.getItem('masker_account')||'10000';
+  const risk=localStorage.getItem('masker_risk')||'1';
+  el.innerHTML=`
+    <div class="tk-section">
+      <div class="tk-hd">🛠️ Trader Toolkit</div>
+      <div class="tk-grid">
+        <div class="tk-card">
+          <div class="tk-card-hd">💰 Position Sizing</div>
+          <div class="tk-inputs">
+            <label class="tk-lab">Capitale ($)<input class="tk-inp" id="tk-acct" type="number" min="0" value="${acct}" oninput="_tkCalc()"></label>
+            <label class="tk-lab">Rischio per trade (%)<input class="tk-inp" id="tk-risk" type="number" min="0.1" max="100" step="0.1" value="${risk}" oninput="_tkCalc()"></label>
+          </div>
+          <div class="tk-out" id="tk-pos-out"></div>
+        </div>
+        <div class="tk-card">
+          <div class="tk-card-hd">📐 Livelli Chiave</div>
+          <div class="tk-levels" id="tk-levels"><div class="tk-load">⏳ Calcolo livelli…</div></div>
+        </div>
+      </div>
+    </div>`;
+  _tkCalc();
+  _tkLevels(stock.ticker, stock.current_price);
+}
+
+function _tkCalc(){
+  const out=document.getElementById('tk-pos-out'); if(!out||!_tkStock) return;
+  const acct=parseFloat(document.getElementById('tk-acct').value)||0;
+  const riskPct=parseFloat(document.getElementById('tk-risk').value)||1;
+  localStorage.setItem('masker_account', acct); localStorage.setItem('masker_risk', riskPct);
+  const entry=_tkStock.trade_setup?.entry || _tkStock.current_price || 0;
+  let stop=_tkStock.trade_setup?.stop;
+  if(!stop || stop>=entry){ // stima stop dalla volatilità (o -5%)
+    const vol=_tkStock.volatility||40;
+    const stopPct=Math.max(0.03, Math.min(0.12, vol/100/Math.sqrt(252)*2));
+    stop=entry*(1-stopPct);
+  }
+  const riskPerShare=Math.max(entry-stop, entry*0.001);
+  const riskDollar=acct*riskPct/100;
+  let shares=Math.floor(riskDollar/riskPerShare);
+  let capped=false;
+  if(shares*entry>acct){ shares=Math.floor(acct/entry); capped=true; }
+  const posVal=shares*entry;
+  const realRisk=shares*riskPerShare;
+  const ccy=_tkStock.currency==='EUR'?'€':_tkStock.currency==='GBP'?'£':'$';
+  out.innerHTML=`
+    <div class="tk-row big"><span>Azioni da comprare</span><b>${shares.toLocaleString('it-IT')}</b></div>
+    <div class="tk-row"><span>Valore posizione</span><b>${ccy}${posVal.toLocaleString('it-IT',{maximumFractionDigits:0})}</b></div>
+    <div class="tk-row"><span>Capitale a rischio</span><b class="risk">${ccy}${realRisk.toLocaleString('it-IT',{maximumFractionDigits:0})} (${(acct>0?realRisk/acct*100:0).toFixed(1)}%)</b></div>
+    <div class="tk-row"><span>Entry / Stop</span><b>${ccy}${entry.toFixed(2)} / ${ccy}${stop.toFixed(2)}</b></div>
+    ${capped?'<div class="tk-note">⚠️ Size limitata dal capitale disponibile</div>':''}`;
+}
+
+async function _tkLevels(ticker, price){
+  const el=document.getElementById('tk-levels'); if(!el) return;
+  try{
+    const ohlc=await fetch(`/api/stock/${ticker}/ohlc?period=3mo&interval=1d`).then(r=>r.ok?r.json():[]);
+    if(!Array.isArray(ohlc)||ohlc.length<10){ el.innerHTML='<div class="tk-load">Dati livelli non disponibili</div>'; return; }
+    const highs=ohlc.map(o=>o.high), lows=ohlc.map(o=>o.low);
+    const recent=ohlc.slice(-40);
+    const resistance=Math.max(...recent.map(o=>o.high));
+    const support=Math.min(...recent.map(o=>o.low));
+    const hi=Math.max(...highs), lo=Math.min(...lows);
+    const cur=price||ohlc[ohlc.length-1].close;
+    const ccy=_tkStock?.currency==='EUR'?'€':_tkStock?.currency==='GBP'?'£':'$';
+    // Fibonacci retracement (dal minimo al massimo del periodo)
+    const fibs=[0.236,0.382,0.5,0.618].map(r=>({r,v:hi-(hi-lo)*r}));
+    const lvl=(label,val,cls)=>{
+      const dist=((val-cur)/cur*100);
+      return `<div class="tk-lvl ${cls}"><span class="tk-lvl-k">${label}</span><span class="tk-lvl-v">${ccy}${val.toFixed(2)}</span><span class="tk-lvl-d ${dist>=0?'up':'down'}">${dist>=0?'+':''}${dist.toFixed(1)}%</span></div>`;
+    };
+    el.innerHTML=
+      lvl('🔴 Resistenza', resistance, 'res')+
+      fibs.filter(f=>f.v>cur).slice(0,1).map(f=>lvl('Fib '+(f.r*100).toFixed(1)+'%', f.v,'fib')).join('')+
+      `<div class="tk-lvl cur"><span class="tk-lvl-k">⬤ Prezzo ora</span><span class="tk-lvl-v">${ccy}${cur.toFixed(2)}</span><span class="tk-lvl-d">—</span></div>`+
+      fibs.filter(f=>f.v<cur).slice(-1).map(f=>lvl('Fib '+(f.r*100).toFixed(1)+'%', f.v,'fib')).join('')+
+      lvl('🟢 Supporto', support, 'sup');
+  }catch(e){ el.innerHTML='<div class="tk-load">Errore livelli</div>'; }
 }
 
 // apre il modal di dettaglio per un ticker (cerca nei dati o fetch al volo)
@@ -3624,6 +3742,8 @@ async function openModal(stock){
 
   // Analizzatore AI completo (descrizione, verdetto, rischi, concorrenti, news)
   loadDeepAI(stock.ticker);
+  // Trader Toolkit (position sizing + livelli tecnici)
+  loadToolkit(stock);
 
   // Chart (con indicatori tecnici RSI / Bollinger)
   _renderChartWithIndicators(stock.ticker,_chartPeriod,_chartInterval,_chartType);
