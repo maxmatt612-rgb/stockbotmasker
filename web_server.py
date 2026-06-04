@@ -1418,6 +1418,93 @@ async def api_longterm(ticker: str):
     return data
 
 
+@app.get("/api/stock/{ticker}/deep")
+async def api_deep_analysis(ticker: str):
+    """Analizzatore AI completo: descrizione azienda, verdetto, perché, rischi,
+    concorrenti (con ticker cliccabili) e notizie. Cache 1h."""
+    t = ticker.upper()
+    key = f"deep:{t}"
+    if (c := _cached(key, 3600)) is not None:
+        return c
+    if not groq_client:
+        return JSONResponse({"error": "AI non disponibile"}, status_code=503)
+
+    data = await asyncio.to_thread(get_enriched_analysis, t)
+    if not data:
+        return JSONResponse({"error": "ticker non trovato"}, status_code=404)
+    data = _clean(data)
+
+    news_titles = (data.get("news") or [])[:4]
+    news_str = "\n".join(f"- {n}" for n in news_titles) or "Nessuna notizia recente disponibile."
+
+    prompt = (
+        f"Analizza il titolo {t} ({data.get('name', t)}).\n"
+        f"Prezzo: ${data.get('current_price', 0):.2f} ({data.get('day_change_pct', 0):+.1f}% oggi)\n"
+        f"Settore: {data.get('sector', 'N/D')}\n"
+        f"RSI: {data.get('rsi', 50):.0f} | Rischio: {data.get('risk_level', 'N/D')} | "
+        f"Volatilità: {data.get('volatility', 0):.0f}%\n"
+        f"Performance: settimana {(data.get('week_return') or 0):+.1f}%, mese {(data.get('month_return') or 0):+.1f}%\n"
+        f"Prossimi earnings: {data.get('next_earnings_str', 'N/D')}\n"
+        f"Notizie recenti:\n{news_str}\n\n"
+        "Rispondi SOLO in questo formato ESATTO, in ITALIANO, conciso e concreto:\n"
+        "DESCRIZIONE: [cosa fa l'azienda in 1-2 frasi semplici]\n"
+        "VERDETTO: COMPRA oppure VENDI oppure ASPETTA\n"
+        "CONFIDENZA: [numero intero 50-95]\n"
+        "PERCHE: [2 motivi concreti per questo verdetto]\n"
+        "RISCHI: [2 rischi specifici e reali]\n"
+        "CONCORRENTI: [3-4 aziende concorrenti, includi i TICKER in maiuscolo es: AMD, INTC, QCOM]\n"
+        "NOTIZIE: [1-2 frasi sulla situazione/notizie attuali del titolo]\n"
+    )
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=520,
+            messages=[
+                {"role": "system", "content": "Sei un analista finanziario esperto. Dai analisi complete ma concise, in italiano. Conosci bene i concorrenti delle aziende quotate. Sii diretto sul verdetto, niente giri di parole."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        sec = {"descrizione": "", "verdetto": "ASPETTA", "confidenza": 70,
+               "perche": "", "rischi": "", "concorrenti": "", "notizie": ""}
+        cur = None
+        for line in text.split("\n"):
+            l = line.strip()
+            lu = l.upper()
+            if lu.startswith("DESCRIZIONE:"):
+                sec["descrizione"] = l.split(":", 1)[1].strip(); cur = "descrizione"
+            elif lu.startswith("VERDETTO:"):
+                v = l.split(":", 1)[1].strip().upper()
+                sec["verdetto"] = "COMPRA" if "COMPRA" in v else ("VENDI" if "VENDI" in v else "ASPETTA")
+                cur = None
+            elif lu.startswith("CONFIDENZA:"):
+                try:
+                    sec["confidenza"] = max(50, min(95, int("".join(ch for ch in l if ch.isdigit())[:2] or "70")))
+                except Exception:
+                    pass
+                cur = None
+            elif lu.startswith("PERCHE") or lu.startswith("PERCHÉ"):
+                sec["perche"] = l.split(":", 1)[1].strip() if ":" in l else ""; cur = "perche"
+            elif lu.startswith("RISCHI:"):
+                sec["rischi"] = l.split(":", 1)[1].strip(); cur = "rischi"
+            elif lu.startswith("CONCORRENTI:"):
+                sec["concorrenti"] = l.split(":", 1)[1].strip(); cur = "concorrenti"
+            elif lu.startswith("NOTIZIE:"):
+                sec["notizie"] = l.split(":", 1)[1].strip(); cur = "notizie"
+            elif cur and l:
+                sec[cur] += " " + l
+
+        import re as _re
+        comp_tickers = [c for c in _re.findall(r'\b[A-Z]{2,5}\b', sec["concorrenti"]) if c != t]
+        # dedup preservando ordine
+        comp_tickers = list(dict.fromkeys(comp_tickers))[:5]
+        result = {**sec, "concorrenti_tickers": comp_tickers, "ticker": t, "name": data.get("name", t)}
+        _store(key, result)
+        return result
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.get("/api/stock/{ticker}/why-today")
 async def api_why_today(ticker: str):
     """3 bullet points: perché il titolo si è mosso oggi (AI, cached 30 min)."""

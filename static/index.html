@@ -1529,6 +1529,29 @@ header{border-top:2px solid var(--primary)!important}
   .radar-fig{grid-column:1/-1;margin-bottom:2px}
 }
 
+/* ── Analizzatore AI completo (modal) ─────────────────────────────────────── */
+.deep-ai{margin:14px 0;border:1px solid var(--border-hi);background:var(--surf-v);border-left:3px solid var(--primary)}
+.deep-ai-loading{padding:14px;font-size:.82rem;color:var(--text-dim);text-align:center;animation:shimmer 1.6s infinite}
+.deep-ai-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 13px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.deep-ai-title{font-family:var(--sans);font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text)}
+.deep-verdict{font-family:var(--sans);font-size:.78rem;font-weight:800;letter-spacing:.04em;padding:4px 11px;border:1px solid}
+.deep-verdict.buy{color:var(--green-b);border-color:rgba(0,217,163,.5);background:rgba(0,179,125,.12)}
+.deep-verdict.sell{color:var(--red-b);border-color:rgba(255,77,109,.5);background:rgba(232,74,95,.12)}
+.deep-verdict.wait{color:var(--gold);border-color:rgba(240,180,41,.5);background:rgba(240,180,41,.1)}
+.deep-desc{padding:11px 13px;font-size:.85rem;line-height:1.5;color:var(--text);border-bottom:1px solid var(--border)}
+.deep-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+@media(max-width:520px){.deep-grid{grid-template-columns:1fr}}
+.deep-sec{background:var(--surf-v);padding:10px 13px}
+.deep-grid .deep-sec{border-bottom:1px solid var(--border)}
+.deep-sec-k{font-family:var(--sans);font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--green-b);margin-bottom:5px}
+.deep-sec-k.risk{color:var(--red-b)}
+.deep-sec-v{font-size:.8rem;line-height:1.5;color:var(--text-dim)}
+.deep-comps{display:flex;gap:6px;flex-wrap:wrap}
+.deep-comp{font-family:var(--mono);font-size:.74rem;font-weight:700;color:#5b9dff;border:1px solid rgba(41,121,255,.45);
+  background:rgba(41,121,255,.08);padding:3px 9px;cursor:pointer;transition:all .12s}
+.deep-comp:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
+.deep-disc{font-size:.58rem;color:var(--text-dim);opacity:.7;padding:8px 13px;text-transform:uppercase;letter-spacing:.04em;text-align:center}
+
 /* ── Track Record ─────────────────────────────────────────────────────────── */
 #track-record{padding:12px 14px 4px;border-bottom:1px solid var(--border)}
 @media(min-width:900px){#track-record{padding:14px 28px 6px}}
@@ -1589,7 +1612,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v64';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v65';color:var(--primary);opacity:.7}
 </style>
 </head>
 <body>
@@ -2396,6 +2419,10 @@ footer::after{content:' · BUILD v64';color:var(--primary);opacity:.7}
       <div class="modal-price" id="m-price">—</div>
       <div class="price-chg" id="m-chg"></div>
     </div>
+    <!-- Analizzatore AI completo -->
+    <div id="deep-ai" class="deep-ai">
+      <div class="deep-ai-loading">🧠 Analisi AI in corso…</div>
+    </div>
     <div class="chart-controls">
       <div class="chart-tf-group" id="chart-tf-group">
         <button class="chart-tf-btn" data-tf="1G" data-p="1d"  data-i="5m">1G</button>
@@ -2818,6 +2845,34 @@ function _dismissVipAlert(){
     const key=_vipAlertItem.figure+'|'+_vipAlertItem.ticker+'|'+(_vipAlertItem.title||'').slice(0,40);
     try{ localStorage.setItem('masker_vip_dismissed', key); }catch(_){}
   }
+}
+
+// ── Analizzatore AI completo (descrizione, verdetto, rischi, concorrenti, news) ──
+async function loadDeepAI(ticker){
+  const el=document.getElementById('deep-ai');
+  if(!el) return;
+  el.innerHTML='<div class="deep-ai-loading">🧠 Analisi AI completa in corso…</div>';
+  try{
+    const d=await fetch('/api/stock/'+ticker+'/deep').then(r=>r.ok?r.json():null);
+    if(!d||d.error){ el.innerHTML='<div class="deep-ai-loading" style="color:var(--text-dim)">🧠 Analisi AI non disponibile</div>'; return; }
+    const v=d.verdetto||'ASPETTA';
+    const vCls=v==='COMPRA'?'buy':v==='VENDI'?'sell':'wait';
+    const vIcon=v==='COMPRA'?'📈':v==='VENDI'?'📉':'⏳';
+    const comp=(d.concorrenti_tickers||[]).map(c=>`<span class="deep-comp" onclick="openTickerModal('${c}');event.stopPropagation()">${c}</span>`).join('');
+    el.innerHTML=`
+      <div class="deep-ai-hd">
+        <span class="deep-ai-title">🧠 Analizzatore AI</span>
+        <span class="deep-verdict ${vCls}">${vIcon} ${v} · ${d.confidenza||70}%</span>
+      </div>
+      ${d.descrizione?`<div class="deep-desc">${d.descrizione}</div>`:''}
+      <div class="deep-grid">
+        ${d.perche?`<div class="deep-sec"><div class="deep-sec-k">✅ Perché</div><div class="deep-sec-v">${d.perche}</div></div>`:''}
+        ${d.rischi?`<div class="deep-sec"><div class="deep-sec-k risk">⚠️ Rischi</div><div class="deep-sec-v">${d.rischi}</div></div>`:''}
+      </div>
+      ${comp?`<div class="deep-sec"><div class="deep-sec-k">⚔️ Concorrenti</div><div class="deep-comps">${comp}</div></div>`:''}
+      ${d.notizie?`<div class="deep-sec"><div class="deep-sec-k">📰 Notizie & contesto</div><div class="deep-sec-v">${d.notizie}</div></div>`:''}
+      <div class="deep-disc">Analisi AI · Groq Llama 70B · non è consulenza finanziaria</div>`;
+  }catch(e){ el.innerHTML='<div class="deep-ai-loading" style="color:var(--red-b)">⚠️ Errore analisi AI</div>'; }
 }
 
 // apre il modal di dettaglio per un ticker (cerca nei dati o fetch al volo)
@@ -3566,6 +3621,9 @@ async function openModal(stock){
   document.getElementById('m-verdict').textContent='';
   document.getElementById('m-score-hist').style.display='none';
   renderScoreBreakdown(stock.score_breakdown ?? null);
+
+  // Analizzatore AI completo (descrizione, verdetto, rischi, concorrenti, news)
+  loadDeepAI(stock.ticker);
 
   // Chart (con indicatori tecnici RSI / Bollinger)
   _renderChartWithIndicators(stock.ticker,_chartPeriod,_chartInterval,_chartType);
