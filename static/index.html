@@ -1723,7 +1723,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v71';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v72';color:var(--primary);opacity:.7}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
@@ -1811,6 +1811,98 @@ footer{color:var(--text-dim)}
 ::-webkit-scrollbar{width:11px;height:11px}
 ::-webkit-scrollbar-thumb{background:#1e2c40;border:3px solid var(--bg);border-radius:6px}
 ::-webkit-scrollbar-thumb:hover{background:#2a3a52}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   REDESIGN + MOTION — look animato premium (vince su tutto, ultimo nel foglio)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Sfondo aurora animato ────────────────────────────────────────────────── */
+body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(38% 30% at 12% 8%,rgba(59,130,246,.13),transparent 70%),
+    radial-gradient(34% 28% at 88% 4%,rgba(31,217,155,.08),transparent 70%),
+    radial-gradient(45% 40% at 50% 108%,rgba(124,99,255,.08),transparent 70%);
+  animation:aurora 20s ease-in-out infinite alternate}
+@keyframes aurora{0%{transform:translate3d(0,0,0) scale(1);opacity:.85}100%{transform:translate3d(2%,-3%,0) scale(1.12);opacity:1}}
+
+/* ── Glass panels: superfici semitrasparenti + blur + glow accento ────────── */
+.cmd-chart-panel,.cmd-strat-panel,.sector-panel,.deep-ai,.tk-section,.movers-region,
+.backtest-panel,.wl-judge-card,.port-pie-card{
+  background:rgba(14,21,31,.72)!important;backdrop-filter:blur(14px) saturate(1.15);
+  -webkit-backdrop-filter:blur(14px) saturate(1.15);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 8px 30px rgba(0,0,0,.35)!important}
+.cmd-chart-panel::before,.cmd-strat-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--primary),transparent);opacity:.55}
+.cmd-chart-panel,.cmd-strat-panel{position:relative;overflow:hidden}
+.modal-sheet{background:rgba(13,20,30,.92)!important;backdrop-filter:blur(20px) saturate(1.2)!important}
+
+/* ── Entrate scaglionate ──────────────────────────────────────────────────── */
+@media (prefers-reduced-motion:no-preference){
+  .sentiment-bar,.cmd-stats,.cmd-main,.sector-panel,.signals-panel,.controls-bar,
+  #radar-body,.briefing-section,.port-summary{animation:revealUp .55s cubic-bezier(.22,1,.36,1) both}
+  .cmd-main{animation-delay:.06s}.sector-panel{animation-delay:.1s}.signals-panel{animation-delay:.14s}
+  /* le viste si dissolvono quando attivate */
+  #live-view,#radar-view,#portfolio-view,#history-view,#briefing-view{animation:viewFade .45s ease both}
+}
+@keyframes revealUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes viewFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes cardIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
+
+/* ── Card: hover lift + glow, score ring entrata ──────────────────────────── */
+.cmd-strat-panel .card{transition:background .15s ease,box-shadow .25s ease,transform .2s cubic-bezier(.22,1,.36,1)!important}
+.cmd-strat-panel .card:hover{transform:translateX(2px);box-shadow:inset 0 0 0 1px rgba(59,130,246,.25),0 6px 24px rgba(0,0,0,.4)!important;z-index:2}
+.cmd-strat-panel .card.sel{box-shadow:inset 0 0 0 1px var(--primary),-2px 0 14px rgba(59,130,246,.3)!important}
+.score-ring{animation:ringPop .55s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes ringPop{from{opacity:0;transform:scale(.4) rotate(-30deg)}to{opacity:1;transform:none}}
+.score-ring.s-hi{box-shadow:0 0 16px rgba(31,217,155,.3)!important}
+.score-ring.s-lo{box-shadow:0 0 16px rgba(255,93,120,.25)!important}
+
+/* ── Live dot / pulse raffinati ───────────────────────────────────────────── */
+.live-dot,.refresh-pill .live-dot{box-shadow:0 0 0 0 rgba(31,217,155,.55);animation:livePulse 2s infinite}
+@keyframes livePulse{0%{box-shadow:0 0 0 0 rgba(31,217,155,.55)}70%{box-shadow:0 0 0 9px rgba(31,217,155,0)}100%{box-shadow:0 0 0 0 rgba(31,217,155,0)}}
+
+/* ── Logo: shimmer ────────────────────────────────────────────────────────── */
+.logo span{background:linear-gradient(90deg,var(--text) 30%,var(--primary-2) 50%,var(--text) 70%);
+  background-size:200% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  animation:shimmer 6s linear infinite}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ── Pulsanti: glow su hover ──────────────────────────────────────────────── */
+.ctrl-btn,.tab-btn,.cmd-tf button,.chart-tf-btn,.ai-explain-btn,.deep-comp,.cmd-detail-btn,.screen-toggle-btn{
+  transition:all .18s cubic-bezier(.22,1,.36,1)!important}
+.ctrl-btn:hover,.cmd-tf button:hover,.chart-tf-btn:hover{box-shadow:0 0 0 2px var(--primary-dim)!important;transform:translateY(-1px)}
+.tab-btn.active{text-shadow:0 0 12px rgba(59,130,246,.5)}
+.deep-comp:hover{box-shadow:0 0 14px rgba(59,130,246,.4)!important;transform:translateY(-1px)}
+
+/* ── Sentiment marker glow + slide ────────────────────────────────────────── */
+.sent-marker{box-shadow:0 0 10px rgba(255,255,255,.8);transition:left .8s cubic-bezier(.22,1,.36,1)}
+
+/* ── Modal entrata raffinata ──────────────────────────────────────────────── */
+.modal-overlay.open .modal-sheet{animation:modalIn .4s cubic-bezier(.22,1,.36,1) both}
+@keyframes modalIn{from{opacity:0;transform:translateY(24px) scale(.97)}to{opacity:1;transform:none}}
+
+/* ── Verdetto AI: glow pulsante ───────────────────────────────────────────── */
+.deep-verdict.buy{animation:glowBuy 2.4s ease-in-out infinite}
+.deep-verdict.sell{animation:glowSell 2.4s ease-in-out infinite}
+@keyframes glowBuy{0%,100%{box-shadow:0 0 0 0 rgba(31,217,155,0)}50%{box-shadow:0 0 16px rgba(31,217,155,.35)}}
+@keyframes glowSell{0%,100%{box-shadow:0 0 0 0 rgba(255,93,120,0)}50%{box-shadow:0 0 16px rgba(255,93,120,.35)}}
+
+/* ── Flash prezzo all'aggiornamento (via classe JS) ───────────────────────── */
+.price-val.flash-up{animation:flashUp .8s ease}
+.price-val.flash-down{animation:flashDown .8s ease}
+@keyframes flashUp{0%{color:var(--green-b);text-shadow:0 0 12px rgba(31,217,155,.6)}100%{}}
+@keyframes flashDown{0%{color:var(--red-b);text-shadow:0 0 12px rgba(255,93,120,.6)}100%{}}
+
+/* ── Tape: dissolvenza ai bordi ───────────────────────────────────────────── */
+.tape-scroll-wrap{-webkit-mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent)}
+
+/* numeri animati: stile cursore */
+.cstat-v.counting{color:var(--primary-2)}
+
+@media (prefers-reduced-motion:reduce){
+  body::after,.score-ring,.live-dot,.logo span,.deep-verdict.buy,.deep-verdict.sell{animation:none!important}
+}
 </style>
 </head>
 <body>
@@ -3697,9 +3789,15 @@ function renderCards(data){
     grid.innerHTML='<div class="empty-state"><span class="icon">🔍</span>Nessuna azione corrisponde ai filtri</div>';
     return;
   }
+  const animate = !window._cardsShownOnce && !window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  window._cardsShownOnce=true;
   const frag=document.createDocumentFragment();
   data.forEach((d,i)=>{
-    try{ frag.appendChild(buildCard(d,i+1)); }
+    try{
+      const c=buildCard(d,i+1);
+      if(animate) c.style.animation=`cardIn .5s ${(i*0.045).toFixed(2)}s cubic-bezier(.22,1,.36,1) both`;
+      frag.appendChild(c);
+    }
     catch(e){ console.error('[buildCard]',d?.ticker,e); }
   });
   grid.appendChild(frag);
