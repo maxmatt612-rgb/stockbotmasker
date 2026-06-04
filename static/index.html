@@ -1470,12 +1470,14 @@ header{border-top:2px solid var(--primary)!important}
 .cmd-chart{height:380px;width:100%;position:relative}
 .cmd-chart-load{height:380px;display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:.76rem;font-family:var(--sans)}
 /* la griglia card diventa la lista strategia (1 colonna, scrollabile) */
-.cmd-strat-panel #grid{padding:0!important;gap:1px!important;background:var(--border)!important;
+.cmd-strat-panel #grid{padding:9px!important;gap:9px!important;background:transparent!important;
   grid-template-columns:1fr!important;border-top:none!important;overflow-y:auto;max-height:412px}
 .cmd-strat-panel .card.sel{background:var(--surf-hi)!important}
 .cmd-strat-panel .card.sel::before{width:3px;background:var(--primary)!important}
-/* card DENSE nel pannello laterale (riga watchlist scansionabile) */
-.cmd-strat-panel .card{padding:8px 12px!important}
+/* card DENSE nel pannello laterale (riga watchlist scansionabile) — ognuna separata */
+.cmd-strat-panel .card{padding:11px 13px!important;border:1px solid var(--border)!important}
+.cmd-strat-panel .card:hover{border-color:var(--border-hi)!important}
+.cmd-strat-panel .card.sel{border-color:var(--primary)!important}
 .cmd-strat-panel .card .sparkline-wrap,
 .cmd-strat-panel .card .trade-setup,
 .cmd-strat-panel .card .why-today-btn,
@@ -1723,7 +1725,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v72';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v73';color:var(--primary);opacity:.7}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
