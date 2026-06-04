@@ -1529,6 +1529,19 @@ header{border-top:2px solid var(--primary)!important}
   .radar-fig{grid-column:1/-1;margin-bottom:2px}
 }
 
+/* ── Composizione settoriale ──────────────────────────────────────────────── */
+.sector-panel{margin:0 0 16px;border:1px solid var(--border);background:var(--surf)}
+@media(min-width:900px){.sector-panel{margin:0 28px 16px}}
+.sector-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);
+  font-family:var(--sans);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text)}
+.sector-warn{font-size:.62rem;color:var(--gold);font-weight:700;display:none;text-transform:none;letter-spacing:0}
+.sector-bar{display:flex;height:14px;margin:11px 12px 9px;gap:1px;background:var(--bg)}
+.sector-seg{height:100%;transition:width .5s ease;min-width:2px}
+.sector-legend{display:flex;flex-wrap:wrap;gap:12px;padding:0 12px 11px}
+.sector-leg{display:flex;align-items:center;gap:5px;font-family:var(--sans);font-size:.66rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.03em}
+.sector-leg i{width:9px;height:9px;flex-shrink:0}
+.sector-leg b{font-family:var(--mono);color:var(--text);margin-left:2px}
+
 /* ── Market Sentiment gauge (Fear & Greed) ────────────────────────────────── */
 .sentiment-bar{display:flex;align-items:center;gap:12px;padding:8px 12px;margin-bottom:1px;
   background:var(--surf);border:1px solid var(--border)}
@@ -1656,7 +1669,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v67';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v68';color:var(--primary);opacity:.7}
 </style>
 </head>
 <body>
@@ -2435,6 +2448,13 @@ footer::after{content:' · BUILD v67';color:var(--primary);opacity:.7}
 </section>
 
 <!-- ── Tabella segnali (blotter) ── -->
+<!-- Composizione settoriale del top 10 -->
+<section class="sector-panel" id="sector-panel" style="display:none">
+  <div class="sector-hd"><span>🏭 Composizione settoriale · Top 10</span><span class="sector-warn" id="sector-warn"></span></div>
+  <div class="sector-bar" id="sector-bar"></div>
+  <div class="sector-legend" id="sector-legend"></div>
+</section>
+
 <section class="signals-panel" id="signals-panel" style="display:none">
   <div class="signals-panel-hd">
     <span class="signals-panel-title">▦ Top Signals — Blotter</span>
@@ -3014,6 +3034,31 @@ async function _tkLevels(ticker, price){
       fibs.filter(f=>f.v<cur).slice(-1).map(f=>lvl('Fib '+(f.r*100).toFixed(1)+'%', f.v,'fib')).join('')+
       lvl('🟢 Supporto', support, 'sup');
   }catch(e){ el.innerHTML='<div class="tk-load">Errore livelli</div>'; }
+}
+
+// ── Composizione settoriale del top 10 (concentrazione) ──────────────────────
+const _SECTOR_IT={'Technology':'Tech','Healthcare':'Salute','Financial Services':'Finanza','Consumer Cyclical':'Consumi cicl.','Consumer Defensive':'Consumi dif.','Energy':'Energia','Industrials':'Industria','Communication Services':'Comunicaz.','Basic Materials':'Materiali','Real Estate':'Immobiliare','Utilities':'Utility'};
+const _SECTOR_COL={'Technology':'#2979ff','Healthcare':'#00d9a3','Financial Services':'#f0b429','Consumer Cyclical':'#a855f7','Consumer Defensive':'#10b981','Energy':'#ff6b35','Industrials':'#5b9dff','Communication Services':'#ec4899','Basic Materials':'#94a3b8','Real Estate':'#22d3ee','Utilities':'#84cc16'};
+function _renderSectors(){
+  const panel=document.getElementById('sector-panel'); if(!panel) return;
+  const counts={};
+  let known=0;
+  cardsData.forEach(c=>{ if(c.sector){ counts[c.sector]=(counts[c.sector]||0)+1; known++; } });
+  if(known<3){ return; } // aspetta abbastanza dati dall'arricchimento
+  const total=known;
+  const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const bar=sorted.map(([s,n])=>{
+    const pct=n/total*100;
+    return `<div class="sector-seg" style="width:${pct}%;background:${_SECTOR_COL[s]||'#64748b'}" title="${_SECTOR_IT[s]||s}: ${n}"></div>`;
+  }).join('');
+  const legend=sorted.map(([s,n])=>`<span class="sector-leg"><i style="background:${_SECTOR_COL[s]||'#64748b'}"></i>${_SECTOR_IT[s]||s} <b>${Math.round(n/total*100)}%</b></span>`).join('');
+  document.getElementById('sector-bar').innerHTML=bar;
+  document.getElementById('sector-legend').innerHTML=legend;
+  const top=sorted[0];
+  const warn=document.getElementById('sector-warn');
+  if(top && top[1]/total>=0.5){ warn.textContent='⚠️ Concentrato su '+(_SECTOR_IT[top[0]]||top[0]); warn.style.display='inline'; }
+  else warn.style.display='none';
+  panel.style.display='block';
 }
 
 // apre il modal di dettaglio per un ticker (cerca nei dati o fetch al volo)
@@ -4218,7 +4263,7 @@ async function loadData(){
           if(vEl&&sig){vEl.textContent='🔍 '+sig;vEl.classList.add('show');}
           // Earnings: avviso ROSSO se imminente (rischio #1 per uno swing trade)
           const cd=cardsData.find(c=>c.ticker===stock.ticker);
-          if(cd){ cd.next_earnings_str=full.next_earnings_str; cd.days_to_earnings=full.days_to_earnings; cd.earnings_today=full.earnings_today; }
+          if(cd){ cd.next_earnings_str=full.next_earnings_str; cd.days_to_earnings=full.days_to_earnings; cd.earnings_today=full.earnings_today; cd.sector=full.sector; _renderSectors(); }
           let chips=card.querySelector('.chips');
           if(!chips){ chips=document.createElement('div'); chips.className='chips'; (card.querySelector('.card-why')||card.querySelector('.metrics-strip'))?.after(chips); }
           if(!chips.dataset.earn){
