@@ -1725,7 +1725,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v73';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v74';color:var(--primary);opacity:.7}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
@@ -1905,6 +1905,25 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 @media (prefers-reduced-motion:reduce){
   body::after,.score-ring,.live-dot,.logo span,.deep-verdict.buy,.deep-verdict.sell{animation:none!important}
 }
+
+/* ── Coerenza su TUTTE le viste: Radar, Storico, Portfolio, Mercati ────────── */
+.radar-item,.hcard,.vport-pos-card,.lb-item,.eco-item,.earnings-item,.mover-row{
+  transition:background .15s ease,box-shadow .2s ease,transform .18s cubic-bezier(.22,1,.36,1)!important}
+.radar-item:hover,.hcard:hover{box-shadow:inset 0 0 0 1px rgba(59,130,246,.22),0 6px 22px rgba(0,0,0,.35)!important;transform:translateY(-1px)}
+.lb-item:hover,.vport-pos-card:hover,.mover-row:hover{background:var(--surf-hi)!important}
+.hcard{background:rgba(14,21,31,.72)!important;backdrop-filter:blur(12px) saturate(1.1);border:1px solid var(--border)!important}
+@media (prefers-reduced-motion:no-preference){
+  .radar-item{animation:revealUp .5s cubic-bezier(.22,1,.36,1) both}
+  .radar-item:nth-child(2){animation-delay:.04s}.radar-item:nth-child(3){animation-delay:.08s}
+  .radar-item:nth-child(4){animation-delay:.12s}.radar-item:nth-child(5){animation-delay:.16s}
+  .hcard{animation:revealUp .5s cubic-bezier(.22,1,.36,1) both}
+}
+/* Briefing: sezioni rifinite */
+.briefing-section{transition:background .15s ease}
+.briefing-idx{background:rgba(14,21,31,.7)!important;backdrop-filter:blur(8px);border:1px solid var(--border)!important}
+.briefing-mood{box-shadow:0 0 14px rgba(59,130,246,.12)}
+/* Portfolio: pannelli glass */
+.port-stat,.port-pie-card{background:rgba(14,21,31,.72)!important;backdrop-filter:blur(12px) saturate(1.1)}
 </style>
 </head>
 <body>
