@@ -1829,7 +1829,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v77';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v78';color:var(--primary);opacity:.7}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
@@ -2028,6 +2028,20 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .briefing-mood{box-shadow:0 0 14px rgba(59,130,246,.12)}
 /* Portfolio: pannelli glass */
 .port-stat,.port-pie-card{background:rgba(14,21,31,.72)!important;backdrop-filter:blur(12px) saturate(1.1)}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PERFORMANCE — via i backdrop-filter (causa lag/scatti nello scroll).
+   I pannelli restano belli ma con sfondo solido invece del blur live.
+   ═══════════════════════════════════════════════════════════════════════════ */
+*{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.modal-overlay,.modal-sheet,.search-dropdown,.cmp-overlay,.cmp-box{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.modal-overlay{background:rgba(3,6,11,.86)!important}
+.cmd-chart-panel,.cmd-strat-panel,.sector-panel,.deep-ai,.tk-section,.movers-region,
+.rep,.timing-card,.lmov-panel,.hcard,.briefing-idx,.port-stat,.port-pie-card,
+.backtest-panel,.wl-judge-card{background:var(--surf)!important}
+.modal-sheet{background:linear-gradient(180deg,#10172230,#0c121c)!important;background-color:#0d141e!important}
+/* aurora: compositing GPU, niente repaint */
+body::after{will-change:transform;animation-duration:30s}
 </style>
 </head>
 <body>
@@ -3641,6 +3655,7 @@ async function openTickerModal(tk){
 // ══════════════════════════════════════════════════════════════════════════════
 (function(){
   try {
+  return; // DISABILITATO per performance — lo sfondo ora è l'aurora CSS (niente loop RAF)
   if (typeof THREE === 'undefined') return; // CDN non caricato — skip silenzioso
   const canvas = document.getElementById('bg-canvas');
   const mob = innerWidth < 640;
@@ -3842,7 +3857,7 @@ function updateMarketStatus(){
   if(_lbl){_lbl.style.color=us.color;_lbl.textContent=us.label;}
   if(_tim){_tim.textContent='NYSE '+us.ts;}
 }
-setInterval(updateMarketStatus, 1000); // ogni secondo per l'orologio live
+setInterval(updateMarketStatus, 20000); // ogni 20s (mostra HH:MM, non servono i secondi)
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Infinite scroll ticker — CSS animation, contenuto duplicato per loop seamless
