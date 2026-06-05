@@ -1418,6 +1418,108 @@ async def api_longterm(ticker: str):
     return data
 
 
+@app.get("/api/stock/{ticker}/timing")
+async def api_timing(ticker: str):
+    """Tool di TIMING: dato un ticker, analizza i tecnici e dice QUANDO entrare
+    long e quando short (entra ora / aspetta pullback / aspetta conferma). Cache 30 min."""
+    t = ticker.upper()
+    key = f"timing:{t}"
+    if (c := _cached(key, 1800)) is not None:
+        return c
+
+    data = await asyncio.to_thread(get_enriched_analysis, t)
+    if not data:
+        return JSONResponse({"error": "Ticker non trovato"}, status_code=404)
+    data = _clean(data)
+
+    # Supporto / Resistenza recenti
+    def _sr():
+        import yfinance as yf
+        try:
+            h = yf.Ticker(t).history(period="3mo")
+            if h.empty or len(h) < 10:
+                return None, None
+            recent = h.tail(40)
+            return float(recent["Low"].min()), float(recent["High"].max())
+        except Exception:
+            return None, None
+    support, resistance = await asyncio.to_thread(_sr)
+
+    cur = data.get("current_price", 0) or 0
+    rsi = data.get("rsi", 50) or 50
+    sma20 = data.get("sma_20")
+    sma50 = data.get("sma_50")
+    name = data.get("name", t)
+    ccy = data.get("currency", "USD")
+    dist_sup = round((cur - support) / cur * 100, 1) if (support and cur) else None
+    dist_res = round((resistance - cur) / cur * 100, 1) if (resistance and cur) else None
+
+    if not groq_client:
+        # Fallback rule-based se l'AI non è disponibile
+        if rsi < 35:
+            verdetto, lt, st = "MEGLIO LONG", "Entra ora o su rimbalzo (RSI ipervenduto)", "Aspetta un rimbalzo verso la resistenza"
+        elif rsi > 70:
+            verdetto, lt, st = "MEGLIO SHORT", "Aspetta un pullback verso il supporto", "Entra ora o su debolezza (RSI ipercomprato)"
+        else:
+            verdetto, lt, st = "ASPETTARE", "Aspetta conferma sopra la resistenza", "Aspetta conferma sotto il supporto"
+        result = {"ticker": t, "name": name, "currency": ccy, "price": cur,
+                  "rsi": round(rsi), "support": support, "resistance": resistance,
+                  "verdetto": verdetto, "long_timing": lt, "long_motivo": "",
+                  "short_timing": st, "short_motivo": "", "livello": resistance or cur,
+                  "ai": False}
+        _store(key, result)
+        return result
+
+    sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+    prompt = (
+        f"Analisi di TIMING di trading per {t} ({name}).\n"
+        f"Prezzo attuale: {sym}{cur:.2f}\n"
+        f"RSI(14): {rsi:.0f}  |  Volatilità: {data.get('volatility',0):.0f}%\n"
+        f"Media 20gg: {('%.2f'%sma20) if sma20 else 'N/D'} | Media 50gg: {('%.2f'%sma50) if sma50 else 'N/D'}\n"
+        f"Performance: settimana {(data.get('week_return') or 0):+.1f}%, mese {(data.get('month_return') or 0):+.1f}%\n"
+        f"Supporto recente: {('%.2f'%support) if support else 'N/D'} ({dist_sup}% sotto) | "
+        f"Resistenza recente: {('%.2f'%resistance) if resistance else 'N/D'} ({dist_res}% sopra)\n"
+        f"Segnali: {', '.join((data.get('signals') or [])[:3]) or 'nessuno'}\n\n"
+        "Dimmi QUANDO conviene entrare. Rispondi SOLO in questo formato ESATTO, ITALIANO, conciso:\n"
+        "VERDETTO: [MEGLIO LONG oppure MEGLIO SHORT oppure ASPETTARE]\n"
+        "LONG_TIMING: [quando entrare LONG: es 'Ora' / 'Aspetta pullback verso "+sym+"X' / 'Aspetta 2-3 giorni' / 'Aspetta rottura sopra "+sym+"X']\n"
+        "LONG_MOTIVO: [1 frase breve]\n"
+        "SHORT_TIMING: [quando entrare SHORT, stesso stile]\n"
+        "SHORT_MOTIVO: [1 frase breve]\n"
+        "LIVELLO: [il prezzo chiave da sorvegliare, solo numero]\n"
+    )
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile", max_tokens=320,
+            messages=[
+                {"role": "system", "content": "Sei un trader tecnico esperto di market timing. Dai indicazioni concrete su QUANDO entrare (ora, aspetta un pullback a un prezzo, aspetta una rottura, aspetta N giorni). Conciso, in italiano. Le previsioni sono incerte."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        out = {"verdetto": "ASPETTARE", "long_timing": "", "long_motivo": "",
+               "short_timing": "", "short_motivo": "", "livello": resistance or cur}
+        for line in text.split("\n"):
+            l = line.strip()
+            lu = l.upper()
+            if lu.startswith("VERDETTO:"):
+                v = l.split(":", 1)[1].strip().upper()
+                out["verdetto"] = "MEGLIO LONG" if "LONG" in v else ("MEGLIO SHORT" if "SHORT" in v else "ASPETTARE")
+            elif lu.startswith("LONG_TIMING:"): out["long_timing"] = l.split(":", 1)[1].strip()
+            elif lu.startswith("LONG_MOTIVO:"): out["long_motivo"] = l.split(":", 1)[1].strip()
+            elif lu.startswith("SHORT_TIMING:"): out["short_timing"] = l.split(":", 1)[1].strip()
+            elif lu.startswith("SHORT_MOTIVO:"): out["short_motivo"] = l.split(":", 1)[1].strip()
+            elif lu.startswith("LIVELLO:"):
+                try: out["livello"] = float("".join(ch for ch in l.split(":",1)[1] if (ch.isdigit() or ch=="." )) or cur)
+                except Exception: pass
+        result = {"ticker": t, "name": name, "currency": ccy, "price": cur,
+                  "rsi": round(rsi), "support": support, "resistance": resistance, "ai": True, **out}
+        _store(key, result)
+        return result
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.get("/api/stock/{ticker}/deep")
 async def api_deep_analysis(ticker: str):
     """Analizzatore AI completo: descrizione azienda, verdetto, perché, rischi,

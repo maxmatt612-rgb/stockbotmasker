@@ -1605,6 +1605,57 @@ header{border-top:2px solid var(--primary)!important}
 .sent-verdict.fear,.sent-verdict.fear2{color:var(--red-b)}
 @media(max-width:640px){.sent-label{display:none}.sent-verdict{min-width:auto;font-size:.68rem}}
 
+/* ── Timing Analyzer ──────────────────────────────────────────────────────── */
+.timing-head{padding:20px 16px 16px;border-bottom:1px solid var(--border);text-align:center}
+@media(min-width:900px){.timing-head{padding:26px 28px 18px}}
+.timing-title{font-family:var(--sans);font-size:1.3rem;font-weight:700;letter-spacing:.02em;color:var(--text)}
+.timing-sub{font-size:.8rem;color:var(--text-dim);margin:6px auto 16px;max-width:520px;line-height:1.5}
+.timing-form{display:flex;gap:8px;max-width:460px;margin:0 auto}
+.timing-input{flex:1;background:#080d15!important;border:1px solid var(--border-hi)!important;color:var(--text);
+  font-family:var(--mono);font-size:1rem;padding:12px 14px;border-radius:4px!important;outline:none;text-transform:uppercase;letter-spacing:.05em}
+.timing-input:focus{border-color:var(--primary)!important;box-shadow:0 0 0 3px var(--primary-dim)!important}
+.timing-btn{background:var(--primary)!important;border:none;color:#fff;font-family:var(--sans);font-weight:700;
+  font-size:.86rem;text-transform:uppercase;letter-spacing:.05em;padding:0 20px;cursor:pointer;border-radius:4px;transition:all .15s}
+.timing-btn:hover{background:var(--primary-2)!important;box-shadow:0 0 18px rgba(59,130,246,.4)}
+.timing-quick{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:14px}
+.timing-quick-lbl{font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim)}
+.timing-chip{font-family:var(--mono);font-size:.74rem;font-weight:600;background:var(--surf-v);border:1px solid var(--border);
+  color:var(--text-dim);padding:4px 10px;cursor:pointer;border-radius:3px;transition:all .14s}
+.timing-chip:hover{border-color:var(--primary);color:var(--primary-2);transform:translateY(-1px)}
+#timing-result{padding:18px 14px 60px;max-width:760px;margin:0 auto}
+@media(min-width:900px){#timing-result{padding:22px 28px 60px}}
+.timing-loading{text-align:center;padding:40px;color:var(--text-dim);font-size:.86rem;animation:shimmer 1.6s infinite}
+.timing-card{border:1px solid var(--border-hi);background:rgba(14,21,31,.72);backdrop-filter:blur(14px) saturate(1.15);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 10px 40px rgba(0,0,0,.4);animation:revealUp .5s cubic-bezier(.22,1,.36,1) both}
+.timing-card-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
+.timing-tk{font-family:var(--sans);font-size:1.5rem;font-weight:700;color:#fff}
+.timing-name{font-size:.72rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;margin-left:10px}
+.timing-price{font-family:var(--mono);font-size:1.4rem;font-weight:700;color:var(--text)}
+.timing-verdict{text-align:center;font-family:var(--sans);font-size:1.05rem;font-weight:800;letter-spacing:.05em;padding:12px;border-bottom:1px solid var(--border)}
+.timing-verdict.long{color:var(--green-b);background:rgba(31,217,155,.08)}
+.timing-verdict.short{color:var(--red-b);background:rgba(255,93,120,.08)}
+.timing-verdict.wait{color:var(--gold);background:rgba(245,183,60,.07)}
+.timing-cols{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+@media(max-width:560px){.timing-cols{grid-template-columns:1fr}}
+.timing-col{background:var(--surf);padding:14px 16px}
+.timing-col.long{border-top:2px solid var(--green-b)}
+.timing-col.short{border-top:2px solid var(--red-b)}
+.timing-col-hd{font-family:var(--sans);font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin-bottom:8px}
+.timing-when{font-size:1rem;font-weight:600;color:var(--text);line-height:1.4}
+.timing-col.long .timing-when{color:var(--green-b)}
+.timing-col.short .timing-when{color:var(--red-b)}
+.timing-why{font-size:.76rem;color:var(--text-dim);line-height:1.45;margin-top:6px}
+.timing-levels{display:flex;flex-wrap:wrap;gap:14px;padding:12px 16px;border-top:1px solid var(--border);font-size:.74rem;color:var(--text-dim)}
+.timing-levels b{font-family:var(--mono);color:var(--text);margin-left:3px}
+.timing-levels .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.timing-levels .dot.rsi{background:var(--primary)}.timing-levels .dot.sup{background:var(--green-b)}
+.timing-levels .dot.res{background:var(--red-b)}.timing-levels .dot.key{background:var(--gold)}
+.timing-actions{padding:12px 16px;border-top:1px solid var(--border)}
+.timing-detail-btn{width:100%;background:var(--surf-v);border:1px solid var(--border-hi);color:var(--text);
+  font-family:var(--sans);font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:10px;cursor:pointer;border-radius:3px;transition:all .15s}
+.timing-detail-btn:hover{border-color:var(--primary);color:var(--primary-2)}
+.timing-disc{font-size:.6rem;color:var(--text-dim);opacity:.7;padding:10px 16px;text-align:center;text-transform:uppercase;letter-spacing:.03em}
+
 /* ── Trader Toolkit (position sizing + livelli) ───────────────────────────── */
 .tk-section{margin:14px 0;border:1px solid var(--border)}
 .tk-hd{font-family:var(--sans);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text);padding:9px 12px;background:var(--surf-v);border-bottom:1px solid var(--border)}
@@ -1725,7 +1776,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v74';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v75';color:var(--primary);opacity:.7}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
@@ -2045,6 +2096,7 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 <!-- ── Tab navigation ── -->
 <div class="tab-nav">
   <button class="tab-btn active" data-tab="live"      onclick="switchTab('live')">📊 Live</button>
+  <button class="tab-btn" data-tab="timing"    onclick="switchTab('timing')">⚡ Timing</button>
   <button class="tab-btn" data-tab="radar"     onclick="switchTab('radar')">📡 Radar VIP</button>
   <button class="tab-btn" data-tab="portfolio" onclick="switchTab('portfolio')">💼 Portfolio</button>
   <button class="tab-btn" data-tab="history"   onclick="switchTab('history')">📅 Storico</button>
@@ -2412,6 +2464,20 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   <div id="radar-body">
     <div class="radar-loading">📡 Scansione dichiarazioni in corso…</div>
   </div>
+</div>
+
+<!-- ── Timing tool view ── -->
+<div id="timing-view" style="display:none">
+  <div class="timing-head">
+    <div class="timing-title">⚡ Timing Analyzer</div>
+    <div class="timing-sub">Digita un ticker: l'AI analizza i tecnici e ti dice <b>quando</b> conviene entrare long e quando short.</div>
+    <div class="timing-form">
+      <input class="timing-input" id="timing-input" placeholder="Es. NVDA, AAPL, TSLA…" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter')runTiming()">
+      <button class="timing-btn" onclick="runTiming()">Analizza ⚡</button>
+    </div>
+    <div class="timing-quick" id="timing-quick"></div>
+  </div>
+  <div id="timing-result"></div>
 </div>
 
 <!-- ── Alert panel (overlay) ── -->
@@ -2985,7 +3051,7 @@ let _lastNotifTicker = null;
 // switchTab — definita subito così onclick="switchTab(...)" funziona sempre
 window._tabLoaded = {};
 window.switchTab = function(tab) {
-  const VIEWS = ['live','radar','history','heatmap','portfolio','watchlist','calendar','ai-chat','briefing'];
+  const VIEWS = ['live','timing','radar','history','heatmap','portfolio','watchlist','calendar','ai-chat','briefing'];
   document.querySelectorAll('.tab-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === tab);
   });
@@ -2996,6 +3062,7 @@ window.switchTab = function(tab) {
   });
   if (!window._tabLoaded[tab]) {
     window._tabLoaded[tab] = true;
+    if (tab === 'timing')    _initTimingQuick();
     if (tab === 'radar')     loadRadar();
     if (tab === 'history')   loadHistoryDates();
     if (tab === 'heatmap')   loadHeatmap();
@@ -3174,6 +3241,65 @@ function _dismissVipAlert(){
     const key=_vipAlertItem.figure+'|'+_vipAlertItem.ticker+'|'+(_vipAlertItem.title||'').slice(0,40);
     try{ localStorage.setItem('masker_vip_dismissed', key); }catch(_){}
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Timing Analyzer — quando entrare long / short
+// ══════════════════════════════════════════════════════════════════════════════
+const _TIMING_QUICK=['NVDA','AAPL','TSLA','AMD','PLTR','MSFT','AMZN','META'];
+function _initTimingQuick(){
+  const q=document.getElementById('timing-quick'); if(!q||q.dataset.init)return; q.dataset.init='1';
+  q.innerHTML='<span class="timing-quick-lbl">Popolari:</span>'+_TIMING_QUICK.map(t=>`<button class="timing-chip" onclick="runTiming('${t}')">${t}</button>`).join('');
+}
+async function runTiming(tk){
+  _initTimingQuick();
+  const inp=document.getElementById('timing-input');
+  const ticker=(tk||inp.value||'').trim().toUpperCase();
+  if(!ticker){ inp.focus(); return; }
+  inp.value=ticker;
+  const res=document.getElementById('timing-result');
+  res.innerHTML='<div class="timing-loading">⚡ Analisi timing di <b>'+ticker+'</b> in corso…</div>';
+  try{
+    const d=await fetch('/api/stock/'+ticker+'/timing').then(r=>r.ok?r.json():r.json().then(j=>({error:j.error||'errore'})));
+    if(!d||d.error){ res.innerHTML='<div class="timing-loading" style="color:var(--red-b)">⚠️ '+((d&&d.error)||'Ticker non trovato')+'</div>'; return; }
+    renderTiming(d);
+  }catch(e){ res.innerHTML='<div class="timing-loading" style="color:var(--red-b)">⚠️ Errore di rete</div>'; }
+}
+function renderTiming(d){
+  const res=document.getElementById('timing-result'); if(!res) return;
+  const ccy=d.currency==='EUR'?'€':d.currency==='GBP'?'£':'$';
+  const vCls=d.verdetto&&d.verdetto.includes('LONG')?'long':d.verdetto&&d.verdetto.includes('SHORT')?'short':'wait';
+  const vIcon=vCls==='long'?'📈':vCls==='short'?'📉':'⏳';
+  res.innerHTML=`
+    <div class="timing-card">
+      <div class="timing-card-hd">
+        <div><span class="timing-tk">${d.ticker}</span><span class="timing-name">${(d.name||'').slice(0,28)}</span></div>
+        <div class="timing-price">${ccy}${(d.price||0).toFixed(2)}</div>
+      </div>
+      <div class="timing-verdict ${vCls}">${vIcon} ${d.verdetto||'ASPETTARE'}</div>
+      <div class="timing-cols">
+        <div class="timing-col long">
+          <div class="timing-col-hd">📈 Entrare LONG</div>
+          <div class="timing-when">${d.long_timing||'—'}</div>
+          ${d.long_motivo?`<div class="timing-why">${d.long_motivo}</div>`:''}
+        </div>
+        <div class="timing-col short">
+          <div class="timing-col-hd">📉 Entrare SHORT</div>
+          <div class="timing-when">${d.short_timing||'—'}</div>
+          ${d.short_motivo?`<div class="timing-why">${d.short_motivo}</div>`:''}
+        </div>
+      </div>
+      <div class="timing-levels">
+        <span><i class="dot rsi"></i>RSI <b>${d.rsi??'—'}</b></span>
+        ${d.support?`<span><i class="dot sup"></i>Supporto <b>${ccy}${d.support.toFixed(2)}</b></span>`:''}
+        ${d.resistance?`<span><i class="dot res"></i>Resistenza <b>${ccy}${d.resistance.toFixed(2)}</b></span>`:''}
+        ${d.livello?`<span><i class="dot key"></i>Livello chiave <b>${ccy}${(+d.livello).toFixed(2)}</b></span>`:''}
+      </div>
+      <div class="timing-actions">
+        <button class="timing-detail-btn" onclick="openTickerModal('${d.ticker}')">Apri dettaglio completo ▸</button>
+      </div>
+      <div class="timing-disc">${d.ai?'Analisi AI · Groq Llama 70B':'Analisi tecnica'} · il timing è una stima, non una certezza · non è consulenza finanziaria</div>
+    </div>`;
 }
 
 // ── Analizzatore AI completo (descrizione, verdetto, rischi, concorrenti, news) ──
