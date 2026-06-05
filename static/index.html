@@ -1605,6 +1605,41 @@ header{border-top:2px solid var(--primary)!important}
 .sent-verdict.fear,.sent-verdict.fear2{color:var(--red-b)}
 @media(max-width:640px){.sent-label{display:none}.sent-verdict{min-width:auto;font-size:.68rem}}
 
+/* ── Wall Street Research Tear Sheet (modal) ──────────────────────────────── */
+.rep{margin:14px 0;border:1px solid var(--border-hi);background:rgba(14,21,31,.72);backdrop-filter:blur(14px) saturate(1.15);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.rep-loading{margin:14px 0;padding:16px;text-align:center;color:var(--text-dim);font-size:.8rem;border:1px solid var(--border);background:var(--surf-v);animation:shimmer 1.6s infinite}
+.rep-hd{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,#15202f,#111927)}
+.rep-title{font-family:var(--sans);font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text)}
+.rep-quality{font-family:var(--mono);font-size:.66rem;font-weight:700;padding:3px 9px;border:1px solid}
+.rep-quality.qhi{color:var(--green-b);border-color:rgba(31,217,155,.4);background:rgba(31,217,155,.1)}
+.rep-quality.qmid{color:var(--gold);border-color:rgba(245,183,60,.35);background:rgba(245,183,60,.08)}
+.rep-quality.qlo{color:var(--red-b);border-color:rgba(255,93,120,.35);background:rgba(255,93,120,.1)}
+.rep-sector{padding:8px 14px 0;font-size:.7rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em}
+.rep-consensus{display:flex;align-items:center;gap:12px;padding:12px 14px;flex-wrap:wrap}
+.rep-reco{font-family:var(--sans);font-size:1.05rem;font-weight:800;letter-spacing:.05em;padding:6px 14px;border:1px solid}
+.rep-reco.buy{color:var(--green-b);border-color:rgba(31,217,155,.5);background:rgba(31,217,155,.12)}
+.rep-reco.hold{color:var(--gold);border-color:rgba(245,183,60,.5);background:rgba(245,183,60,.1)}
+.rep-reco.sell{color:var(--red-b);border-color:rgba(255,93,120,.5);background:rgba(255,93,120,.12)}
+.rep-reco-meta{display:flex;gap:12px;align-items:center;font-size:.74rem;color:var(--text-dim)}
+.rep-upside{font-family:var(--mono);font-weight:700}.rep-upside.up{color:var(--green-b)}.rep-upside.down{color:var(--red-b)}
+.rep-target{padding:0 14px 12px}
+.rep-target-track{position:relative;height:8px;background:#080d15;border:1px solid var(--border)}
+.rep-target-range{position:absolute;top:0;bottom:0;background:linear-gradient(90deg,rgba(59,130,246,.3),rgba(59,130,246,.5))}
+.rep-target-cur{position:absolute;top:-3px;width:2px;height:12px;background:#fff;transform:translateX(-50%)}
+.rep-target-mean{position:absolute;top:-4px;width:8px;height:14px;background:var(--primary);transform:translateX(-50%);border-radius:1px;box-shadow:0 0 8px rgba(59,130,246,.6)}
+.rep-target-ends{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.62rem;color:var(--text-dim);margin-top:4px}
+.rep-sec-t{font-family:var(--sans);font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--primary-2);
+  padding:9px 14px 5px;border-top:1px solid var(--border)}
+.rep-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border)}
+@media(max-width:520px){.rep-grid{grid-template-columns:1fr 1fr}}
+.rep-cell{background:var(--surf);padding:8px 12px;display:flex;flex-direction:column;gap:2px}
+.rep-k{font-family:var(--sans);font-size:.58rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim)}
+.rep-v{font-family:var(--mono);font-size:.92rem;font-weight:700;color:var(--text)}
+.rep-v.up{color:var(--green-b)}.rep-v.down{color:var(--red-b)}
+.rep-disc{font-size:.58rem;color:var(--text-dim);opacity:.7;padding:9px 14px;text-align:center;text-transform:uppercase;letter-spacing:.03em;border-top:1px solid var(--border)}
+
 /* ── Timing Analyzer ──────────────────────────────────────────────────────── */
 .timing-head{padding:20px 16px 16px;border-bottom:1px solid var(--border);text-align:center}
 @media(min-width:900px){.timing-head{padding:26px 28px 18px}}
@@ -1776,7 +1811,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v75';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v76';color:var(--primary);opacity:.7}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
@@ -2841,6 +2876,8 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     <div class="detail-grid" id="m-details"></div>
     <!-- Trader Toolkit: position sizing + livelli tecnici -->
     <div id="m-toolkit"></div>
+    <!-- Wall Street Research Tear Sheet -->
+    <div id="m-report"></div>
     <!-- Score breakdown -->
     <div class="score-breakdown" id="m-score-breakdown" style="display:none"></div>
     <!-- Fondamentali -->
@@ -3447,6 +3484,102 @@ function _renderSectors(){
   if(top && top[1]/total>=0.5){ warn.textContent='⚠️ Concentrato su '+(_SECTOR_IT[top[0]]||top[0]); warn.style.display='inline'; }
   else warn.style.display='none';
   panel.style.display='block';
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Wall Street Research Tear Sheet — dati istituzionali del titolo
+// ══════════════════════════════════════════════════════════════════════════════
+function _fmtBig(v){ if(v==null||isNaN(v))return'—'; const a=Math.abs(v);
+  if(a>=1e12)return(v/1e12).toFixed(2)+'T'; if(a>=1e9)return(v/1e9).toFixed(2)+'B';
+  if(a>=1e6)return(v/1e6).toFixed(1)+'M'; if(a>=1e3)return(v/1e3).toFixed(1)+'K'; return v.toFixed(0); }
+function _fmtN(v,d=1){ return (v==null||isNaN(v))?'—':(+v).toFixed(d); }
+function _fmtP(v){ return (v==null||isNaN(v))?'—':((v>=0?'+':'')+(+v).toFixed(1)+'%'); }
+async function loadReport(ticker){
+  const el=document.getElementById('m-report'); if(!el) return;
+  el.innerHTML='<div class="rep-loading">🏛️ Caricamento research report…</div>';
+  try{
+    const d=await fetch('/api/stock/'+ticker+'/report').then(r=>r.ok?r.json():null);
+    if(!d||d.error){ el.innerHTML='<div class="rep-loading" style="color:var(--text-dim)">🏛️ Report istituzionale non disponibile per questo titolo</div>'; return; }
+    renderReport(d);
+  }catch(e){ el.innerHTML=''; }
+}
+function renderReport(d){
+  const el=document.getElementById('m-report'); if(!el) return;
+  const sym=d.currency==='EUR'?'€':d.currency==='GBP'?'£':'$';
+  // Consenso
+  const recoMap={strong_buy:['STRONG BUY','buy'],buy:['BUY','buy'],hold:['HOLD','hold'],underperform:['UNDERPERFORM','sell'],sell:['SELL','sell'],strong_sell:['STRONG SELL','sell']};
+  const reco=recoMap[d.reco_key]||['N/D','hold'];
+  const upCls=(d.upside??0)>=0?'up':'down';
+  // target range bar
+  let targetBar='';
+  if(d.target_low&&d.target_high&&d.price){
+    const lo=Math.min(d.target_low,d.price),hi=Math.max(d.target_high,d.price);
+    const pos=v=>Math.max(0,Math.min(100,(v-lo)/(hi-lo)*100));
+    targetBar=`<div class="rep-target">
+      <div class="rep-target-track">
+        <div class="rep-target-range" style="left:${pos(d.target_low)}%;width:${pos(d.target_high)-pos(d.target_low)}%"></div>
+        <div class="rep-target-cur" style="left:${pos(d.price)}%" title="Prezzo ${sym}${d.price}"></div>
+        <div class="rep-target-mean" style="left:${pos(d.target_mean)}%" title="Target medio"></div>
+      </div>
+      <div class="rep-target-ends"><span>${sym}${_fmtN(d.target_low,0)}</span><span>obiettivo ${sym}${_fmtN(d.target_mean,0)}</span><span>${sym}${_fmtN(d.target_high,0)}</span></div>
+    </div>`;
+  }
+  const cell=(k,v,cls='')=>`<div class="rep-cell"><span class="rep-k">${k}</span><span class="rep-v ${cls}">${v}</span></div>`;
+  const div=d.div_yield;
+  el.innerHTML=`
+   <div class="rep">
+    <div class="rep-hd">
+      <span class="rep-title">🏛️ Research Report</span>
+      ${d.quality!=null?`<span class="rep-quality q${d.quality>=66?'hi':d.quality>=40?'mid':'lo'}">Qualità ${d.quality}/100</span>`:''}
+    </div>
+    ${d.sector?`<div class="rep-sector">${d.sector}${d.industry?' · '+d.industry:''}</div>`:''}
+
+    <div class="rep-consensus">
+      <div class="rep-reco ${reco[1]}">${reco[0]}</div>
+      <div class="rep-reco-meta">
+        ${d.n_analysts?`<span>${d.n_analysts} analisti</span>`:''}
+        ${d.upside!=null?`<span class="rep-upside ${upCls}">Upside ${_fmtP(d.upside)}</span>`:''}
+      </div>
+    </div>
+    ${targetBar}
+
+    <div class="rep-sec-t">Valutazione</div>
+    <div class="rep-grid">
+      ${cell('P/E',_fmtN(d.pe))}${cell('P/E fwd',_fmtN(d.fwd_pe))}${cell('PEG',_fmtN(d.peg,2))}
+      ${cell('P/S',_fmtN(d.ps))}${cell('P/B',_fmtN(d.pb))}${cell('EV/EBITDA',_fmtN(d.ev_ebitda))}
+    </div>
+
+    <div class="rep-sec-t">Crescita & Redditività</div>
+    <div class="rep-grid">
+      ${cell('Ricavi YoY',_fmtP(d.rev_growth),(d.rev_growth??0)>0?'up':'down')}
+      ${cell('Margine lordo',_fmtN(d.gross_margin)+'%')}
+      ${cell('Margine netto',_fmtN(d.profit_margin)+'%',(d.profit_margin??0)>0?'up':'down')}
+      ${cell('ROE',_fmtN(d.roe)+'%',(d.roe??0)>12?'up':'')}
+      ${cell('ROA',_fmtN(d.roa)+'%')}
+      ${cell('Margine op.',_fmtN(d.oper_margin)+'%')}
+    </div>
+
+    <div class="rep-sec-t">Salute finanziaria</div>
+    <div class="rep-grid">
+      ${cell('Debito/Equity',_fmtN(d.debt_equity,0),(d.debt_equity??0)>150?'down':'')}
+      ${cell('Current ratio',_fmtN(d.current_ratio,2))}
+      ${cell('Free cash flow',sym+_fmtBig(d.fcf),(d.fcf??0)>0?'up':'down')}
+      ${cell('Cassa',sym+_fmtBig(d.total_cash))}
+      ${cell('Debito',sym+_fmtBig(d.total_debt))}
+      ${cell('Market cap',sym+_fmtBig(d.market_cap))}
+    </div>
+
+    <div class="rep-sec-t">Azionariato & Rischio</div>
+    <div class="rep-grid">
+      ${cell('Istituzionali',_fmtN(d.inst_pct)+'%')}
+      ${cell('Insider',_fmtN(d.insider_pct)+'%')}
+      ${cell('Short float',_fmtN(d.short_float)+'%',(d.short_float??0)>15?'down':'')}
+      ${cell('Beta',_fmtN(d.beta,2))}
+      ${div?cell('Dividendo',_fmtN(div)+'%','up'):''}
+      ${div&&d.payout?cell('Payout',_fmtN(d.payout)+'%'):''}
+    </div>
+    <div class="rep-disc">Dati: Yahoo Finance · a scopo informativo, non consulenza finanziaria</div>
+   </div>`;
 }
 
 // apre il modal di dettaglio per un ticker (cerca nei dati o fetch al volo)
@@ -4232,6 +4365,8 @@ async function openModal(stock){
   loadDeepAI(stock.ticker);
   // Trader Toolkit (position sizing + livelli tecnici)
   loadToolkit(stock);
+  // Wall Street Research Report (tear sheet istituzionale)
+  loadReport(stock.ticker);
 
   // Chart (con indicatori tecnici RSI / Bollinger)
   _renderChartWithIndicators(stock.ticker,_chartPeriod,_chartInterval,_chartType);

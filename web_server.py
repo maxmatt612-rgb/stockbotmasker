@@ -1418,6 +1418,84 @@ async def api_longterm(ticker: str):
     return data
 
 
+@app.get("/api/stock/{ticker}/report")
+async def api_report_sheet(ticker: str):
+    """Research Tear Sheet istituzionale: consenso analisti + target, valutazione,
+    crescita, redditività, salute finanziaria, ownership/short. Cache 2h."""
+    t = ticker.upper()
+    key = f"report:{t}"
+    if (c := _cached(key, 7200)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        try:
+            info = yf.Ticker(t).info or {}
+        except Exception:
+            info = {}
+        if not info or not (info.get("currentPrice") or info.get("regularMarketPrice")):
+            return None
+        g = info.get
+        price = g("currentPrice") or g("regularMarketPrice") or 0
+        tm = g("targetMeanPrice")
+        upside = round((tm - price) / price * 100, 1) if (tm and price) else None
+        pct = lambda v: round(v * 100, 1) if isinstance(v, (int, float)) else None
+        return {
+            "ticker": t, "name": g("shortName") or t, "currency": g("currency", "USD"),
+            "sector": g("sector"), "industry": g("industry"),
+            "price": round(price, 2),
+            "market_cap": g("marketCap"), "beta": g("beta"),
+            "wk_high": g("fiftyTwoWeekHigh"), "wk_low": g("fiftyTwoWeekLow"),
+            # Consenso analisti
+            "reco_key": g("recommendationKey"), "reco_mean": g("recommendationMean"),
+            "n_analysts": g("numberOfAnalystOpinions"),
+            "target_mean": tm, "target_high": g("targetHighPrice"), "target_low": g("targetLowPrice"),
+            "upside": upside,
+            # Valutazione
+            "pe": g("trailingPE"), "fwd_pe": g("forwardPE"),
+            "peg": g("trailingPegRatio") or g("pegRatio"),
+            "ps": g("priceToSalesTrailing12Months"), "pb": g("priceToBook"),
+            "ev_ebitda": g("enterpriseToEbitda"),
+            # Crescita
+            "rev_growth": pct(g("revenueGrowth")), "earn_growth": pct(g("earningsGrowth")),
+            # Redditività
+            "gross_margin": pct(g("grossMargins")), "profit_margin": pct(g("profitMargins")),
+            "oper_margin": pct(g("operatingMargins")),
+            "roe": pct(g("returnOnEquity")), "roa": pct(g("returnOnAssets")),
+            # Salute finanziaria
+            "debt_equity": g("debtToEquity"), "current_ratio": g("currentRatio"),
+            "fcf": g("freeCashflow"), "total_cash": g("totalCash"), "total_debt": g("totalDebt"),
+            # Dividendo
+            "div_yield": pct(g("dividendYield")) if (g("dividendYield") and g("dividendYield") < 1) else g("dividendYield"),
+            "payout": pct(g("payoutRatio")),
+            # Ownership / short
+            "inst_pct": pct(g("heldPercentInstitutions")), "insider_pct": pct(g("heldPercentInsiders")),
+            "short_float": pct(g("shortPercentOfFloat")),
+        }
+
+    data = await asyncio.to_thread(_get)
+    if not data:
+        return JSONResponse({"error": "Dati non disponibili"}, status_code=404)
+
+    # Composite quality score (0-100) — qualità del business
+    q = 0; n = 0
+    def _bump(cond_good, weight=1):
+        nonlocal q, n
+        n += weight
+        if cond_good: q += weight
+    if data["profit_margin"] is not None: _bump(data["profit_margin"] > 8)
+    if data["roe"] is not None: _bump(data["roe"] > 12)
+    if data["rev_growth"] is not None: _bump(data["rev_growth"] > 8)
+    if data["debt_equity"] is not None: _bump(data["debt_equity"] < 120)
+    if data["fcf"] is not None: _bump(data["fcf"] > 0)
+    if data["upside"] is not None: _bump(data["upside"] > 5)
+    data["quality"] = round(q / n * 100) if n else None
+
+    result = _clean(data)
+    _store(key, result)
+    return result
+
+
 @app.get("/api/stock/{ticker}/timing")
 async def api_timing(ticker: str):
     """Tool di TIMING: dato un ticker, analizza i tecnici e dice QUANDO entrare
