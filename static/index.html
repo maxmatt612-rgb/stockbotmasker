@@ -1578,6 +1578,24 @@ header{border-top:2px solid var(--primary)!important}
   .radar-fig{grid-column:1/-1;margin-bottom:2px}
 }
 
+/* ── Top movers del giorno ────────────────────────────────────────────────── */
+.lmov-panel{margin:0 0 16px;border:1px solid var(--border);background:rgba(14,21,31,.72);backdrop-filter:blur(12px) saturate(1.1)}
+@media(min-width:900px){.lmov-panel{margin:0 28px 16px}}
+.lmov-hd{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid var(--border);
+  font-family:var(--sans);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text)}
+.lmov-ts{font-family:var(--mono);font-size:.62rem;color:var(--text-dim);text-transform:none;letter-spacing:0}
+.lmov-cols{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+.lmov-col{background:var(--surf)}
+.lmov-col-hd{font-family:var(--sans);font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:7px 12px;border-bottom:1px solid var(--border)}
+.lmov-col-hd.up{color:var(--green-b)}.lmov-col-hd.down{color:var(--red-b)}
+.lmov-row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:6px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s}
+.lmov-row:last-child{border-bottom:none}
+.lmov-row:hover{background:var(--surf-hi)}
+.lmov-tk{font-family:var(--sans);font-weight:700;font-size:.82rem;color:var(--text)}
+.lmov-px{font-family:var(--mono);font-size:.72rem;color:var(--text-dim)}
+.lmov-chg{font-family:var(--mono);font-size:.78rem;font-weight:700;min-width:62px;text-align:right}
+.lmov-chg.up{color:var(--green-b)}.lmov-chg.down{color:var(--red-b)}
+
 /* ── Composizione settoriale ──────────────────────────────────────────────── */
 .sector-panel{margin:0 0 16px;border:1px solid var(--border);background:var(--surf)}
 @media(min-width:900px){.sector-panel{margin:0 28px 16px}}
@@ -1811,7 +1829,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v76';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v77';color:var(--primary);opacity:.7}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
@@ -2803,6 +2821,15 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 </section>
 
 <!-- ── Tabella segnali (blotter) ── -->
+<!-- Top movers del giorno (USA) -->
+<section class="lmov-panel" id="live-movers" style="display:none">
+  <div class="lmov-hd"><span>🔥 Movers del giorno · USA</span><span class="lmov-ts" id="lmov-ts"></span></div>
+  <div class="lmov-cols">
+    <div class="lmov-col"><div class="lmov-col-hd up">▲ Top gainers</div><div id="lmov-top"></div></div>
+    <div class="lmov-col"><div class="lmov-col-hd down">▼ Top losers</div><div id="lmov-bot"></div></div>
+  </div>
+</section>
+
 <!-- Composizione settoriale del top 10 -->
 <section class="sector-panel" id="sector-panel" style="display:none">
   <div class="sector-hd"><span>🏭 Composizione settoriale · Top 10</span><span class="sector-warn" id="sector-warn"></span></div>
@@ -3459,6 +3486,24 @@ async function _tkLevels(ticker, price){
       fibs.filter(f=>f.v<cur).slice(-1).map(f=>lvl('Fib '+(f.r*100).toFixed(1)+'%', f.v,'fib')).join('')+
       lvl('🟢 Supporto', support, 'sup');
   }catch(e){ el.innerHTML='<div class="tk-load">Errore livelli</div>'; }
+}
+
+// ── Top movers del giorno (USA) ──────────────────────────────────────────────
+async function loadLiveMovers(){
+  const panel=document.getElementById('live-movers'); if(!panel) return;
+  try{
+    const data=await fetch('/api/market/movers').then(r=>r.ok?r.json():null);
+    const us=data&&data.usa; if(!us||!us.top){ return; }
+    const ccy='$';
+    const row=(m,pos)=>`<div class="lmov-row" onclick="openTickerModal('${m.ticker}')">
+      <span class="lmov-tk">${m.ticker}</span>
+      <span class="lmov-px">${ccy}${(m.price??0).toFixed(2)}</span>
+      <span class="lmov-chg ${pos?'up':'down'}">${(m.chg>=0?'+':'')+(m.chg??0).toFixed(2)}%</span></div>`;
+    document.getElementById('lmov-top').innerHTML=(us.top||[]).slice(0,5).map(m=>row(m,true)).join('');
+    document.getElementById('lmov-bot').innerHTML=(us.bottom||[]).slice(0,5).map(m=>row(m,false)).join('');
+    document.getElementById('lmov-ts').textContent='agg. '+now();
+    panel.style.display='block';
+  }catch(_){}
 }
 
 // ── Composizione settoriale del top 10 (concentrazione) ──────────────────────
@@ -6219,6 +6264,8 @@ document.getElementById('wl-add-btn').addEventListener('click',async()=>{
 updateMarketStatus();
 loadIndices();
 setInterval(()=>{updateMarketStatus();loadIndices();},60000);
+setTimeout(loadLiveMovers,2500);
+setInterval(loadLiveMovers,150000);
 initFX();
 loadData().then(r=>startCountdown(r==='retry'?3:60));
 loadAccuracy();
