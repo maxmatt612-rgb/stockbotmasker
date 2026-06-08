@@ -1947,7 +1947,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v81';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v82';color:var(--primary);opacity:.7}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
@@ -2176,6 +2176,11 @@ body::after{will-change:transform;animation-duration:30s}
   letter-spacing:.06em;color:#fff;padding:4px 10px 18px}
 .side-brand-dot{width:11px;height:11px;border-radius:50%;background:var(--primary);
   box-shadow:0 0 12px var(--primary);animation:livePulse 2s infinite;flex-shrink:0}
+.lang-toggle{display:flex;align-items:center;gap:6px;margin:-8px 10px 10px;padding:6px 11px;cursor:pointer;
+  border:1px solid var(--border-hi);border-radius:8px;background:rgba(255,255,255,.03);color:var(--text);
+  font-family:var(--sans);font-size:.74rem;font-weight:700;letter-spacing:.04em;transition:border-color .15s,background .15s;width:fit-content}
+.lang-toggle:hover{border-color:var(--primary);background:rgba(16,185,129,.08)}
+.lang-flag{font-size:.95rem;line-height:1}
 .side-sec{font-family:var(--sans);font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;
   color:var(--text-dim);padding:14px 12px 6px}
 .tab-nav .tab-btn{
@@ -2213,6 +2218,7 @@ header .logo{display:none}
     flex-direction:row!important;gap:0!important;padding:0!important;border-right:none!important;
     border-top:1px solid var(--border)!important;overflow-x:auto;overflow-y:hidden;z-index:500}
   .side-brand,.side-sec{display:none!important}
+  .lang-toggle{position:fixed;top:9px;right:9px;margin:0;z-index:600;padding:5px 9px;font-size:.68rem}
   .tab-nav .tab-btn{flex:1;flex-direction:column!important;justify-content:center!important;align-items:center!important;
     gap:3px!important;font-size:.6rem!important;padding:7px 4px!important;border-radius:0!important;white-space:nowrap}
   .tab-nav .tab-btn .tb-ico{font-size:1.1rem;width:auto}
@@ -2343,6 +2349,7 @@ header .logo{display:none}
 <!-- ── Sidebar navigation ── -->
 <div class="tab-nav">
   <div class="side-brand"><span class="side-brand-dot"></span>MASKER</div>
+  <button id="lang-toggle" class="lang-toggle" onclick="toggleLang()" title="Language / Lingua"><span class="lang-flag">🇬🇧</span><span id="lang-label">EN</span></button>
   <div class="side-sec">Principale</div>
   <button class="tab-btn active" data-tab="live"      onclick="switchTab('live')"><span class="tb-ico">📊</span><span class="tb-lab">Live</span></button>
   <button class="tab-btn" data-tab="timing"    onclick="switchTab('timing')"><span class="tb-ico">⚡</span><span class="tb-lab">Timing</span></button>
@@ -3701,7 +3708,7 @@ function renderShouldBuy(d){
         <div><span class="trc-tk">${d.ticker}</span><span class="trc-name">${(d.name||'').slice(0,30)}</span></div>
         <div class="trc-price">${ccy}${(d.price||0).toFixed(2)}</div>
       </div>
-      <div class="sb-verdict ${vCls}">${vIcon} ${d.verdict||'ASPETTA'}${d.confidence!=null?`<span class="sb-conf">Confidenza ${(+d.confidence).toFixed(0)}%</span>`:''}</div>
+      <div class="sb-verdict ${vCls}">${vIcon} ${d.verdict||'ASPETTA'}${d.confidence!=null?`<span class="sb-conf">Confidenza <b>${(+d.confidence).toFixed(0)}%</b></span>`:''}</div>
       <div class="trc-grid">
         ${(d.entry_low!=null&&d.entry_high!=null)?`<div class="trc-cell green"><div class="trc-cell-l">Zona d'ingresso</div><div class="trc-cell-v">${ccy}${(+d.entry_low).toFixed(2)} – ${ccy}${(+d.entry_high).toFixed(2)}</div></div>`:''}
         ${d.stop!=null?`<div class="trc-cell red"><div class="trc-cell-l">Stop-loss</div><div class="trc-cell-v">${ccy}${(+d.stop).toFixed(2)}</div></div>`:''}
@@ -8335,6 +8342,238 @@ async function loadWhyToday(ticker, btn) {
     btn.classList.remove('loading');
   }
 }
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     i18n — traduzione runtime IT → EN (toggle lingua)
+     ══════════════════════════════════════════════════════════════════════════ -->
+<script>
+(function(){
+  const I18N = {
+    // Navigazione / sezioni
+    "Principale":"Main","Decisioni AI":"AI Decisions","Strumenti":"Tools","Intelligence":"Intelligence",
+    "Live":"Live","Timing":"Timing","Portfolio":"Portfolio","Storico":"History","Storico Analisi":"Analysis History",
+    "Radar VIP":"VIP Radar","Briefing":"Briefing","Top Buy":"Top Buy","Compro?":"Should I Buy?","Watchlist":"Watchlist",
+    "Heatmap":"Heatmap","Mercati":"Markets","Calendario macro 2025–2026":"Macro calendar 2025–2026",
+    // Top Buy / Compro view
+    "Scansione AI del mercato per trovare la":"AI market scan to find the",
+    "singola migliore opportunità d'acquisto":"single best buy opportunity",
+    "adesso":"right now",
+    "Seleziona l'orizzonte d'investimento":"Select investment timeframe",
+    "Breve termine":"Short-term","Lungo termine":"Long-term",
+    "3–6 mesi":"3–6 months","12–24 mesi":"12–24 months","3 mesi":"3 months","6 mesi":"6 months",
+    "Ottieni il consiglio":"Get recommendation",
+    "Verdetto compra/non-compra basato sui dati, con":"Data-driven buy/no-buy verdict, with",
+    "zona d'ingresso, stop-loss e catalizzatori":"entry zone, stop-loss and catalysts",
+    "Orizzonte":"Timeframe","Analizza":"Analyze","Analizza ⚡":"Analyze ⚡",
+    // Verdetti / etichette card
+    "COMPRA":"BUY","NON COMPRARE":"DO NOT BUY","ASPETTA":"WAIT",
+    "MIGLIOR ACQUISTO ADESSO":"BEST BUY RIGHT NOW","VERDETTO":"VERDICT",
+    "Ingresso":"Entry","Obiettivo":"Target","Rischio/Rendimento":"Risk/Reward",
+    "Alternative:":"Alternatives:","Alternative":"Alternatives",
+    "Perché proprio questo":"Why this one","Motivo":"Reason","Catalizzatori":"Catalysts",
+    "Confidenza":"Confidence","Apri dettaglio completo":"Open full detail",
+    "Trend rialzista":"Uptrend","Trend neutro":"Neutral trend","Rischio":"Risk",
+    "Zona d'ingresso":"Entry zone","Supporto":"Support","Resistenza":"Resistance",
+    "Score qualità Masker":"Masker quality score",
+    // Stati di caricamento
+    "Caricamento":"Loading","Caricamento dati mercato":"Loading market data",
+    "Caricamento notizie":"Loading news","Analisi AI in corso":"AI analysis in progress",
+    "Analisi AI completa in corso":"Full AI analysis in progress",
+    "Generazione briefing in corso":"Generating briefing","Scansione dichiarazioni in corso":"Scanning declarations",
+    "Calcolo in corso":"Calculating","In attesa dati":"Waiting for data","scansione":"scanning",
+    "Scansione mercato in corso — prima richiesta ~30 sec":"Market scan running — first request ~30 sec",
+    "Caricamento dati mercato…":"Loading market data…","ORARIO MIGLIORE PER COMPRARE":"BEST TIME TO BUY",
+    // Mercato / header
+    "Cerca":"Search","Cerca qualsiasi azione mondiale... AAPL, ENI.MI, BTC-USD":"Search any global stock... AAPL, ENI.MI, BTC-USD",
+    "Cerca qualsiasi azione mondiale":"Search any global stock",
+    "Scanner AI · Grafici · Portafoglio · Mercati · Analisi fissata ogni mattina alle 7:30":"AI Scanner · Charts · Portfolio · Markets · Analysis locked every morning at 7:30",
+    "Masker — Stock Intelligence":"Masker — Stock Intelligence","Masker Stock Intelligence":"Masker Stock Intelligence",
+    "Forza aggiornamento":"Force refresh","Installa":"Install","Nascondi":"Hide","Aggiorna":"Refresh",
+    "Installa Masker come app — accesso rapido dal desktop, senza aprire il browser.":"Install Masker as an app — quick desktop access, no browser needed.",
+    // Portfolio / posizioni
+    "Tieni traccia delle tue posizioni":"Track your positions","Aggiungi":"Add","Aggiungi la tua prima posizione sopra.":"Add your first position above.",
+    "Panoramica Portafoglio":"Portfolio Overview","Allocazione per settore":"Allocation by sector","Allocazione per titolo":"Allocation by stock",
+    "Composizione settoriale · Top 10":"Sector composition · Top 10","Valore attuale":"Current value","Investito":"Invested",
+    "P&L totale":"Total P&L","Variazione oggi":"Today's change","Var%":"Chg%","Variazione %":"Change %","Variazione oggi":"Today's change",
+    "Prezzo acquisto $":"Buy price $","Quantità":"Quantity","Azione":"Stock","Azioni":"Stocks","Prezzo":"Price","Prezzo $":"Price $","Prezzo ($)":"Price ($)",
+    "Attuale %":"Current %","Target %":"Target %","Range target":"Target range","Differenza":"Difference","Direzione":"Direction","Segnale":"Signal",
+    "Imposta il % target per ogni posizione e clicca Calcola.":"Set the target % for each position and click Calculate.","Calcola":"Calculate",
+    "Il tuo portafoglio":"Your portfolio","Risultato":"Result","AFFINITÀ TRA TITOLI":"STOCK AFFINITY","Rebalancing":"Rebalancing",
+    "SFIDA VS S&P 500 (1 anno)":"CHALLENGE VS S&P 500 (1 year)","Confronta":"Compare","Confronta con un'altra azione…":"Compare with another stock…",
+    "Confronto Titoli":"Stock Comparison","Aggiungi ticker per confrontare":"Add ticker to compare","Aggiungi ticker (es. AAPL)...":"Add ticker (e.g. AAPL)...",
+    // Watchlist
+    "Monitora azioni dal momento dell'aggiunta":"Track stocks from the moment you add them","Aggiungi azioni da monitorare.":"Add stocks to track.",
+    "Ticker da aggiungere (es. AAPL)":"Ticker to add (e.g. AAPL)","Giudica la mia watchlist":"Judge my watchlist",
+    // AI chat
+    "Masker AI":"Masker AI","Chiedi analisi, confronti o info sui tuoi titoli.":"Ask for analysis, comparisons or info on your stocks.",
+    "Conosco il tuo portafoglio e watchlist.":"I know your portfolio and watchlist.","Allega grafico":"Attach chart","Foto allegata":"Photo attached",
+    "Scrivi o allega un grafico 📸...":"Type or attach a chart 📸...","ANALISI GRAFICO — carica uno screenshot":"CHART ANALYSIS — upload a screenshot",
+    "Clicca per caricare o trascina qui":"Click to upload or drag here","Analizza grafico":"Analyze chart",
+    "CONFESSIONALE FINANZIARIO — scrivi cosa stai pensando di fare":"FINANCIAL CONFESSIONAL — write what you're thinking of doing",
+    "Analizza i miei bias":"Analyze my biases","Chiudi":"Close","COSA STA SUCCEDENDO":"WHAT'S HAPPENING","CONSIGLIO":"ADVICE",
+    "Confessionale finanziario":"Financial confessional","Simulatore Investimento":"Investment Simulator","Simulatore investimento":"Investment simulator",
+    "Importo investito ($)":"Amount invested ($)","Periodo":"Period",
+    // Timing
+    "Timing Analyzer":"Timing Analyzer","Analizza":"Analyze",
+    "Digita un ticker: l'AI analizza i tecnici e ti dice":"Type a ticker: AI analyzes the technicals and tells you",
+    "quando":"when","conviene entrare long e quando short.":"when to go long and when to go short.","Popolari:":"Popular:",
+    // Radar
+    "RADAR VIP":"VIP RADAR","Radar VIP — Dichiarazioni di figure pubbliche":"VIP Radar — Public figures' declarations",
+    "Menzioni di titoli da parte di figure influenti, con orario e impatto sul prezzo. Fonte: news finanziarie · aggiornato ogni 8 min.":"Stock mentions by influential figures, with time and price impact. Source: financial news · updated every 8 min.",
+    "Scansione dichiarazioni in corso…":"Scanning declarations…",
+    // Briefing / news
+    "Briefing di Mercato":"Market Briefing","ULTIME NOTIZIE":"LATEST NEWS","Movers del giorno · USA":"Today's movers · USA",
+    "Top gainers":"Top gainers","Top losers":"Top losers","Top / Flop":"Top / Flop","Top Signals — Blotter":"Top Signals — Blotter",
+    "Strategia AI · Top Signals":"AI Strategy · Top Signals","Genera briefing in corso":"Generating briefing",
+    // History / heatmap
+    "Seleziona una data per vedere l'analisi di quel giorno":"Select a date to see that day's analysis",
+    "Dati di oggi ·":"Today's data ·","titoli nel pool mattutino":"stocks in the morning pool","Trovati:":"Found:",
+    "Backtest — Risultati reali dei segnali":"Backtest — Real signal results",
+    "Calcolo basato su segnali mattutini vs prezzo di chiusura. Passato ≠ futuro.":"Based on morning signals vs closing price. Past ≠ future.",
+    "Track Record — affidabilità storica delle previsioni mattutine":"Track Record — historical reliability of morning forecasts",
+    "STORICO SCORE GIORNALIERO":"DAILY SCORE HISTORY","RENDIMENTO PER GIORNO DELLA SETTIMANA":"RETURN BY DAY OF WEEK",
+    // Screener / filtri
+    "SCREENER AVANZATO":"ADVANCED SCREENER","Filtri":"Filters","Reset filtri":"Reset filters","Universo":"Universe","Ordina":"Sort",
+    "Score minimo":"Min score","Qualsiasi":"Any","Tutti":"All","Solo AI":"AI only","Reset":"Reset","Rimuovi":"Remove",
+    "Volume anomalo (>2×)":"Unusual volume (>2×)","Aziende AI":"AI companies","Score":"Score",
+    // Sentiment / fondamentali
+    "Sentiment di Mercato":"Market Sentiment","Dati Fondamentali":"Fundamentals","Grafico Live ·":"Live Chart ·",
+    "Previsione 7 giorni":"7-day forecast","Analisi Lungo Termine":"Long-Term Analysis","Prossimi bilanci":"Upcoming earnings",
+    "Prossimi bilanci (portfolio & watchlist)":"Upcoming earnings (portfolio & watchlist)","Conclusione":"Conclusion","Consigli":"Tips",
+    "Perché investirci":"Why invest","Rischi":"Risks","Rischi identificati":"Identified risks","Azione consigliata":"Recommended action",
+    "Genera Report Istituzionale Completo — 13 sezioni":"Generate Full Institutional Report — 13 sections",
+    "INSIDER TRANSACTIONS":"INSIDER TRANSACTIONS","SENTIMENT r/wallstreetbets":"r/wallstreetbets SENTIMENT",
+    "Volatilità annua":"Annual volatility","Peggior calo":"Worst drawdown","Deviazione std":"Std deviation","Beta vs SPY":"Beta vs SPY",
+    "Target analisti":"Analyst target","Forza aggiornamento":"Force refresh","Range target":"Target range",
+    "Ipercomprato >65":"Overbought >65","Ipervenduto <35":"Oversold <35","Neutro 35–65":"Neutral 35–65",
+    "Vicino al massimo":"Near high","Vicino al minimo":"Near low","52 settimane":"52 weeks",
+    "Borse asiatiche (Tokyo / Hong Kong)":"Asian markets (Tokyo / Hong Kong)","Borse europee (Francoforte / Milano)":"European markets (Frankfurt / Milan)",
+    "Europa":"Europe","Asia":"Asia","Aziende AI":"AI companies","NASDAQ Tech":"NASDAQ Tech",
+    // Diario / tasse
+    "DIARIO OPERAZIONI":"TRADE JOURNAL","Acquisto":"Buy","Vendita":"Sell","Nota (opzionale)":"Note (optional)",
+    "Nessuna operazione registrata.":"No trades recorded.","NOTE PERSONALI":"PERSONAL NOTES","Aggiungi appunti su questo titolo...":"Add notes on this stock...",
+    "Calcolatore Plusvalenze":"Capital Gains Calculator","Plusvalenza lorda":"Gross capital gain","Commissioni Revolut (€1 × operazioni)":"Revolut fees (€1 × trades)",
+    "Imponibile netto":"Net taxable","Imposta 26% (capital gain italiano)":"26% tax (Italian capital gain)","Guadagno netto stimato":"Estimated net gain",
+    "Stima indicativa. Consulta un commercialista per la dichiarazione ufficiale.":"Indicative estimate. Consult an accountant for the official filing.",
+    // Alerts / install
+    "Price Alerts":"Price Alerts","Ticker mondiale (NVDA, ENI.MI, BTC-USD…)":"Global ticker (NVDA, ENI.MI, BTC-USD…)",
+    // Disclaimer / footer
+    "Solo a scopo informativo. Non è consulenza finanziaria.":"For informational purposes only. Not financial advice.",
+    "Solo a scopo informativo":"For informational purposes only",
+    "Stima indicativa. Consulta un commercialista per la dichiarazione ufficiale.":"Indicative estimate. Consult an accountant for the official filing.",
+    "I contenuti di questo sito non costituiscono consulenza finanziaria ai sensi del TUF (D.Lgs. 58/1998) e della Direttiva MiFID II.":"The content of this site does not constitute financial advice under the Italian TUF (Leg. Decree 58/1998) or the MiFID II Directive.",
+    "Investire comporta rischi. Consulta un consulente finanziario autorizzato Consob prima di prendere decisioni.":"Investing involves risk. Consult a Consob-authorized financial advisor before making decisions.",
+    "Seleziona un titolo dalla lista →":"Select a stock from the list →",
+    // Generici tooltip/pulsanti
+    "Stampa analisi corrente":"Print current analysis","PDF analisi mattutina":"Morning analysis PDF","PDF recap serale":"Evening recap PDF",
+    "Custom":"Custom","Mean":"Mean","Rialzo":"Up","Ribasso":"Down","Top":"Top",
+    // Livelli di rischio + parole singole comuni
+    "Basso":"Low","Medio":"Medium","Alto":"High","Alta":"High","Media":"Medium","Bassa":"Low",
+    "Es. TSLA":"e.g. TSLA","Es. NVDA, AAPL, TSLA":"e.g. NVDA, AAPL, TSLA","es. NVDA":"e.g. NVDA",
+    "Es. MSFT, ENI.MI, BTC-USD":"e.g. MSFT, ENI.MI, BTC-USD","Ticker (es. AAPL)":"Ticker (e.g. AAPL)",
+    // Residui / frasi delle nuove tab e disclaimer
+    "Analisi AI":"AI Analysis","stima basata sui dati, non è consulenza finanziaria":"data-based estimate, not financial advice",
+    "Grafico Live":"Live Chart","I titoli vengono caricati automaticamente.":"Stocks are loaded automatically.",
+    "e come sono andati i titoli da allora.":"and how the stocks have done since then.",
+    "Prossimi bilanci (portfolio & watchlist)":"Upcoming earnings (portfolio & watchlist)",
+    "stima basata sui dati":"data-based estimate","non è consulenza finanziaria":"not financial advice",
+    // Varianti senza punto finale (per l'ultimo segmento dei nodi multi-frase,
+    // dove _RE sposta il punto nel suffisso che viene poi riaggiunto)
+    "e come sono andati i titoli da allora":"and how the stocks have done since then",
+    "Investire comporta rischi. Consulta un consulente finanziario autorizzato Consob prima di prendere decisioni":"Investing involves risk. Consult a Consob-authorized financial advisor before making decisions"
+  };
+
+  const _RE=/^([^\p{L}\p{N}]*)([\s\S]*?)([^\p{L}\p{N}]*)$/u;
+  let _LANG = localStorage.getItem('masker_lang') || 'it';
+  let _obs = null;
+
+  function translateText(s){
+    if(_LANG!=='en'||!s) return s;
+    if(!/[A-Za-zÀ-ÿ]/.test(s)) return s;
+    if(I18N[s]!=null) return I18N[s];
+    const tr=s.trim();
+    if(tr!==s && I18N[tr]!=null) return s.replace(tr,I18N[tr]);
+    const m=s.match(_RE);
+    if(m){
+      const core=m[2];
+      if(I18N[core]!=null) return m[1]+I18N[core]+m[3];
+      const ct=core.trim();
+      if(ct!==core && I18N[ct]!=null) return m[1]+core.replace(ct,I18N[ct])+m[3];
+      // core + suffisso (es. parentesi/punto finale che chiude la frase)
+      if(m[3] && I18N[core+m[3]]!=null) return m[1]+I18N[core+m[3]];
+      // Fallback: nodi composti separati da · : — | o a capo → traduci ogni segmento
+      const sep=/(\s*·\s*|:\s+|\s+—\s+|\s*\|\s*|\n\s*)/;
+      const parts=core.split(sep);
+      if(parts.length>1){
+        let changed=false;
+        const mapped=parts.map(p=>{
+          if(sep.test(p) && p.trim()==='') return p;
+          if(/^(\s*·\s*|:\s+|\s+—\s+|\s*\|\s*|\n\s*)$/.test(p)) return p;
+          const seg=p.trim();
+          if(seg && I18N[seg]!=null){ changed=true; return p.replace(seg,I18N[seg]); }
+          return p;
+        });
+        if(changed) return m[1]+mapped.join('')+m[3];
+      }
+    }
+    return s;
+  }
+
+  function _translateEl(el){
+    ['placeholder','title'].forEach(a=>{
+      if(el.getAttribute && el.getAttribute(a)){
+        const v=el.getAttribute(a), t=translateText(v);
+        if(t!==v) el.setAttribute(a,t);
+      }
+    });
+  }
+  function walkTranslate(root){
+    if(!root) return;
+    if(root.nodeType===1) _translateEl(root);
+    const w=document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(n){
+        const p=n.parentNode, tag=p&&p.tagName;
+        if(tag==='SCRIPT'||tag==='STYLE'||tag==='TEXTAREA') return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    const arr=[]; let n; while(n=w.nextNode()) arr.push(n);
+    arr.forEach(tn=>{ const v=tn.nodeValue, t=translateText(v); if(t!==v) tn.nodeValue=t; });
+    if(root.querySelectorAll) root.querySelectorAll('[placeholder],[title]').forEach(_translateEl);
+  }
+
+  function _startObserver(){
+    if(_obs) return;
+    _obs=new MutationObserver(muts=>{
+      if(_LANG!=='en') return;
+      for(const m of muts) m.addedNodes.forEach(nd=>{
+        if(nd.nodeType===3){ const t=translateText(nd.nodeValue); if(t!==nd.nodeValue) nd.nodeValue=t; }
+        else if(nd.nodeType===1) walkTranslate(nd);
+      });
+    });
+    _obs.observe(document.body,{childList:true,subtree:true});
+  }
+
+  function _applyLabel(){
+    const lab=document.getElementById('lang-label'), flag=document.querySelector('#lang-toggle .lang-flag');
+    if(lab) lab.textContent = (_LANG==='en') ? 'IT' : 'EN';
+    if(flag) flag.textContent = (_LANG==='en') ? '🇮🇹' : '🇬🇧';
+    document.documentElement.lang = _LANG;
+  }
+
+  window.toggleLang=function(){
+    if(_LANG==='en'){ localStorage.setItem('masker_lang','it'); location.reload(); }
+    else { localStorage.setItem('masker_lang','en'); _LANG='en'; _applyLabel(); walkTranslate(document.body); _startObserver(); }
+  };
+
+  function _init(){
+    _applyLabel();
+    if(_LANG==='en'){ walkTranslate(document.body); _startObserver(); }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',_init);
+  else _init();
+})();
 </script>
 </body>
 </html>
