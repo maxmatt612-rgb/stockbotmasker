@@ -1418,6 +1418,233 @@ async def api_longterm(ticker: str):
     return data
 
 
+@app.get("/api/stock/{ticker}/deepreport")
+async def api_deep_report(ticker: str):
+    """Report istituzionale a 13 sezioni con punteggi (Business Quality, Financials,
+    Growth, Valuation, Smart Money + Final Score /100, Risk Register, Position Sizing…).
+    Cache 4h. Generato dall'AI sui dati reali del titolo."""
+    t = ticker.upper()
+    key = f"deepreport:{t}"
+    if (c := _cached(key, 14400)) is not None:
+        return c
+    if not groq_client:
+        return JSONResponse({"error": "AI non disponibile"}, status_code=503)
+
+    def _ctx():
+        import yfinance as yf
+        try:
+            info = yf.Ticker(t).info or {}
+        except Exception:
+            info = {}
+        g = info.get
+        pct = lambda v: f"{v*100:.1f}%" if isinstance(v, (int, float)) else "N/D"
+        price = g("currentPrice") or g("regularMarketPrice") or 0
+        return info, (
+            f"Titolo: {t} ({g('shortName') or t})\n"
+            f"Settore: {g('sector','N/D')} / {g('industry','N/D')}\n"
+            f"Prezzo: ${price}  |  Market cap: {g('marketCap','N/D')}  |  Beta: {g('beta','N/D')}\n"
+            f"Valutazione: P/E {g('trailingPE','N/D')}, P/E fwd {g('forwardPE','N/D')}, PEG {g('trailingPegRatio') or g('pegRatio','N/D')}, P/S {g('priceToSalesTrailing12Months','N/D')}, P/B {g('priceToBook','N/D')}\n"
+            f"Crescita: ricavi {pct(g('revenueGrowth'))}, utili {pct(g('earningsGrowth'))}\n"
+            f"Redditività: margine lordo {pct(g('grossMargins'))}, margine netto {pct(g('profitMargins'))}, ROE {pct(g('returnOnEquity'))}\n"
+            f"Salute: debito/equity {g('debtToEquity','N/D')}, free cash flow {g('freeCashflow','N/D')}, cassa {g('totalCash','N/D')}\n"
+            f"Target analisti: media ${g('targetMeanPrice','N/D')} (min ${g('targetLowPrice','N/D')} - max ${g('targetHighPrice','N/D')}), rating {g('recommendationKey','N/D')}, {g('numberOfAnalystOpinions','N/D')} analisti\n"
+            f"Ownership: istituzionali {pct(g('heldPercentInstitutions'))}, insider {pct(g('heldPercentInsiders'))}, short float {pct(g('shortPercentOfFloat'))}\n"
+            f"Dividendo: {g('dividendYield','N/D')}\n"
+            f"Business: {(g('longBusinessSummary') or '')[:600]}\n"
+        )
+
+    info, ctx = await asyncio.to_thread(_ctx)
+    if not info:
+        return JSONResponse({"error": "Dati non disponibili"}, status_code=404)
+
+    prompt = (
+        "Sei un analista istituzionale di Wall Street. Scrivi un REPORT completo sul titolo usando "
+        "ESCLUSIVAMENTE i dati forniti (più la tua conoscenza dell'azienda). In ITALIANO, conciso ma preciso.\n\n"
+        f"DATI:\n{ctx}\n\n"
+        "Rispondi SOLO con queste 13 sezioni, formato ESATTO (una per riga, dopo i due punti il contenuto, max 2-3 frasi a sezione):\n"
+        "VERDICT: [valutazione complessiva in una frase + se COMPRA/TIENI/EVITA]\n"
+        "BUSINESS_QUALITY|/25: [moat, clienti, qualità dei ricavi — assegna punteggio su 25]\n"
+        "FINANCIALS|/20: [ricavi, margini, cash flow, diluizione — punteggio su 20]\n"
+        "GROWTH|/20: [mercato (TAM), catalizzatori futuri, scenari — punteggio su 20]\n"
+        "VALUATION|/15: [multipli, è caro o economico, setup d'ingresso — punteggio su 15]\n"
+        "INSIDER: [attività insider: acquisti, pattern di vendita, ownership]\n"
+        "SMART_MONEY|/20: [istituzionali, validazione strategica/governativa — punteggio su 20]\n"
+        "POLITICAL: [trade del Congresso, venti di policy a favore/contro]\n"
+        "ALTERNATIVES: [confronto con i concorrenti/peer del settore]\n"
+        "RISK: [3 rischi principali, ognuno con severità ALTA/MEDIA/BASSA]\n"
+        "FINAL_SCORE|/100: [punteggio composito su 100 + decisione finale COMPRA o EVITA]\n"
+        "POSITION: [come allocare: % del portafoglio, entrata graduale, stop]\n"
+        "CHANGE_MY_MIND: [cosa ti farebbe cambiare idea — 1 trigger bull e 1 bear da monitorare]\n"
+    )
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=1700,
+            messages=[
+                {"role": "system", "content": "Sei un analista azionario istituzionale rigoroso e diretto. Assegni punteggi numerici onesti e dai una decisione netta. Italiano."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        keys = {"VERDICT": "verdict", "BUSINESS_QUALITY": "business", "FINANCIALS": "financials",
+                "GROWTH": "growth", "VALUATION": "valuation", "INSIDER": "insider",
+                "SMART_MONEY": "smart_money", "POLITICAL": "political", "ALTERNATIVES": "alternatives",
+                "RISK": "risk", "FINAL_SCORE": "final", "POSITION": "position", "CHANGE_MY_MIND": "change_mind"}
+        out = {v: {"text": "", "score": None, "max": None} for v in keys.values()}
+        cur = None
+        for line in text.split("\n"):
+            l = line.strip()
+            if not l:
+                continue
+            matched = False
+            for kk, field in keys.items():
+                if l.upper().startswith(kk + ":") or l.upper().startswith(kk + "|"):
+                    head, _, rest = l.partition(":")
+                    # estrai punteggio max dal formato KEY|/NN
+                    if "|" in head:
+                        mx = head.split("|", 1)[1].replace("/", "").strip()
+                        try: out[field]["max"] = int(mx)
+                        except Exception: pass
+                    out[field]["text"] = rest.strip()
+                    cur = field
+                    matched = True
+                    break
+            if not matched and cur:
+                out[cur]["text"] += " " + l
+
+        # estrai punteggi numerici dal testo (primo numero <= max)
+        import re as _re
+        for field in out:
+            mx = out[field]["max"]
+            if mx:
+                m = _re.search(r'(\d{1,3})\s*/\s*' + str(mx), out[field]["text"])
+                if not m:
+                    m = _re.search(r'\b(\d{1,3})\b', out[field]["text"])
+                if m:
+                    try: out[field]["score"] = min(int(m.group(1)), mx)
+                    except Exception: pass
+        result = {"ticker": t, "name": info.get("shortName", t), **out}
+        _store(key, result)
+        return result
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/stock/{ticker}/technicals")
+async def api_technicals(ticker: str):
+    """Analisi tecnica completa stile TradingView: ogni indicatore (RSI, MACD, Stoch,
+    CCI, Williams %R, ADX, momentum + medie mobili 10→200) con valore e segnale,
+    più riepilogo Oscillatori / Medie / Totale. Cache 5 min."""
+    t = ticker.upper()
+    key = f"tech:{t}"
+    if (c := _cached(key, 300)) is not None:
+        return c
+
+    def _compute():
+        import yfinance as yf
+        import pandas as pd
+        import numpy as np
+        try:
+            h = yf.Ticker(t).history(period="1y", interval="1d")
+        except Exception:
+            return None
+        if h is None or h.empty or len(h) < 30:
+            return None
+        c = h["Close"]; hi = h["High"]; lo = h["Low"]
+        price = float(c.iloc[-1])
+        osc = []   # oscillatori
+        mas = []   # medie mobili
+
+        def sig(label, value, s):
+            return {"name": label, "value": (None if value is None or (isinstance(value, float) and (value != value)) else round(float(value), 2)), "signal": s}
+
+        # RSI(14)
+        d = c.diff(); g = d.clip(lower=0).rolling(14).mean(); l = (-d.clip(upper=0)).rolling(14).mean()
+        rsi = float((100 - 100 / (1 + g / l)).iloc[-1])
+        osc.append(sig("RSI (14)", rsi, "sell" if rsi > 70 else "buy" if rsi < 30 else "neutral"))
+
+        # Stochastic %K(14)
+        ll = lo.rolling(14).min(); hh = hi.rolling(14).max()
+        k = float(((c - ll) / (hh - ll) * 100).iloc[-1])
+        osc.append(sig("Stocastico %K", k, "sell" if k > 80 else "buy" if k < 20 else "neutral"))
+
+        # CCI(20)
+        tp = (hi + lo + c) / 3
+        sma_tp = tp.rolling(20).mean()
+        md = (tp - sma_tp).abs().rolling(20).mean()
+        cci = float(((tp - sma_tp) / (0.015 * md)).iloc[-1])
+        osc.append(sig("CCI (20)", cci, "sell" if cci > 100 else "buy" if cci < -100 else "neutral"))
+
+        # Williams %R(14)
+        wr = float(((hh - c) / (hh - ll) * -100).iloc[-1])
+        osc.append(sig("Williams %R", wr, "buy" if wr < -80 else "sell" if wr > -20 else "neutral"))
+
+        # MACD(12,26,9)
+        e12 = c.ewm(span=12, adjust=False).mean(); e26 = c.ewm(span=26, adjust=False).mean()
+        macd = e12 - e26; macd_sig = macd.ewm(span=9, adjust=False).mean()
+        mval = float(macd.iloc[-1]); msig = float(macd_sig.iloc[-1])
+        osc.append(sig("MACD (12,26)", mval, "buy" if mval > msig else "sell"))
+
+        # Momentum(10)
+        mom = float((c - c.shift(10)).iloc[-1])
+        osc.append(sig("Momentum (10)", mom, "buy" if mom > 0 else "sell"))
+
+        # ADX(14) + DI
+        try:
+            up = hi.diff(); dn = -lo.diff()
+            plus_dm = ((up > dn) & (up > 0)) * up
+            minus_dm = ((dn > up) & (dn > 0)) * dn
+            tr = pd.concat([(hi - lo), (hi - c.shift()).abs(), (lo - c.shift()).abs()], axis=1).max(axis=1)
+            atr = tr.rolling(14).mean()
+            pdi = 100 * (plus_dm.rolling(14).mean() / atr)
+            mdi = 100 * (minus_dm.rolling(14).mean() / atr)
+            dx = (100 * (pdi - mdi).abs() / (pdi + mdi)).rolling(14).mean()
+            adx = float(dx.iloc[-1]); pdi_v = float(pdi.iloc[-1]); mdi_v = float(mdi.iloc[-1])
+            adx_sig = "neutral" if adx < 20 else ("buy" if pdi_v > mdi_v else "sell")
+            osc.append(sig("ADX (14)", adx, adx_sig))
+        except Exception:
+            pass
+
+        # Medie mobili (SMA + EMA) — price above=buy, below=sell
+        for p in (10, 20, 50, 100, 200):
+            if len(c) >= p:
+                sma = float(c.rolling(p).mean().iloc[-1])
+                mas.append(sig(f"SMA {p}", sma, "buy" if price > sma else "sell"))
+        for p in (10, 20, 50, 100):
+            if len(c) >= p:
+                ema = float(c.ewm(span=p, adjust=False).mean().iloc[-1])
+                mas.append(sig(f"EMA {p}", ema, "buy" if price > ema else "sell"))
+
+        def summarize(items):
+            b = sum(1 for x in items if x["signal"] == "buy")
+            s = sum(1 for x in items if x["signal"] == "sell")
+            ne = sum(1 for x in items if x["signal"] == "neutral")
+            tot = max(b + s + ne, 1)
+            score = (b - s) / tot
+            if score >= 0.5: lab = "STRONG BUY"
+            elif score >= 0.15: lab = "BUY"
+            elif score <= -0.5: lab = "STRONG SELL"
+            elif score <= -0.15: lab = "SELL"
+            else: lab = "NEUTRAL"
+            return {"buy": b, "sell": s, "neutral": ne, "label": lab, "score": round(score, 2)}
+
+        allitems = osc + mas
+        return {
+            "ticker": t, "price": round(price, 2),
+            "oscillators": osc, "moving_averages": mas,
+            "summary_osc": summarize(osc),
+            "summary_ma": summarize(mas),
+            "summary": summarize(allitems),
+        }
+
+    data = await asyncio.to_thread(_compute)
+    if not data:
+        return JSONResponse({"error": "Dati non disponibili"}, status_code=404)
+    result = _clean(data)
+    _store(key, result)
+    return result
+
+
 @app.get("/api/stock/{ticker}/report")
 async def api_report_sheet(ticker: str):
     """Research Tear Sheet istituzionale: consenso analisti + target, valutazione,

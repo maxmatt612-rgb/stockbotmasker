@@ -1623,6 +1623,65 @@ header{border-top:2px solid var(--primary)!important}
 .sent-verdict.fear,.sent-verdict.fear2{color:var(--red-b)}
 @media(max-width:640px){.sent-label{display:none}.sent-verdict{min-width:auto;font-size:.68rem}}
 
+/* ── Report istituzionale 13 sezioni (modal) ──────────────────────────────── */
+.dr-cta{display:block;width:100%;margin:14px 0;padding:14px;cursor:pointer;
+  font-family:var(--sans);font-size:.92rem;font-weight:700;letter-spacing:.02em;color:#fff;
+  background:linear-gradient(135deg,#10b981,#059669);border:none;border-radius:12px;
+  box-shadow:0 0 0 1px rgba(16,185,129,.4),0 8px 24px rgba(16,185,129,.2);transition:all .18s}
+.dr-cta:hover{box-shadow:0 0 0 1px rgba(16,185,129,.6),0 8px 30px rgba(16,185,129,.35);transform:translateY(-1px)}
+.dr-loading{margin:14px 0;padding:24px;text-align:center;color:var(--text);font-size:.88rem;
+  border:1px solid var(--border-hi);background:var(--surf-v);border-radius:12px;animation:shimmer 1.8s infinite}
+.dr{margin:14px 0;border:1px solid var(--border-hi);background:var(--surf);border-radius:12px;overflow:hidden}
+.dr-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;
+  border-bottom:1px solid var(--border);background:linear-gradient(180deg,#15202f,#111927);flex-wrap:wrap}
+.dr-top-lab{font-family:var(--sans);font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text)}
+.dr-final{display:flex;align-items:center;gap:12px}
+.dr-final-score{font-family:var(--mono);font-size:1.6rem;font-weight:800;line-height:1;color:var(--text)}
+.dr-final-score span{font-size:.8rem;color:var(--text-dim);font-weight:400}
+.dr-final-dec{font-family:var(--sans);font-size:.95rem;font-weight:800;letter-spacing:.05em;padding:5px 13px;border:1px solid;border-radius:8px}
+.dr-final.buy .dr-final-dec{color:var(--green-b);border-color:rgba(31,217,155,.5);background:rgba(31,217,155,.12)}
+.dr-final.buy .dr-final-score{color:var(--green-b)}
+.dr-final.sell .dr-final-dec{color:var(--red-b);border-color:rgba(255,93,120,.5);background:rgba(255,93,120,.12)}
+.dr-final.sell .dr-final-score{color:var(--red-b)}
+.dr-final.neu .dr-final-dec{color:var(--gold);border-color:rgba(245,183,60,.5);background:rgba(245,183,60,.1)}
+.dr-secs{display:flex;flex-direction:column}
+.dr-sec{padding:13px 16px;border-bottom:1px solid var(--border)}
+.dr-sec:last-child{border-bottom:none}
+.dr-sec-hd{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.dr-num{font-family:var(--mono);font-size:.9rem;font-weight:800;color:var(--primary);min-width:24px}
+.dr-sec-title{font-family:var(--sans);font-size:.86rem;font-weight:700;color:var(--text);flex:1}
+.dr-score{font-family:var(--mono);font-size:.74rem;font-weight:700;color:var(--primary-2);
+  border:1px solid rgba(16,185,129,.4);background:rgba(16,185,129,.1);padding:2px 9px;border-radius:6px}
+.dr-sec-body{font-size:.82rem;line-height:1.55;color:var(--text-dim);padding-left:34px}
+.dr-disc{font-size:.58rem;color:var(--text-dim);opacity:.7;padding:11px 16px;text-align:center;text-transform:uppercase;letter-spacing:.03em;border-top:1px solid var(--border)}
+
+/* ── Analisi Tecnica (modal) ──────────────────────────────────────────────── */
+.tech{margin:14px 0;border:1px solid var(--border-hi);background:var(--surf)}
+.tech-loading{margin:14px 0;padding:16px;text-align:center;color:var(--text-dim);font-size:.8rem;border:1px solid var(--border);background:var(--surf-v);animation:shimmer 1.6s infinite;border-radius:12px}
+.tech-hd{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#15202f,#111927)}
+.tech-title{font-family:var(--sans);font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text)}
+.tech-tf{font-size:.62rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em}
+.tech-sum-main{padding:12px}
+.tech-sums{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-top:1px solid var(--border)}
+.tech-sum{padding:12px;text-align:center;background:var(--surf)}
+.tech-sum-lab{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin-bottom:6px}
+.tech-sum-verdict{font-family:var(--sans);font-size:1.15rem;font-weight:800;letter-spacing:.04em;margin-bottom:6px}
+.tech-sum.buy .tech-sum-verdict{color:var(--green-b)}.tech-sum.sell .tech-sum-verdict{color:var(--red-b)}.tech-sum.neu .tech-sum-verdict{color:var(--gold)}
+.tech-sum-main .tech-sum-verdict{font-size:1.5rem}
+.tech-sum-counts{display:flex;justify-content:center;gap:12px;font-family:var(--mono);font-size:.64rem}
+.tech-sum-counts .sell{color:var(--red-b)}.tech-sum-counts .buy{color:var(--green-b)}.tech-sum-counts .neu{color:var(--text-dim)}
+.tech-sec-t{font-family:var(--sans);font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--primary-2);padding:10px 14px 4px;border-top:1px solid var(--border)}
+.tech-list{display:flex;flex-direction:column}
+.tech-row{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:7px 14px;border-bottom:1px solid var(--border);font-size:.78rem}
+.tech-row:last-child{border-bottom:none}
+.tech-k{color:var(--text-dim)}
+.tech-val{font-family:var(--mono);color:var(--text);font-weight:600}
+.tech-sig{font-family:var(--sans);font-size:.62rem;font-weight:700;letter-spacing:.04em;padding:2px 8px;border:1px solid;min-width:64px;text-align:center;border-radius:4px}
+.tech-sig.buy{color:var(--green-b);border-color:rgba(31,217,155,.4);background:rgba(31,217,155,.1)}
+.tech-sig.sell{color:var(--red-b);border-color:rgba(255,93,120,.4);background:rgba(255,93,120,.1)}
+.tech-sig.neu{color:var(--text-dim);border-color:var(--border-hi)}
+.tech-disc{font-size:.58rem;color:var(--text-dim);opacity:.7;padding:9px 14px;text-align:center;text-transform:uppercase;letter-spacing:.03em;border-top:1px solid var(--border)}
+
 /* ── Wall Street Research Tear Sheet (modal) ──────────────────────────────── */
 .rep{margin:14px 0;border:1px solid var(--border-hi);background:rgba(14,21,31,.72);backdrop-filter:blur(14px) saturate(1.15);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
@@ -1829,7 +1888,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v79';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v80';color:var(--primary);opacity:.7}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
@@ -2957,6 +3016,9 @@ header .logo{display:none}
     <div id="deep-ai" class="deep-ai">
       <div class="deep-ai-loading">🧠 Analisi AI in corso…</div>
     </div>
+    <!-- Report istituzionale 13 sezioni -->
+    <button class="dr-cta" id="dr-cta" onclick="loadDeepReport()">📋 Genera Report Istituzionale Completo — 13 sezioni</button>
+    <div id="m-deepreport"></div>
     <div class="chart-controls">
       <div class="chart-tf-group" id="chart-tf-group">
         <button class="chart-tf-btn" data-tf="1G" data-p="1d"  data-i="5m">1G</button>
@@ -2984,6 +3046,8 @@ header .logo{display:none}
     <div id="m-toolkit"></div>
     <!-- Wall Street Research Tear Sheet -->
     <div id="m-report"></div>
+    <!-- Analisi tecnica completa (TradingView style) -->
+    <div id="m-technicals"></div>
     <!-- Score breakdown -->
     <div class="score-breakdown" id="m-score-breakdown" style="display:none"></div>
     <!-- Fondamentali -->
@@ -3703,6 +3767,111 @@ function renderReport(d){
       ${div&&d.payout?cell('Payout',_fmtN(d.payout)+'%'):''}
     </div>
     <div class="rep-disc">Dati: Yahoo Finance · a scopo informativo, non consulenza finanziaria</div>
+   </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Analisi Tecnica completa (stile TradingView) — indicatori + segnali
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadTechnicals(ticker){
+  const el=document.getElementById('m-technicals'); if(!el) return;
+  el.innerHTML='<div class="tech-loading">📐 Calcolo analisi tecnica…</div>';
+  try{
+    const d=await fetch('/api/stock/'+ticker+'/technicals').then(r=>r.ok?r.json():null);
+    if(!d||d.error){ el.innerHTML=''; return; }
+    renderTechnicals(d);
+  }catch(e){ el.innerHTML=''; }
+}
+function _techSummaryHtml(s,title){
+  const cls=s.label.includes('BUY')?'buy':s.label.includes('SELL')?'sell':'neu';
+  return `<div class="tech-sum ${cls}">
+    <div class="tech-sum-lab">${title}</div>
+    <div class="tech-sum-verdict">${s.label}</div>
+    <div class="tech-sum-counts"><span class="sell">${s.sell} vendi</span><span class="neu">${s.neutral} neutri</span><span class="buy">${s.buy} compra</span></div>
+  </div>`;
+}
+function _techRows(items){
+  return items.map(i=>{
+    const cls=i.signal==='buy'?'buy':i.signal==='sell'?'sell':'neu';
+    const lab=i.signal==='buy'?'COMPRA':i.signal==='sell'?'VENDI':'NEUTRO';
+    return `<div class="tech-row"><span class="tech-k">${i.name}</span><span class="tech-val">${i.value!=null?i.value:'—'}</span><span class="tech-sig ${cls}">${lab}</span></div>`;
+  }).join('');
+}
+function renderTechnicals(d){
+  const el=document.getElementById('m-technicals'); if(!el) return;
+  el.innerHTML=`
+   <div class="tech">
+    <div class="tech-hd"><span class="tech-title">📐 Analisi Tecnica</span><span class="tech-tf">timeframe giornaliero</span></div>
+    <div class="tech-sum-main ${d.summary.label.includes('BUY')?'buy':d.summary.label.includes('SELL')?'sell':'neu'}">
+      ${_techSummaryHtml(d.summary,'Riepilogo totale')}
+    </div>
+    <div class="tech-sums">
+      ${_techSummaryHtml(d.summary_osc,'Oscillatori')}
+      ${_techSummaryHtml(d.summary_ma,'Medie mobili')}
+    </div>
+    <div class="tech-sec-t">Oscillatori</div>
+    <div class="tech-list">${_techRows(d.oscillators)}</div>
+    <div class="tech-sec-t">Medie mobili</div>
+    <div class="tech-list">${_techRows(d.moving_averages)}</div>
+    <div class="tech-disc">Calcolo su 1 anno di dati giornalieri · a scopo informativo</div>
+   </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Report Istituzionale a 13 sezioni (AI)
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadDeepReport(){
+  const tk=_modalTicker; if(!tk) return;
+  const cta=document.getElementById('dr-cta');
+  const el=document.getElementById('m-deepreport');
+  if(!el) return;
+  if(cta) cta.style.display='none';
+  el.innerHTML='<div class="dr-loading">📋 Generazione report istituzionale di <b>'+tk+'</b>…<div style="font-size:.7rem;margin-top:6px;color:var(--text-dim)">analisi delle 13 sezioni, può richiedere ~10s</div></div>';
+  try{
+    const d=await fetch('/api/stock/'+tk+'/deepreport').then(r=>r.ok?r.json():r.json().then(j=>({error:j.error||'errore'})));
+    if(!d||d.error){ el.innerHTML='<div class="dr-loading" style="color:var(--red-b)">⚠️ '+((d&&d.error)||'Report non disponibile')+'</div>'; if(cta){cta.style.display='block';} return; }
+    renderDeepReport(d);
+  }catch(e){ el.innerHTML='<div class="dr-loading" style="color:var(--red-b)">⚠️ Errore generazione report</div>'; if(cta){cta.style.display='block';} }
+}
+function renderDeepReport(d){
+  const el=document.getElementById('m-deepreport'); if(!el) return;
+  const secs=[
+    ['01','Verdict',d.verdict],
+    ['02','Business Quality',d.business],
+    ['03','Financials (GAAP)',d.financials],
+    ['04','Growth Catalysts',d.growth],
+    ['05','Valuation',d.valuation],
+    ['06','Insider Activity',d.insider],
+    ['07','Smart Money',d.smart_money],
+    ['08','Political Signal',d.political],
+    ['09','Alternatives',d.alternatives],
+    ['10','Risk Register',d.risk],
+    ['11','Final Score',d.final],
+    ['12','Position Sizing',d.position],
+    ['13','Change My Mind',d.change_mind],
+  ];
+  const fin=d.final||{};
+  const finScore=fin.score;
+  const buy=(fin.text||'').toUpperCase().includes('COMPRA');
+  const avoid=(fin.text||'').toUpperCase().includes('EVITA');
+  const decCls=buy?'buy':avoid?'sell':'neu';
+  const decTxt=buy?'COMPRA':avoid?'EVITA':'NEUTRO';
+  const rows=secs.map(([n,title,sec])=>{
+    if(!sec||!sec.text) return '';
+    const scoreBadge=sec.score!=null&&sec.max?`<span class="dr-score">${sec.score}/${sec.max}</span>`:'';
+    return `<div class="dr-sec">
+      <div class="dr-sec-hd"><span class="dr-num">${n}</span><span class="dr-sec-title">${title}</span>${scoreBadge}</div>
+      <div class="dr-sec-body">${sec.text}</div>
+    </div>`;
+  }).join('');
+  el.innerHTML=`
+   <div class="dr">
+    <div class="dr-top">
+      <div class="dr-top-lab">📋 Report Istituzionale · ${d.ticker}</div>
+      ${finScore!=null?`<div class="dr-final ${decCls}"><div class="dr-final-score">${finScore}<span>/100</span></div><div class="dr-final-dec">${decTxt}</div></div>`:''}
+    </div>
+    <div class="dr-secs">${rows}</div>
+    <div class="dr-disc">Report generato dall'AI sui dati reali · a scopo informativo, non consulenza finanziaria</div>
    </div>`;
 }
 
@@ -4492,6 +4661,11 @@ async function openModal(stock){
   loadToolkit(stock);
   // Wall Street Research Report (tear sheet istituzionale)
   loadReport(stock.ticker);
+  // Analisi tecnica completa (indicatori + segnali)
+  loadTechnicals(stock.ticker);
+  // Reset report istituzionale (mostra di nuovo il pulsante per il nuovo titolo)
+  const _drC=document.getElementById('dr-cta'); if(_drC) _drC.style.display='block';
+  const _drR=document.getElementById('m-deepreport'); if(_drR) _drR.innerHTML='';
 
   // Chart (con indicatori tecnici RSI / Bollinger)
   _renderChartWithIndicators(stock.ticker,_chartPeriod,_chartInterval,_chartType);
