@@ -87,6 +87,73 @@ try:
 except Exception:
     groq_client = None
 
+# ─── Lingua richiesta (risposte AI in EN/IT in base al toggle del frontend) ───
+import contextvars as _ctxvars
+_REQ_LANG = _ctxvars.ContextVar("req_lang", default="it")
+
+
+def _lang() -> str:
+    try:
+        return _REQ_LANG.get()
+    except Exception:
+        return "it"
+
+
+class _LangASGIMiddleware:
+    """Middleware ASGI puro: legge ?lang= e lo mette nel contextvar.
+    Gira nello stesso task dell'endpoint, quindi il contextvar si propaga
+    in modo affidabile (a differenza di BaseHTTPMiddleware)."""
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http":
+            qs = scope.get("query_string", b"").decode("latin-1")
+            try:
+                from urllib.parse import parse_qs
+                lang = (parse_qs(qs).get("lang", ["it"])[0] or "it").lower()
+            except Exception:
+                lang = "it"
+            token = _REQ_LANG.set("en" if lang == "en" else "it")
+            try:
+                await self.app(scope, receive, send)
+            finally:
+                _REQ_LANG.reset(token)
+        else:
+            await self.app(scope, receive, send)
+
+
+app.add_middleware(_LangASGIMiddleware)
+
+
+# Wrapper Groq: quando lang=en inietta l'istruzione di rispondere in inglese
+# in OGNI chiamata AI (un solo punto, copre tutti gli endpoint presenti e futuri).
+if groq_client is not None:
+    try:
+        _orig_groq_create = groq_client.chat.completions.create
+
+        async def _groq_create_lang(*args, **kwargs):
+            if _lang() == "en":
+                msgs = kwargs.get("messages")
+                if isinstance(msgs, list) and msgs:
+                    directive = ("\n\nIMPORTANT: Write all explanatory / free-form text in fluent, natural ENGLISH "
+                                 "(not Italian). BUT keep any fixed verdict keywords, field labels or structured "
+                                 "tokens required by the format above EXACTLY as written in the instructions "
+                                 "(e.g. COMPRA, ASPETTA, NON COMPRARE, VERDETTO, LONG, SHORT) — do not translate those tokens.")
+                    injected = False
+                    for msg in msgs:
+                        if isinstance(msg, dict) and msg.get("role") == "system":
+                            msg["content"] = (msg.get("content") or "") + directive
+                            injected = True
+                            break
+                    if not injected:
+                        msgs.insert(0, {"role": "system", "content": "Respond entirely in fluent English."})
+            return await _orig_groq_create(*args, **kwargs)
+
+        groq_client.chat.completions.create = _groq_create_lang
+    except Exception:
+        pass
+
 # ─── Autenticazione Telegram + JWT ───────────────────────────────────────────
 # Variabili env richieste per il login:
 #   BOT_TOKEN    — token del bot (già usato da bot.py)
@@ -1044,7 +1111,7 @@ async def api_ai_news(ticker: str = "", title: str = ""):
     if not groq_client:
         return JSONResponse({"error": "AI non disponibile"}, status_code=503)
 
-    key = "ainews:" + hashlib.md5(f"{ticker}|{title}".encode("utf-8")).hexdigest()
+    key = "ainews:" + hashlib.md5(f"{ticker}|{title}".encode("utf-8")).hexdigest() + ":" + _lang()
     if (c := _cached(key, 86400)) is not None:
         return c
 
@@ -1167,7 +1234,7 @@ async def api_insider(ticker: str):
 async def api_reddit(ticker: str):
     """Mention count e sentiment su r/wallstreetbets — cache 30 min."""
     t = ticker.upper()
-    key = f"reddit:{t}"
+    key = f"reddit:{t}:{_lang()}"
     if (c := _cached(key, 1800)) is not None:
         return c
 
@@ -1264,7 +1331,7 @@ async def api_stock_history(ticker: str, period: str = "1mo"):
 async def api_ai(ticker: str):
     """Analisi AI: perché investire, rischi, conclusione SI/NO."""
     t = ticker.upper()
-    key = f"ai:{t}"
+    key = f"ai:{t}:{_lang()}"
     if (c := _cached(key, _AI_TTL)) is not None:
         return c
 
@@ -1350,7 +1417,7 @@ async def api_ai(ticker: str):
 async def api_longterm(ticker: str):
     """Analisi lungo termine: CAGR storici, proiezioni scenari, AI outlook 3-5 anni."""
     t = ticker.upper()
-    key = f"longterm:{t}"
+    key = f"longterm:{t}:{_lang()}"
     if (c := _cached(key, 21600)) is not None:   # cache 6h
         return c
 
@@ -1423,7 +1490,7 @@ async def api_best_buy(horizon: str = "short"):
     """Top Buy: l'AI trova il MIGLIOR acquisto adesso tra i titoli analizzati,
     in base all'orizzonte (short = momentum/tecnico, long = trend solido+qualità)."""
     horizon = "long" if horizon == "long" else "short"
-    key = f"bestbuy:{horizon}"
+    key = f"bestbuy:{horizon}:{_lang()}"
     if (c := _cached(key, 1200)) is not None:
         return c
     pool = ((_cache.get("scan:full") or {}).get("data")) or _morning_data or ((_cache.get("scan:10") or {}).get("data")) or []
@@ -1479,7 +1546,7 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
     """Should I Buy: verdetto compra/non-compra con zona d'ingresso, stop-loss e catalizzatori."""
     t = ticker.upper()
     horizon = "long" if horizon == "long" else "short"
-    key = f"shouldbuy:{t}:{horizon}"
+    key = f"shouldbuy:{t}:{horizon}:{_lang()}"
     if (c := _cached(key, 1200)) is not None:
         return c
     data = await asyncio.to_thread(get_enriched_analysis, t)
@@ -1536,13 +1603,18 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
             txt = r.choices[0].message.content.strip()
             for line in txt.split("\n"):
                 lu = line.strip().upper()
-                if lu.startswith("VERDETTO:"):
+                if lu.startswith("VERDETTO:") or lu.startswith("VERDICT:"):
                     v = line.split(":", 1)[1].strip().upper()
-                    verdict = "NON COMPRARE" if "NON" in v else ("COMPRA" if "COMPRA" in v else "ASPETTA")
-                elif lu.startswith("CONFIDENZA:"):
+                    if "NON" in v or "DO NOT" in v or "DON'T" in v or "NOT BUY" in v:
+                        verdict = "NON COMPRARE"
+                    elif "COMPRA" in v or "BUY" in v:
+                        verdict = "COMPRA"
+                    else:
+                        verdict = "ASPETTA"
+                elif lu.startswith("CONFIDENZA:") or lu.startswith("CONFIDENCE:"):
                     try: conf = max(50, min(95, int("".join(ch for ch in line if ch.isdigit())[:2] or "60")))
                     except Exception: pass
-                elif lu.startswith("MOTIVO:"):
+                elif lu.startswith("MOTIVO:") or lu.startswith("REASON:"):
                     reasoning = line.split(":", 1)[1].strip()
         except Exception:
             pass
@@ -1566,7 +1638,7 @@ async def api_deep_report(ticker: str):
     Growth, Valuation, Smart Money + Final Score /100, Risk Register, Position Sizing…).
     Cache 4h. Generato dall'AI sui dati reali del titolo."""
     t = ticker.upper()
-    key = f"deepreport:{t}"
+    key = f"deepreport:{t}:{_lang()}"
     if (c := _cached(key, 14400)) is not None:
         return c
     if not groq_client:
@@ -1870,7 +1942,7 @@ async def api_timing(ticker: str):
     """Tool di TIMING: dato un ticker, analizza i tecnici e dice QUANDO entrare
     long e quando short (entra ora / aspetta pullback / aspetta conferma). Cache 30 min."""
     t = ticker.upper()
-    key = f"timing:{t}"
+    key = f"timing:{t}:{_lang()}"
     if (c := _cached(key, 1800)) is not None:
         return c
 
@@ -1972,7 +2044,7 @@ async def api_deep_analysis(ticker: str):
     """Analizzatore AI completo: descrizione azienda, verdetto, perché, rischi,
     concorrenti (con ticker cliccabili) e notizie. Cache 1h."""
     t = ticker.upper()
-    key = f"deep:{t}"
+    key = f"deep:{t}:{_lang()}"
     if (c := _cached(key, 3600)) is not None:
         return c
     if not groq_client:
@@ -2058,7 +2130,7 @@ async def api_deep_analysis(ticker: str):
 async def api_why_today(ticker: str):
     """3 bullet points: perché il titolo si è mosso oggi (AI, cached 30 min)."""
     t = ticker.upper()
-    key = f"why:{t}"
+    key = f"why:{t}:{_lang()}"
     if (c := _cached(key, _AI_TTL)) is not None:
         return c
 
@@ -3412,7 +3484,7 @@ async def api_watchlist_judge(body: WatchlistJudgeBody):
     if not groq_client:
         return JSONResponse({"error": "AI non disponibile"}, status_code=503)
 
-    key = "wljudge:" + ",".join(sorted(tickers))
+    key = "wljudge:" + ",".join(sorted(tickers)) + ":" + _lang()
     if (c := _cached(key, 1800)) is not None:
         return c
 
@@ -3981,7 +4053,7 @@ async def api_compare(body: CompareBody):
     t2 = body.ticker2.upper().strip()
     if not t1 or not t2 or t1 == t2:
         return JSONResponse({"error": "Servono due ticker diversi"}, status_code=400)
-    key = f"compare:{t1}:{t2}"
+    key = f"compare:{t1}:{t2}:{_lang()}"
     if (c := _cached(key, 1800)) is not None:
         return c
 
@@ -4090,7 +4162,7 @@ async def api_compare(body: CompareBody):
 @app.get("/api/briefing")
 async def api_briefing():
     """AI genera un briefing di mercato giornaliero basato sugli indici principali."""
-    key = "briefing:daily"
+    key = f"briefing:daily:{_lang()}"
     if (c := _cached(key, 3600)) is not None:
         return c
 

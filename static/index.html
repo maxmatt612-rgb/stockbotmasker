@@ -1947,7 +1947,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v82';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v83';color:var(--primary);opacity:.7}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
@@ -8487,6 +8487,21 @@ async function loadWhyToday(ticker, btn) {
   const _RE=/^([^\p{L}\p{N}]*)([\s\S]*?)([^\p{L}\p{N}]*)$/u;
   let _LANG = localStorage.getItem('masker_lang') || 'it';
   let _obs = null;
+
+  // Passa la lingua scelta a TUTTE le chiamate /api/ così l'AI risponde in EN/IT
+  const _origFetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    try{
+      const lang = localStorage.getItem('masker_lang') || 'it';
+      let url = (typeof input==='string') ? input : (input && input.url);
+      if(url && url.indexOf('/api/')!==-1 && !/[?&]lang=/.test(url)){
+        const u = url + (url.indexOf('?')!==-1?'&':'?') + 'lang=' + lang;
+        if(typeof input==='string') input = u;
+        else input = new Request(u, input);
+      }
+    }catch(e){}
+    return _origFetch(input, init);
+  };
 
   function translateText(s){
     if(_LANG!=='en'||!s) return s;
