@@ -1737,6 +1737,65 @@ header{border-top:2px solid var(--primary)!important}
 #timing-result{padding:18px 14px 60px;max-width:760px;margin:0 auto}
 @media(min-width:900px){#timing-result{padding:22px 28px 60px}}
 .timing-loading{text-align:center;padding:40px;color:var(--text-dim);font-size:.86rem;animation:shimmer 1.6s infinite}
+/* ── Decisioni AI: Top Buy & Compro? ── */
+.tool-head{max-width:680px;margin:0 auto 18px}
+.tool-title{font-family:var(--sans);font-size:1.5rem;font-weight:800;color:#fff;letter-spacing:.01em}
+.tool-sub{color:var(--text-dim);font-size:.88rem;margin:6px 0 16px;line-height:1.5}
+.tool-card{border:1px solid var(--border);border-radius:12px;background:rgba(14,21,31,.6);padding:18px}
+.tool-label{font-size:.74rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px}
+.tf-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tf-card{border:1.5px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;background:rgba(255,255,255,.02);transition:border-color .15s,background .15s,transform .1s}
+.tf-card:hover{border-color:var(--border-hi)}
+.tf-card.active{border-color:var(--primary);background:rgba(16,185,129,.1);box-shadow:0 0 0 1px var(--primary) inset}
+.tf-card-t{font-weight:700;font-size:.95rem;color:#fff}
+.tf-card-s{font-size:.76rem;color:var(--text-dim);margin-top:3px}
+.sb-form .timing-input{width:100%}
+.tool-go{width:100%;margin-top:16px;padding:13px;border:none;border-radius:10px;cursor:pointer;
+  font-family:var(--sans);font-size:.98rem;font-weight:800;letter-spacing:.02em;color:#04140d;
+  background:linear-gradient(135deg,var(--primary),var(--primary-2));box-shadow:0 6px 20px rgba(16,185,129,.32);transition:transform .1s,box-shadow .15s}
+.tool-go:hover{transform:translateY(-1px);box-shadow:0 8px 26px rgba(16,185,129,.42)}
+.tool-go:active{transform:translateY(0)}
+.tool-result-card{max-width:680px;margin:0 auto;border:1px solid var(--border-hi);border-radius:14px;background:rgba(14,21,31,.7);
+  overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.4);animation:revealUp .5s cubic-bezier(.22,1,.36,1) both}
+.trc-badge{background:linear-gradient(90deg,rgba(16,185,129,.18),rgba(16,185,129,.02));color:var(--primary-2);
+  font-size:.72rem;font-weight:800;letter-spacing:.06em;padding:9px 16px;border-bottom:1px solid var(--border)}
+.trc-hd{display:flex;align-items:center;justify-content:space-between;padding:16px}
+.trc-tk{font-family:var(--sans);font-size:1.7rem;font-weight:800;color:#fff}
+.trc-name{font-size:.72rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;margin-left:10px}
+.trc-price{font-family:var(--mono);font-size:1.5rem;font-weight:700;color:var(--text)}
+.trc-score{display:flex;align-items:center;gap:14px;padding:0 16px 14px}
+.trc-score-num{font-family:var(--sans);font-size:2.4rem;font-weight:800;color:var(--green-b);line-height:1}
+.trc-score-num span{font-size:1rem;color:var(--text-dim);font-weight:600}
+.trc-score-lbl{font-size:.78rem;color:var(--text-dim)}
+.trc-tags{display:flex;flex-wrap:wrap;gap:7px;padding:0 16px 14px}
+.vb{font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:7px;border:1px solid var(--border);color:var(--text);background:rgba(255,255,255,.03)}
+.vb.green{color:var(--green-b);border-color:rgba(31,217,155,.4)}
+.vb.gold{color:var(--gold);border-color:rgba(245,183,60,.4)}
+.trc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.trc-cell{background:rgba(14,21,31,.85);padding:12px 16px}
+.trc-cell-l{font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);margin-bottom:4px}
+.trc-cell-v{font-family:var(--mono);font-size:1.05rem;font-weight:700;color:var(--text)}
+.trc-cell-v small{font-size:.72rem;color:var(--text-dim);font-weight:600}
+.trc-cell.green .trc-cell-v{color:var(--green-b)}
+.trc-cell.red .trc-cell-v{color:var(--red-b)}
+.trc-reason,.trc-cats{padding:14px 16px;border-top:1px solid var(--border);font-size:.86rem;line-height:1.55;color:var(--text)}
+.trc-reason-hd{font-size:.74rem;font-weight:800;letter-spacing:.03em;color:var(--primary-2);margin-bottom:7px;text-transform:uppercase}
+.sb-cats{margin:0;padding-left:18px}
+.sb-cats li{margin:4px 0}
+.trc-runners{display:flex;align-items:center;flex-wrap:wrap;gap:7px;padding:14px 16px;border-top:1px solid var(--border)}
+.trc-runners-l{font-size:.74rem;color:var(--text-dim);font-weight:700}
+.rb-chip{font-family:var(--mono);font-size:.8rem;font-weight:700;padding:4px 10px;border-radius:7px;border:1px solid var(--border-hi);
+  background:rgba(255,255,255,.03);color:var(--text);cursor:pointer;transition:border-color .15s}
+.rb-chip:hover{border-color:var(--primary)}
+.rb-chip b{color:var(--green-b)}
+.sb-verdict{text-align:center;font-family:var(--sans);font-size:1.3rem;font-weight:800;letter-spacing:.04em;padding:16px;
+  display:flex;flex-direction:column;align-items:center;gap:6px}
+.sb-verdict.yes{color:var(--green-b);background:rgba(31,217,155,.08)}
+.sb-verdict.no{color:var(--red-b);background:rgba(255,93,120,.08)}
+.sb-verdict.wait{color:var(--gold);background:rgba(245,183,60,.08)}
+.sb-conf{font-size:.74rem;font-weight:600;letter-spacing:.02em;color:var(--text-dim)}
+.trc-actions{padding:14px 16px;border-top:1px solid var(--border)}
+@media(max-width:560px){.trc-grid{grid-template-columns:1fr}.tf-cards{grid-template-columns:1fr}}
 .timing-card{border:1px solid var(--border-hi);background:rgba(14,21,31,.72);backdrop-filter:blur(14px) saturate(1.15);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 10px 40px rgba(0,0,0,.4);animation:revealUp .5s cubic-bezier(.22,1,.36,1) both}
 .timing-card-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
@@ -1888,7 +1947,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v80';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v81';color:var(--primary);opacity:.7}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
@@ -2289,6 +2348,9 @@ header .logo{display:none}
   <button class="tab-btn" data-tab="timing"    onclick="switchTab('timing')"><span class="tb-ico">⚡</span><span class="tb-lab">Timing</span></button>
   <button class="tab-btn" data-tab="portfolio" onclick="switchTab('portfolio')"><span class="tb-ico">💼</span><span class="tb-lab">Portfolio</span></button>
   <button class="tab-btn" data-tab="history"   onclick="switchTab('history')"><span class="tb-ico">📅</span><span class="tb-lab">Storico</span></button>
+  <div class="side-sec">Decisioni AI</div>
+  <button class="tab-btn" data-tab="topbuy"    onclick="switchTab('topbuy')"><span class="tb-ico">💎</span><span class="tb-lab">Top Buy</span></button>
+  <button class="tab-btn" data-tab="shouldbuy" onclick="switchTab('shouldbuy')"><span class="tb-ico">✅</span><span class="tb-lab">Compro?</span></button>
   <div class="side-sec">Strumenti</div>
   <button class="tab-btn" data-tab="radar"     onclick="switchTab('radar')"><span class="tb-ico">📡</span><span class="tb-lab">Radar VIP</span></button>
   <button class="tab-btn" data-tab="briefing"  onclick="switchTab('briefing')"><span class="tb-ico">📰</span><span class="tb-lab">Briefing</span></button>
@@ -2669,6 +2731,48 @@ header .logo{display:none}
     <div class="timing-quick" id="timing-quick"></div>
   </div>
   <div id="timing-result"></div>
+</div>
+
+<!-- ── Top Buy view (miglior acquisto adesso) ── -->
+<div id="topbuy-view" style="display:none">
+  <div class="tool-head">
+    <div class="tool-title">💎 Top Buy</div>
+    <div class="tool-sub">Scansione AI del mercato per trovare la <b>singola migliore opportunità d'acquisto</b> adesso.</div>
+    <div class="tool-card">
+      <div class="tool-label">🟢 Seleziona l'orizzonte d'investimento</div>
+      <div class="tf-cards">
+        <div class="tf-card active" data-h="short" onclick="_pickTbHorizon('short',this)">
+          <div class="tf-card-t">⚡ Breve termine</div><div class="tf-card-s">3–6 mesi</div></div>
+        <div class="tf-card" data-h="long" onclick="_pickTbHorizon('long',this)">
+          <div class="tf-card-t">📈 Lungo termine</div><div class="tf-card-s">12–24 mesi</div></div>
+      </div>
+      <button class="tool-go" onclick="runTopBuy()">💡 Ottieni il consiglio</button>
+    </div>
+  </div>
+  <div id="topbuy-result"></div>
+</div>
+
+<!-- ── Should I Buy view (verdetto compra/non compra) ── -->
+<div id="shouldbuy-view" style="display:none">
+  <div class="tool-head">
+    <div class="tool-title">✅ Compro?</div>
+    <div class="tool-sub">Verdetto compra/non-compra basato sui dati, con <b>zona d'ingresso, stop-loss e catalizzatori</b>.</div>
+    <div class="tool-card">
+      <div class="tool-label">Ticker</div>
+      <div class="sb-form">
+        <input class="timing-input" id="sb-input" placeholder="Es. TSLA" autocapitalize="characters" spellcheck="false" onkeydown="if(event.key==='Enter')runShouldBuy()">
+      </div>
+      <div class="tool-label" style="margin-top:12px">Orizzonte</div>
+      <div class="tf-cards">
+        <div class="tf-card active" data-h="short" onclick="_pickSbHorizon('short',this)">
+          <div class="tf-card-t">⚡ Breve termine</div><div class="tf-card-s">3–6 mesi</div></div>
+        <div class="tf-card" data-h="long" onclick="_pickSbHorizon('long',this)">
+          <div class="tf-card-t">📈 Lungo termine</div><div class="tf-card-s">12–24 mesi</div></div>
+      </div>
+      <button class="tool-go" onclick="runShouldBuy()">🔍 Analizza</button>
+    </div>
+  </div>
+  <div id="shouldbuy-result"></div>
 </div>
 
 <!-- ── Alert panel (overlay) ── -->
@@ -3258,7 +3362,7 @@ let _lastNotifTicker = null;
 // switchTab — definita subito così onclick="switchTab(...)" funziona sempre
 window._tabLoaded = {};
 window.switchTab = function(tab) {
-  const VIEWS = ['live','timing','radar','history','heatmap','portfolio','watchlist','calendar','ai-chat','briefing'];
+  const VIEWS = ['live','timing','topbuy','shouldbuy','radar','history','heatmap','portfolio','watchlist','calendar','ai-chat','briefing'];
   document.querySelectorAll('.tab-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === tab);
   });
@@ -3506,6 +3610,110 @@ function renderTiming(d){
         <button class="timing-detail-btn" onclick="openTickerModal('${d.ticker}')">Apri dettaglio completo ▸</button>
       </div>
       <div class="timing-disc">${d.ai?'Analisi AI · Groq Llama 70B':'Analisi tecnica'} · il timing è una stima, non una certezza · non è consulenza finanziaria</div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 💎 Top Buy — l'AI trova il miglior acquisto adesso
+// ══════════════════════════════════════════════════════════════════════════════
+let _tbHorizon='short';
+function _pickTbHorizon(h,el){
+  _tbHorizon=h;
+  document.querySelectorAll('#topbuy-view .tf-card').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+}
+function _ccySym(c){ return c==='EUR'?'€':c==='GBP'?'£':c==='CHF'?'CHF ':'$'; }
+async function runTopBuy(){
+  const res=document.getElementById('topbuy-result');
+  const oriz=_tbHorizon==='long'?'lungo termine (12–24 mesi)':'breve termine (3–6 mesi)';
+  res.innerHTML='<div class="timing-loading">💎 L\'AI sta scansionando il mercato per il miglior acquisto a '+oriz+'…</div>';
+  try{
+    const r=await fetch('/api/best-buy?horizon='+_tbHorizon);
+    if(r.status===202){ res.innerHTML='<div class="timing-loading" style="color:var(--gold)">⏳ Scansione mercato non ancora pronta — riprova tra qualche secondo.</div>'; return; }
+    const d=await r.json();
+    if(!d||d.error){ res.innerHTML='<div class="timing-loading" style="color:var(--red-b)">⚠️ '+((d&&d.error)||'Errore')+'</div>'; return; }
+    renderTopBuy(d);
+  }catch(e){ res.innerHTML='<div class="timing-loading" style="color:var(--red-b)">⚠️ Errore di rete</div>'; }
+}
+function renderTopBuy(d){
+  const res=document.getElementById('topbuy-result'); if(!res) return;
+  const ccy=_ccySym(d.currency);
+  const oriz=d.horizon==='long'?'Lungo termine · 12–24 mesi':'Breve termine · 3–6 mesi';
+  const up=(d.runners_up||[]).map(s=>`<span class="rb-chip" onclick="openTickerModal('${s.ticker}')">${s.ticker}${s.score_10!=null?` <b>${(+s.score_10).toFixed(1)}</b>`:''}</span>`).join('');
+  const trend=d.uptrend?'<span class="vb green">📈 Trend rialzista</span>':'<span class="vb gold">↔️ Trend neutro</span>';
+  res.innerHTML=`
+    <div class="tool-result-card">
+      <div class="trc-badge">💎 MIGLIOR ACQUISTO ADESSO · ${oriz}</div>
+      <div class="trc-hd">
+        <div><span class="trc-tk">${d.ticker}</span><span class="trc-name">${(d.name||'').slice(0,30)}</span></div>
+        <div class="trc-price">${ccy}${(d.price||0).toFixed(2)}</div>
+      </div>
+      ${d.score_10!=null?`<div class="trc-score"><div class="trc-score-num">${(+d.score_10).toFixed(1)}<span>/10</span></div><div class="trc-score-lbl">Score qualità Masker</div></div>`:''}
+      <div class="trc-tags">${trend}${d.risk_level?`<span class="vb">🛡️ Rischio: ${d.risk_level}</span>`:''}${d.rsi!=null?`<span class="vb">RSI ${(+d.rsi).toFixed(0)}</span>`:''}</div>
+      <div class="trc-grid">
+        ${d.entry!=null?`<div class="trc-cell"><div class="trc-cell-l">Ingresso</div><div class="trc-cell-v">${ccy}${(+d.entry).toFixed(2)}</div></div>`:''}
+        ${d.stop!=null?`<div class="trc-cell red"><div class="trc-cell-l">Stop-loss</div><div class="trc-cell-v">${ccy}${(+d.stop).toFixed(2)}${d.stop_pct!=null?` <small>${(+d.stop_pct).toFixed(1)}%</small>`:''}</div></div>`:''}
+        ${d.target!=null?`<div class="trc-cell green"><div class="trc-cell-l">Obiettivo</div><div class="trc-cell-v">${ccy}${(+d.target).toFixed(2)}${d.target_pct!=null?` <small>+${(+d.target_pct).toFixed(1)}%</small>`:''}</div></div>`:''}
+        ${d.rr!=null?`<div class="trc-cell"><div class="trc-cell-l">Rischio/Rendimento</div><div class="trc-cell-v">${(+d.rr).toFixed(2)} : 1</div></div>`:''}
+      </div>
+      ${d.reasoning?`<div class="trc-reason"><div class="trc-reason-hd">🧠 Perché proprio questo</div>${d.reasoning}</div>`:''}
+      ${up?`<div class="trc-runners"><span class="trc-runners-l">Alternative:</span>${up}</div>`:''}
+      <div class="trc-actions"><button class="timing-detail-btn" onclick="openTickerModal('${d.ticker}')">Apri dettaglio completo ▸</button></div>
+      <div class="timing-disc">Analisi AI · Groq Llama 70B · stima basata sui dati, non è consulenza finanziaria</div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ✅ Compro? — verdetto compra/non-compra con zona d'ingresso, stop e catalizzatori
+// ══════════════════════════════════════════════════════════════════════════════
+let _sbHorizon='short';
+function _pickSbHorizon(h,el){
+  _sbHorizon=h;
+  document.querySelectorAll('#shouldbuy-view .tf-card').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+}
+async function runShouldBuy(){
+  const inp=document.getElementById('sb-input');
+  const t=(inp.value||'').trim().toUpperCase();
+  if(!t){ inp.focus(); return; }
+  inp.value=t;
+  const res=document.getElementById('shouldbuy-result');
+  res.innerHTML='<div class="timing-loading">🔍 Sto valutando <b>'+t+'</b>…</div>';
+  try{
+    const r=await fetch('/api/stock/'+t+'/should-buy?horizon='+_sbHorizon);
+    const d=await r.json();
+    if(!d||d.error){ res.innerHTML='<div class="timing-loading" style="color:var(--red-b)">⚠️ '+((d&&d.error)||'Ticker non trovato')+'</div>'; return; }
+    renderShouldBuy(d);
+  }catch(e){ res.innerHTML='<div class="timing-loading" style="color:var(--red-b)">⚠️ Errore di rete</div>'; }
+}
+function renderShouldBuy(d){
+  const res=document.getElementById('shouldbuy-result'); if(!res) return;
+  const ccy=_ccySym(d.currency);
+  const v=(d.verdict||'').toUpperCase();
+  const vCls=v.includes('NON')?'no':(v.includes('COMPRA')?'yes':'wait');
+  const vIcon=vCls==='yes'?'✅':vCls==='no'?'⛔':'⏳';
+  const oriz=d.horizon==='long'?'Lungo termine · 12–24 mesi':'Breve termine · 3–6 mesi';
+  const cats=(d.catalysts||[]).map(c=>`<li>${c}</li>`).join('');
+  res.innerHTML=`
+    <div class="tool-result-card">
+      <div class="trc-badge">✅ VERDETTO · ${oriz}</div>
+      <div class="trc-hd">
+        <div><span class="trc-tk">${d.ticker}</span><span class="trc-name">${(d.name||'').slice(0,30)}</span></div>
+        <div class="trc-price">${ccy}${(d.price||0).toFixed(2)}</div>
+      </div>
+      <div class="sb-verdict ${vCls}">${vIcon} ${d.verdict||'ASPETTA'}${d.confidence!=null?`<span class="sb-conf">Confidenza ${(+d.confidence).toFixed(0)}%</span>`:''}</div>
+      <div class="trc-grid">
+        ${(d.entry_low!=null&&d.entry_high!=null)?`<div class="trc-cell green"><div class="trc-cell-l">Zona d'ingresso</div><div class="trc-cell-v">${ccy}${(+d.entry_low).toFixed(2)} – ${ccy}${(+d.entry_high).toFixed(2)}</div></div>`:''}
+        ${d.stop!=null?`<div class="trc-cell red"><div class="trc-cell-l">Stop-loss</div><div class="trc-cell-v">${ccy}${(+d.stop).toFixed(2)}</div></div>`:''}
+        ${d.support!=null?`<div class="trc-cell"><div class="trc-cell-l">Supporto</div><div class="trc-cell-v">${ccy}${(+d.support).toFixed(2)}</div></div>`:''}
+        ${d.resistance!=null?`<div class="trc-cell"><div class="trc-cell-l">Resistenza</div><div class="trc-cell-v">${ccy}${(+d.resistance).toFixed(2)}</div></div>`:''}
+        ${d.rsi!=null?`<div class="trc-cell"><div class="trc-cell-l">RSI</div><div class="trc-cell-v">${(+d.rsi).toFixed(0)}</div></div>`:''}
+        ${d.risk_level?`<div class="trc-cell"><div class="trc-cell-l">Rischio</div><div class="trc-cell-v">${d.risk_level}</div></div>`:''}
+      </div>
+      ${d.reasoning?`<div class="trc-reason"><div class="trc-reason-hd">🧠 Motivo</div>${d.reasoning}</div>`:''}
+      ${cats?`<div class="trc-cats"><div class="trc-reason-hd">📅 Catalizzatori</div><ul class="sb-cats">${cats}</ul></div>`:''}
+      <div class="trc-actions"><button class="timing-detail-btn" onclick="openTickerModal('${d.ticker}')">Apri dettaglio completo ▸</button></div>
+      <div class="timing-disc">Analisi AI · Groq Llama 70B · stima basata sui dati, non è consulenza finanziaria</div>
     </div>`;
 }
 

@@ -1418,6 +1418,148 @@ async def api_longterm(ticker: str):
     return data
 
 
+@app.get("/api/best-buy")
+async def api_best_buy(horizon: str = "short"):
+    """Top Buy: l'AI trova il MIGLIOR acquisto adesso tra i titoli analizzati,
+    in base all'orizzonte (short = momentum/tecnico, long = trend solido+qualità)."""
+    horizon = "long" if horizon == "long" else "short"
+    key = f"bestbuy:{horizon}"
+    if (c := _cached(key, 1200)) is not None:
+        return c
+    pool = ((_cache.get("scan:full") or {}).get("data")) or _morning_data or ((_cache.get("scan:10") or {}).get("data")) or []
+    if not pool:
+        return JSONResponse({"error": "Scansione non ancora pronta — riprova tra poco"}, status_code=202)
+
+    cands = [dict(s) for s in pool]
+    if horizon == "long":
+        q = [s for s in cands if s.get("uptrend") and (s.get("volatility", 100) or 100) < 70]
+        cands = q or cands
+    cands.sort(key=lambda s: (s.get("score", 0) or 0), reverse=True)
+    pick = cands[0]
+    runners = [{"ticker": s["ticker"], "score_10": s.get("score_10")} for s in cands[1:4]]
+
+    ts = pick.get("trade_setup") or {}
+    reasoning = ""
+    if groq_client:
+        try:
+            oriz = "breve termine (3-6 mesi)" if horizon == "short" else "lungo termine (12-24 mesi)"
+            prompt = (
+                f"Tra i titoli analizzati oggi, il migliore per {oriz} è {pick['ticker']} "
+                f"(prezzo ${pick.get('current_price',0):.2f}, score {pick.get('score_10','?')}/10, "
+                f"RSI {pick.get('rsi',50):.0f}, trend {'rialzista' if pick.get('uptrend') else 'misto'}, "
+                f"mese {(pick.get('month_return') or 0):+.0f}%).\n"
+                "Spiega in 2-3 frasi PERCHÉ è la migliore opportunità di acquisto adesso per questo orizzonte. "
+                "Italiano, diretto, concreto. Niente disclaimer."
+            )
+            r = await groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile", max_tokens=180,
+                messages=[{"role": "system", "content": "Analista che indica la migliore opportunità d'acquisto. Conciso, italiano."},
+                          {"role": "user", "content": prompt}])
+            reasoning = r.choices[0].message.content.strip()
+        except Exception:
+            pass
+
+    result = {
+        "horizon": horizon, "ticker": pick["ticker"], "name": pick.get("name", pick["ticker"]),
+        "price": pick.get("current_price"), "currency": pick.get("currency", "USD"),
+        "score_10": pick.get("score_10"), "rsi": pick.get("rsi"),
+        "month_return": pick.get("month_return"), "week_return": pick.get("week_return"),
+        "uptrend": pick.get("uptrend"), "risk_level": pick.get("risk_level"),
+        "entry": ts.get("entry"), "stop": ts.get("stop"), "target": ts.get("target"),
+        "stop_pct": ts.get("stop_pct"), "target_pct": ts.get("target_pct"), "rr": ts.get("rr"),
+        "reasoning": reasoning, "runners_up": runners,
+    }
+    result = _clean(result)
+    _store(key, result)
+    return result
+
+
+@app.get("/api/stock/{ticker}/should-buy")
+async def api_should_buy(ticker: str, horizon: str = "short"):
+    """Should I Buy: verdetto compra/non-compra con zona d'ingresso, stop-loss e catalizzatori."""
+    t = ticker.upper()
+    horizon = "long" if horizon == "long" else "short"
+    key = f"shouldbuy:{t}:{horizon}"
+    if (c := _cached(key, 1200)) is not None:
+        return c
+    data = await asyncio.to_thread(get_enriched_analysis, t)
+    if not data:
+        return JSONResponse({"error": "Ticker non trovato"}, status_code=404)
+    data = _clean(data)
+
+    # Zona d'ingresso + stop da supporto/resistenza
+    def _levels():
+        import yfinance as yf
+        try:
+            h = yf.Ticker(t).history(period="3mo")
+            if h.empty:
+                return None, None
+            recent = h.tail(40)
+            return float(recent["Low"].min()), float(recent["High"].max())
+        except Exception:
+            return None, None
+    support, resistance = await asyncio.to_thread(_levels)
+    cur = data.get("current_price", 0) or 0
+    ccy = data.get("currency", "USD")
+    sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+    entry_low = round(max(support or cur * 0.96, cur * 0.95), 2)
+    entry_high = round(cur, 2)
+    stop = round((support or cur * 0.95) * 0.98, 2)
+
+    catalysts = []
+    if data.get("earnings_today"):
+        catalysts.append("⚠️ Earnings OGGI")
+    elif data.get("next_earnings_str"):
+        catalysts.append("📅 Earnings: " + data["next_earnings_str"])
+    if data.get("news_sentiment_label"):
+        catalysts.append("📰 Sentiment news: " + data["news_sentiment_label"])
+
+    verdict, conf, reasoning = "ASPETTA", 60, ""
+    if groq_client:
+        try:
+            oriz = "breve termine (3-6 mesi)" if horizon == "short" else "lungo termine (12-24 mesi)"
+            prompt = (
+                f"Devo comprare {t} ({data.get('name',t)}) per {oriz}?\n"
+                f"Prezzo {sym}{cur:.2f}, RSI {data.get('rsi',50):.0f}, rischio {data.get('risk_level','N/D')}, "
+                f"settimana {(data.get('week_return') or 0):+.1f}%, mese {(data.get('month_return') or 0):+.1f}%, "
+                f"supporto {sym}{(support or 0):.2f}, resistenza {sym}{(resistance or 0):.2f}, "
+                f"sentiment {data.get('news_sentiment_label','N/D')}, earnings {data.get('next_earnings_str','N/D')}.\n"
+                "Rispondi SOLO in questo formato:\n"
+                "VERDETTO: COMPRA oppure ASPETTA oppure NON COMPRARE\n"
+                "CONFIDENZA: [50-95]\n"
+                "MOTIVO: [2 frasi concrete sul perché]\n"
+            )
+            r = await groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile", max_tokens=200,
+                messages=[{"role": "system", "content": "Trader che dà verdetti netti compra/aspetta/non comprare. Italiano, diretto."},
+                          {"role": "user", "content": prompt}])
+            txt = r.choices[0].message.content.strip()
+            for line in txt.split("\n"):
+                lu = line.strip().upper()
+                if lu.startswith("VERDETTO:"):
+                    v = line.split(":", 1)[1].strip().upper()
+                    verdict = "NON COMPRARE" if "NON" in v else ("COMPRA" if "COMPRA" in v else "ASPETTA")
+                elif lu.startswith("CONFIDENZA:"):
+                    try: conf = max(50, min(95, int("".join(ch for ch in line if ch.isdigit())[:2] or "60")))
+                    except Exception: pass
+                elif lu.startswith("MOTIVO:"):
+                    reasoning = line.split(":", 1)[1].strip()
+        except Exception:
+            pass
+
+    result = {
+        "ticker": t, "name": data.get("name", t), "currency": ccy, "price": cur, "horizon": horizon,
+        "verdict": verdict, "confidence": conf, "reasoning": reasoning,
+        "entry_low": entry_low, "entry_high": entry_high, "stop": stop,
+        "support": round(support, 2) if support else None, "resistance": round(resistance, 2) if resistance else None,
+        "rsi": round(data.get("rsi", 50) or 50), "risk_level": data.get("risk_level"),
+        "catalysts": catalysts,
+    }
+    result = _clean(result)
+    _store(key, result)
+    return result
+
+
 @app.get("/api/stock/{ticker}/deepreport")
 async def api_deep_report(ticker: str):
     """Report istituzionale a 13 sezioni con punteggi (Business Quality, Financials,
