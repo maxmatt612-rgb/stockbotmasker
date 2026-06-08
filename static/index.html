@@ -1737,6 +1737,13 @@ header{border-top:2px solid var(--primary)!important}
 #timing-result{padding:18px 14px 60px;max-width:760px;margin:0 auto}
 @media(min-width:900px){#timing-result{padding:22px 28px 60px}}
 .timing-loading{text-align:center;padding:40px;color:var(--text-dim);font-size:.86rem;animation:shimmer 1.6s infinite}
+/* ── Real-time (Finnhub) badge + flash prezzo ── */
+.rt-badge{display:inline-flex;align-items:center;gap:5px;font-size:.6rem;font-weight:800;letter-spacing:.08em;
+  color:var(--green-b);background:rgba(31,217,155,.12);border:1px solid rgba(31,217,155,.35);
+  padding:3px 8px;border-radius:6px;text-transform:uppercase;align-self:center}
+.rt-dot{width:6px;height:6px;border-radius:50%;background:var(--green-b);box-shadow:0 0 8px var(--green-b);animation:livePulse 1.4s infinite}
+@keyframes rtFlash{0%{color:var(--green-b)}100%{color:inherit}}
+.rt-flash{animation:rtFlash .6s ease-out}
 /* ── Decisioni AI: Top Buy & Compro? ── */
 .tool-head{max-width:680px;margin:0 auto 18px}
 .tool-title{font-family:var(--sans);font-size:1.5rem;font-weight:800;color:#fff;letter-spacing:.01em}
@@ -1947,7 +1954,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v83';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v84';color:var(--primary);opacity:.7}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
@@ -3122,6 +3129,7 @@ header .logo{display:none}
     <div class="modal-price-row">
       <div class="modal-price" id="m-price">—</div>
       <div class="price-chg" id="m-chg"></div>
+      <span class="rt-badge" id="m-live" style="display:none"><span class="rt-dot"></span>LIVE</span>
     </div>
     <!-- Analizzatore AI completo -->
     <div id="deep-ai" class="deep-ai">
@@ -4787,6 +4795,7 @@ document.addEventListener('click',e=>{
 // Modal — lightweight-charts (linea + candele) + timeframe
 // ══════════════════════════════════════════════════════════════════════════════
 let _lwChart=null, _lwSeries=null, _modalTicker='', _modalCurrency='USD', _chartType='line', _chartPeriod='1mo', _chartInterval='1d';
+let _rtModalSym=null, _rtModalCb=null, _modalPrevClose=null;
 
 const _lwOpts={
   layout:{background:{type:'solid',color:'transparent'},textColor:'#8E8A9E'},
@@ -4861,6 +4870,8 @@ async function openModal(stock){
   document.getElementById('m-ticker').textContent=stock.ticker;
   document.getElementById('m-company').textContent=stock.name??stock.ticker;
   _modalCurrency=stock.currency||'USD';
+  document.getElementById('m-live').style.display='none';
+  _rtBindModal(stock.ticker);   // real-time Finnhub (solo titoli USA, se la key è impostata)
   document.getElementById('m-price').textContent='…';   // verrà riempito col prezzo LIVE dal grafico
   const chgEl=document.getElementById('m-chg');
   chgEl.textContent=stock.current_price?fmtC(stock.day_change_pct):'';
@@ -4900,6 +4911,9 @@ async function openModal(stock){
     _modalCurrency=full.currency||_modalCurrency;
     // prezzo LIVE (valuta nativa) — fallback se il grafico non è ancora pronto
     if(full.current_price) document.getElementById('m-price').textContent=fmtNative(full.current_price, _modalCurrency);
+    // baseline per ricalcolare la % al volo dai tick real-time
+    if(full.current_price!=null && full.day_change_pct!=null)
+      _modalPrevClose = full.current_price/(1+(full.day_change_pct/100));
     chgEl.textContent=fmtC(full.day_change_pct??0);
     chgEl.className='price-chg '+((full.day_change_pct??0)>=0?'chg-pos':'chg-neg');
     const cells=[
@@ -5017,7 +5031,27 @@ async function _loadForecast(ticker){
 
 document.getElementById('modal-close').addEventListener('click',closeModal);
 document.getElementById('modal-overlay').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal();});
-function closeModal(){_destroyChart();document.getElementById('modal-overlay').classList.remove('open'); _ltLoaded=false;}
+function closeModal(){_destroyChart();document.getElementById('modal-overlay').classList.remove('open'); _ltLoaded=false;
+  if(_rtModalSym && window.rtUnsubscribe){ rtUnsubscribe(_rtModalSym,_rtModalCb); } _rtModalSym=null; _rtModalCb=null; _modalPrevClose=null;}
+
+// ── Binding real-time del modale (Finnhub) ──
+function _rtBindModal(sym){
+  if(_rtModalSym && window.rtUnsubscribe){ rtUnsubscribe(_rtModalSym,_rtModalCb); _rtModalSym=null; _rtModalCb=null; }
+  _modalPrevClose=null;
+  if(!sym || !window.rtSupported || !rtSupported(sym)) return;  // solo titoli USA
+  _rtModalCb=function(price){
+    if(_modalTicker!==sym) return;
+    const pe=document.getElementById('m-price');
+    if(pe){ pe.textContent=fmtNative(price,_modalCurrency); pe.classList.remove('rt-flash'); void pe.offsetWidth; pe.classList.add('rt-flash'); }
+    if(_modalPrevClose){
+      const pct=(price/_modalPrevClose-1)*100, ce=document.getElementById('m-chg');
+      if(ce){ ce.textContent=fmtC(pct); ce.className='price-chg '+(pct>=0?'chg-pos':'chg-neg'); }
+    }
+    const lb=document.getElementById('m-live'); if(lb) lb.style.display='inline-flex';
+  };
+  _rtModalSym=sym;
+  rtSubscribe(sym,_rtModalCb);
+}
 
 // ── Lungo Termine ─────────────────────────────────────────────────────────────
 let _ltLoaded = false;
@@ -8588,6 +8622,65 @@ async function loadWhyToday(ticker, btn) {
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',_init);
   else _init();
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     Real-time prezzi via Finnhub websocket (free tier: azioni USA)
+     La API key arriva da /api/realtime-token (env var Railway), MAI nel repo.
+     ══════════════════════════════════════════════════════════════════════════ -->
+<script>
+(function(){
+  let _ws=null, _wsReady=false, _token=null, _started=false, _reconnectT=null;
+  const _subs=new Map();   // symbol -> Set(callback)
+
+  // Free tier Finnhub = azioni USA: ticker semplici A-Z (niente .MI, niente -USD crypto)
+  function _supported(sym){ return typeof sym==='string' && /^[A-Z]{1,5}$/.test(sym); }
+
+  async function _ensure(){
+    if(_started) return; _started=true;
+    try{ const j=await fetch('/api/realtime-token').then(r=>r.json()); _token=(j&&j.finnhub)||''; }
+    catch(e){ _token=''; }
+    if(!_token){ _started=false; return; }   // nessuna key → resta su polling Yahoo
+    _connect();
+  }
+  function _connect(){
+    if(!_token) return;
+    try{ _ws=new WebSocket('wss://ws.finnhub.io?token='+encodeURIComponent(_token)); }catch(e){ return; }
+    _ws.onopen=()=>{ _wsReady=true; _subs.forEach((c,sym)=>_send('subscribe',sym)); };
+    _ws.onmessage=(ev)=>{
+      let m; try{ m=JSON.parse(ev.data); }catch(e){ return; }
+      if(m.type==='trade' && Array.isArray(m.data)){
+        const last={};
+        for(const t of m.data) last[t.s]=t.p;   // ultimo prezzo per simbolo
+        for(const sym in last){
+          const cbs=_subs.get(sym);
+          if(cbs) cbs.forEach(cb=>{ try{ cb(last[sym]); }catch(e){} });
+        }
+      }
+    };
+    _ws.onclose=()=>{ _wsReady=false; _reconnect(); };
+    _ws.onerror=()=>{ try{ _ws.close(); }catch(e){} };
+  }
+  function _reconnect(){
+    if(_reconnectT) return;
+    _reconnectT=setTimeout(()=>{ _reconnectT=null; if(_subs.size) _connect(); }, 4000);
+  }
+  function _send(action,sym){ if(_ws&&_wsReady){ try{ _ws.send(JSON.stringify({type:action,symbol:sym})); }catch(e){} } }
+
+  window.rtSupported=_supported;
+  window.rtSubscribe=function(sym,cb){
+    if(!_supported(sym)) return false;
+    _ensure();
+    let cbs=_subs.get(sym);
+    if(!cbs){ cbs=new Set(); _subs.set(sym,cbs); _send('subscribe',sym); }
+    cbs.add(cb); return true;
+  };
+  window.rtUnsubscribe=function(sym,cb){
+    const cbs=_subs.get(sym); if(!cbs) return;
+    if(cb) cbs.delete(cb); else cbs.clear();
+    if(cbs.size===0){ _subs.delete(sym); _send('unsubscribe',sym); }
+  };
 })();
 </script>
 </body>

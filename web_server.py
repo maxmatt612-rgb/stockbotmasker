@@ -126,6 +126,13 @@ class _LangASGIMiddleware:
 app.add_middleware(_LangASGIMiddleware)
 
 
+@app.get("/api/realtime-token")
+async def api_realtime_token():
+    """Espone la chiave Finnhub (real-time websocket) letta dalle env var di Railway.
+    Se non impostata, ritorna stringa vuota → il frontend resta su polling Yahoo."""
+    return {"finnhub": os.getenv("FINNHUB_KEY", "")}
+
+
 # Wrapper Groq: quando lang=en inietta l'istruzione di rispondere in inglese
 # in OGNI chiamata AI (un solo punto, copre tutti gli endpoint presenti e futuri).
 if groq_client is not None:
