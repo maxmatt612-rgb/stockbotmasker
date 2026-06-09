@@ -2910,6 +2910,103 @@ async def api_analyze_chart(body: ChartAnalysisBody):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+# ─── Analisi grafico PRO (output strutturato: entry / SL / TP / verdetto) ─────
+
+_CHART_PRO_SYSTEM = (
+    "Sei un trader tecnico professionista (price action + analisi tecnica classica). "
+    "Esamini lo SCREENSHOT di un grafico di prezzo e produci un piano operativo concreto. "
+    "Considera TUTTE le tecniche rilevanti che vedi nel grafico:\n"
+    "- Trend e struttura: massimi/minimi crescenti o decrescenti, trendline, canali, medie mobili.\n"
+    "- Supporti/Resistenze, zone di domanda/offerta, pivot, numeri tondi.\n"
+    "- Pattern grafici: testa-spalle (e inverso), doppio/triplo massimo-minimo, triangoli "
+    "(ascendente/discendente/simmetrico), flag, pennant, cunei (wedge), cup & handle, canali, rettangoli.\n"
+    "- Candlestick: engulfing, hammer/shooting star, doji, morning/evening star, pin bar.\n"
+    "- Indicatori se visibili: RSI (ipercomprato/ipervenduto, divergenze), MACD, Bande di Bollinger, volume.\n"
+    "- Fibonacci (ritracciamenti/estensioni) se presenti o deducibili.\n"
+    "- Breakout, pullback, retest, falsi breakout.\n"
+    "- Gestione del rischio: stop-loss sotto/sopra l'invalidazione tecnica, take-profit a resistenze/supporti, rapporto rischio/rendimento (R/R).\n\n"
+    "Leggi i PREZZI dall'asse del grafico (sono stime ragionevoli, non valori esatti). "
+    "Se l'immagine NON è un grafico di prezzo, imposta is_chart=false.\n\n"
+    "Rispondi SOLO con un oggetto JSON valido (nessun testo prima o dopo), con questo schema esatto:\n"
+    "{\n"
+    '  "is_chart": true,\n'
+    '  "asset_guess": "ticker o nome se visibile, altrimenti null",\n'
+    '  "timeframe": "stima del timeframe (es. giornaliero, 4h, settimanale)",\n'
+    '  "trend": "rialzista|ribassista|laterale",\n'
+    '  "verdict": "COMPRA|ASPETTA|NON COMPRARE",\n'
+    '  "confidence": 0-100,\n'
+    '  "entry_low": numero, "entry_high": numero,\n'
+    '  "stop_loss": numero, "stop_reason": "perché lì (invalidazione tecnica)",\n'
+    '  "take_profits": [{"price": numero, "rr": "1:2", "note": "a quale livello"}],\n'
+    '  "support": numero, "resistance": numero,\n'
+    '  "patterns": ["pattern identificati"],\n'
+    '  "signals": ["osservazioni su RSI/volume/candele/medie"],\n'
+    '  "thesis": "tesi operativa in 1-2 frasi",\n'
+    '  "risk_note": "rischio principale da monitorare"\n'
+    "}\n"
+    "Usa numeri (non stringhe) per prezzi e confidence. Da 2 a 3 take_profits. "
+    "Verdict: COMPRA se setup long valido con buon R/R, NON COMPRARE se il quadro è negativo/short, "
+    "ASPETTA se serve una conferma (breakout/pullback)."
+)
+
+
+def _extract_json(text: str):
+    """Estrae il primo oggetto JSON bilanciato da un testo."""
+    import json as _json
+    if not text:
+        return None
+    s = text.find("{")
+    if s == -1:
+        return None
+    depth = 0
+    for i in range(s, len(text)):
+        c = text[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return _json.loads(text[s:i + 1])
+                except Exception:
+                    return None
+    return None
+
+
+@app.post("/api/chart-pro")
+async def api_chart_pro(body: ChartAnalysisBody):
+    if not groq_client:
+        return JSONResponse({"error": "GROQ_API_KEY non configurata"}, status_code=503)
+    img = body.image_b64
+    if not img.startswith("data:"):
+        img = f"data:image/jpeg;base64,{img}"
+    user_text = "Analizza questo grafico e restituisci il piano operativo in JSON come da istruzioni."
+    if body.question:
+        user_text += f"\nNota dell'utente: {body.question}"
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[
+                {"role": "system", "content": _CHART_PRO_SYSTEM},
+                {"role": "user", "content": [
+                    {"type": "text", "text": user_text},
+                    {"type": "image_url", "image_url": {"url": img}},
+                ]},
+            ],
+            max_tokens=1000,
+            temperature=0.3,
+        )
+        raw = resp.choices[0].message.content.strip()
+        data = _extract_json(raw)
+        if not data:
+            # fallback: ritorna il testo grezzo se il modello non ha dato JSON
+            return {"is_chart": True, "raw": raw, "parsed": False}
+        data["parsed"] = True
+        return _clean(data)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 # ─── Confessionale finanziario ────────────────────────────────────────────────
 
 class ConfessionaleBody(BaseModel):

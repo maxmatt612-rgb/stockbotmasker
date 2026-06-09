@@ -1803,6 +1803,19 @@ header{border-top:2px solid var(--primary)!important}
 .sb-conf{font-size:.74rem;font-weight:600;letter-spacing:.02em;color:var(--text-dim)}
 .trc-actions{padding:14px 16px;border-top:1px solid var(--border)}
 @media(max-width:560px){.trc-grid{grid-template-columns:1fr}.tf-cards{grid-template-columns:1fr}}
+/* ── Grafico AI: zona upload ── */
+.cai-drop{border:1.5px dashed var(--border-hi);border-radius:12px;background:rgba(255,255,255,.02);
+  cursor:pointer;transition:border-color .15s,background .15s;overflow:hidden}
+.cai-drop:hover,.cai-drop.drag{border-color:var(--primary);background:rgba(16,185,129,.07)}
+.cai-drop-inner{display:flex;flex-direction:column;align-items:center;gap:6px;padding:34px 18px;text-align:center}
+.cai-drop-ico{font-size:2rem;opacity:.85}
+.cai-drop-t{font-size:.9rem;font-weight:600;color:var(--text)}
+.cai-drop-s{font-size:.74rem;color:var(--text-dim)}
+.cai-preview-wrap{position:relative;display:flex;justify-content:center;background:#0a0f16;padding:8px}
+.cai-preview{max-width:100%;max-height:340px;border-radius:8px;display:block}
+.cai-clear{position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:50%;border:none;cursor:pointer;
+  background:rgba(0,0,0,.65);color:#fff;font-size:.9rem;font-weight:700;line-height:1}
+.cai-clear:hover{background:var(--red-b)}
 .timing-card{border:1px solid var(--border-hi);background:rgba(14,21,31,.72);backdrop-filter:blur(14px) saturate(1.15);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 10px 40px rgba(0,0,0,.4);animation:revealUp .5s cubic-bezier(.22,1,.36,1) both}
 .timing-card-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
@@ -1954,7 +1967,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v84';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v85';color:var(--primary);opacity:.7}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
@@ -2365,6 +2378,7 @@ header .logo{display:none}
   <div class="side-sec">Decisioni AI</div>
   <button class="tab-btn" data-tab="topbuy"    onclick="switchTab('topbuy')"><span class="tb-ico">💎</span><span class="tb-lab">Top Buy</span></button>
   <button class="tab-btn" data-tab="shouldbuy" onclick="switchTab('shouldbuy')"><span class="tb-ico">✅</span><span class="tb-lab">Compro?</span></button>
+  <button class="tab-btn" data-tab="chartai"   onclick="switchTab('chartai')"><span class="tb-ico">📷</span><span class="tb-lab">Grafico AI</span></button>
   <div class="side-sec">Strumenti</div>
   <button class="tab-btn" data-tab="radar"     onclick="switchTab('radar')"><span class="tb-ico">📡</span><span class="tb-lab">Radar VIP</span></button>
   <button class="tab-btn" data-tab="briefing"  onclick="switchTab('briefing')"><span class="tb-ico">📰</span><span class="tb-lab">Briefing</span></button>
@@ -2787,6 +2801,31 @@ header .logo{display:none}
     </div>
   </div>
   <div id="shouldbuy-result"></div>
+</div>
+
+<!-- ── Grafico AI view (analisi screenshot grafico → piano operativo) ── -->
+<div id="chartai-view" style="display:none">
+  <div class="tool-head">
+    <div class="tool-title">📷 Grafico AI</div>
+    <div class="tool-sub">Carica lo <b>screenshot di un grafico</b> (TradingView, Revolut, app broker…): l'AI legge pattern e livelli e ti dice <b>se entrare, dove mettere stop-loss e take-profit</b>.</div>
+    <div class="tool-card">
+      <div class="cai-drop" id="cai-drop">
+        <input type="file" id="cai-file" accept="image/*" style="display:none" onchange="_caiFile(this)">
+        <div class="cai-drop-inner" id="cai-drop-inner">
+          <div class="cai-drop-ico">🖼️</div>
+          <div class="cai-drop-t">Clicca, trascina o <b>incolla</b> (Ctrl+V) uno screenshot</div>
+          <div class="cai-drop-s">PNG / JPG — un grafico a candele o a linea con l'asse dei prezzi visibile</div>
+        </div>
+        <div class="cai-preview-wrap" id="cai-preview-wrap" style="display:none">
+          <img class="cai-preview" id="cai-preview" src="" alt="grafico">
+          <button class="cai-clear" onclick="_caiClear(event)">✕</button>
+        </div>
+      </div>
+      <input class="timing-input" id="cai-note" placeholder="(facoltativo) ticker o domanda — es. NVDA, conviene entrare ora?" spellcheck="false" style="margin-top:10px">
+      <button class="tool-go" id="cai-go" onclick="runChartPro()" disabled>🔍 Analizza il grafico</button>
+    </div>
+  </div>
+  <div id="chartai-result"></div>
 </div>
 
 <!-- ── Alert panel (overlay) ── -->
@@ -3377,7 +3416,7 @@ let _lastNotifTicker = null;
 // switchTab — definita subito così onclick="switchTab(...)" funziona sempre
 window._tabLoaded = {};
 window.switchTab = function(tab) {
-  const VIEWS = ['live','timing','topbuy','shouldbuy','radar','history','heatmap','portfolio','watchlist','calendar','ai-chat','briefing'];
+  const VIEWS = ['live','timing','topbuy','shouldbuy','chartai','radar','history','heatmap','portfolio','watchlist','calendar','ai-chat','briefing'];
   document.querySelectorAll('.tab-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === tab);
   });
@@ -3389,6 +3428,7 @@ window.switchTab = function(tab) {
   if (!window._tabLoaded[tab]) {
     window._tabLoaded[tab] = true;
     if (tab === 'timing')    _initTimingQuick();
+    if (tab === 'chartai')   _initChartAI();
     if (tab === 'radar')     loadRadar();
     if (tab === 'history')   loadHistoryDates();
     if (tab === 'heatmap')   loadHeatmap();
@@ -3729,6 +3769,105 @@ function renderShouldBuy(d){
       ${cats?`<div class="trc-cats"><div class="trc-reason-hd">📅 Catalizzatori</div><ul class="sb-cats">${cats}</ul></div>`:''}
       <div class="trc-actions"><button class="timing-detail-btn" onclick="openTickerModal('${d.ticker}')">Apri dettaglio completo ▸</button></div>
       <div class="timing-disc">Analisi AI · Groq Llama 70B · stima basata sui dati, non è consulenza finanziaria</div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 📷 Grafico AI — analisi visione di uno screenshot → piano operativo
+// ══════════════════════════════════════════════════════════════════════════════
+let _caiB64=null;
+function _caiSetImg(dataUrl){
+  _caiB64 = dataUrl.split(',')[1];
+  document.getElementById('cai-preview').src = dataUrl;
+  document.getElementById('cai-preview-wrap').style.display='flex';
+  document.getElementById('cai-drop-inner').style.display='none';
+  document.getElementById('cai-go').disabled=false;
+  document.getElementById('chartai-result').innerHTML='';
+}
+function _caiFile(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  const r=new FileReader(); r.onload=e=>_caiSetImg(e.target.result); r.readAsDataURL(f);
+}
+function _caiClear(ev){
+  if(ev) ev.stopPropagation();
+  _caiB64=null;
+  const fi=document.getElementById('cai-file'); if(fi) fi.value='';
+  document.getElementById('cai-preview').src='';
+  document.getElementById('cai-preview-wrap').style.display='none';
+  document.getElementById('cai-drop-inner').style.display='flex';
+  document.getElementById('cai-go').disabled=true;
+  document.getElementById('chartai-result').innerHTML='';
+}
+function _initChartAI(){
+  const drop=document.getElementById('cai-drop'); if(!drop||drop.dataset.init) return; drop.dataset.init='1';
+  drop.addEventListener('click', e=>{ if(e.target.closest('.cai-clear')||e.target.closest('.cai-preview-wrap')) return; document.getElementById('cai-file').click(); });
+  drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('drag'); });
+  drop.addEventListener('dragleave', ()=>drop.classList.remove('drag'));
+  drop.addEventListener('drop', e=>{
+    e.preventDefault(); drop.classList.remove('drag');
+    const f=e.dataTransfer.files&&e.dataTransfer.files[0];
+    if(f&&f.type.startsWith('image/')){ const r=new FileReader(); r.onload=ev=>_caiSetImg(ev.target.result); r.readAsDataURL(f); }
+  });
+  // Incolla (Ctrl+V) quando la tab è attiva
+  window.addEventListener('paste', e=>{
+    const view=document.getElementById('chartai-view');
+    if(!view || view.style.display==='none') return;
+    const items=(e.clipboardData||{}).items||[];
+    for(const it of items){ if(it.type&&it.type.startsWith('image/')){ const f=it.getAsFile(); const r=new FileReader(); r.onload=ev=>_caiSetImg(ev.target.result); r.readAsDataURL(f); break; } }
+  });
+}
+async function runChartPro(){
+  if(!_caiB64) return;
+  const btn=document.getElementById('cai-go'), res=document.getElementById('chartai-result');
+  btn.disabled=true; const old=btn.textContent; btn.textContent='⏳ Analisi in corso…';
+  res.innerHTML='<div class="timing-loading">🧠 L\'AI sta leggendo pattern, livelli e candele…</div>';
+  try{
+    const note=(document.getElementById('cai-note').value||'').trim();
+    const d=await fetch('/api/chart-pro',{method:'POST',headers:{'Content-Type':'application/json',..._authHeader()},
+      body:JSON.stringify({image_b64:_caiB64, question:note||null})}).then(r=>r.json());
+    if(d.error){ res.innerHTML='<div class="timing-loading" style="color:var(--red-b)">⚠️ '+d.error+'</div>'; return; }
+    if(d.is_chart===false){ res.innerHTML='<div class="timing-loading" style="color:var(--gold)">🤔 Questa immagine non sembra un grafico di prezzo. Carica lo screenshot di un grafico.</div>'; return; }
+    if(d.parsed===false && d.raw){ res.innerHTML='<div class="tool-result-card"><div class="trc-reason" style="white-space:pre-wrap">'+d.raw.replace(/[<>]/g,'')+'</div></div>'; return; }
+    renderChartPro(d);
+  }catch(e){ res.innerHTML='<div class="timing-loading" style="color:var(--red-b)">⚠️ Errore di rete</div>'; }
+  finally{ btn.disabled=false; btn.textContent=old; }
+}
+function renderChartPro(d){
+  const res=document.getElementById('chartai-result'); if(!res) return;
+  const num=v=>(v==null||isNaN(+v))?null:(+v);
+  const fx=v=>{ const n=num(v); return n==null?'—':(n<1?n.toFixed(4):n.toFixed(2)); };
+  const v=(d.verdict||'').toUpperCase();
+  const vCls=(v.includes('NON')||v.includes('AVOID')||v.includes('NOT'))?'no':((v.includes('COMPRA')||v.includes('BUY'))?'yes':'wait');
+  const vIcon=vCls==='yes'?'✅':vCls==='no'?'⛔':'⏳';
+  const trend=(d.trend||'').toLowerCase();
+  const trTag = trend.includes('rial')||trend.includes('up')||trend.includes('bull') ? '<span class="vb green">📈 Trend rialzista</span>'
+    : (trend.includes('rib')||trend.includes('down')||trend.includes('bear') ? '<span class="vb" style="color:var(--red-b);border-color:rgba(255,93,120,.4)">📉 Trend ribassista</span>'
+    : '<span class="vb gold">↔️ Laterale</span>');
+  const tps=(d.take_profits||[]).filter(t=>t&&t.price!=null).map((t,i)=>`
+    <div class="trc-cell green"><div class="trc-cell-l">🎯 TP${i+1}${t.rr?' · R/R '+t.rr:''}</div>
+      <div class="trc-cell-v">${fx(t.price)}${t.note?` <small>${(''+t.note).replace(/[<>]/g,'').slice(0,22)}</small>`:''}</div></div>`).join('');
+  const pats=(d.patterns||[]).filter(Boolean).map(p=>`<span class="rb-chip">${(''+p).replace(/[<>]/g,'').slice(0,34)}</span>`).join('');
+  const sigs=(d.signals||[]).filter(Boolean).map(s=>`<li>${(''+s).replace(/[<>]/g,'')}</li>`).join('');
+  const eLow=num(d.entry_low), eHigh=num(d.entry_high);
+  const entryStr = (eLow!=null&&eHigh!=null) ? (Math.abs(eLow-eHigh)<1e-9?fx(eLow):fx(eLow)+' – '+fx(eHigh)) : (eLow!=null?fx(eLow):(eHigh!=null?fx(eHigh):'—'));
+  res.innerHTML=`
+    <div class="tool-result-card">
+      <div class="trc-badge">📷 PIANO OPERATIVO${d.asset_guess?' · '+(''+d.asset_guess).replace(/[<>]/g,'').slice(0,16):''}${d.timeframe?' · '+(''+d.timeframe).replace(/[<>]/g,'').slice(0,18):''}</div>
+      <div class="sb-verdict ${vCls}">${vIcon} ${d.verdict||'ASPETTA'}${d.confidence!=null?`<span class="sb-conf">Confidenza <b>${(+d.confidence).toFixed(0)}%</b></span>`:''}</div>
+      <div class="trc-tags" style="padding-top:14px">${trTag}</div>
+      <div class="trc-grid">
+        <div class="trc-cell"><div class="trc-cell-l">📍 Zona d'ingresso</div><div class="trc-cell-v">${entryStr}</div></div>
+        <div class="trc-cell red"><div class="trc-cell-l">🛑 Stop-loss</div><div class="trc-cell-v">${fx(d.stop_loss)}</div></div>
+        ${tps}
+        ${d.support!=null?`<div class="trc-cell"><div class="trc-cell-l">Supporto</div><div class="trc-cell-v">${fx(d.support)}</div></div>`:''}
+        ${d.resistance!=null?`<div class="trc-cell"><div class="trc-cell-l">Resistenza</div><div class="trc-cell-v">${fx(d.resistance)}</div></div>`:''}
+      </div>
+      ${d.stop_reason?`<div class="trc-reason"><div class="trc-reason-hd">🛑 Perché lo stop qui</div>${(''+d.stop_reason).replace(/[<>]/g,'')}</div>`:''}
+      ${pats?`<div class="trc-runners"><span class="trc-runners-l">Pattern:</span>${pats}</div>`:''}
+      ${sigs?`<div class="trc-cats"><div class="trc-reason-hd">📊 Segnali tecnici</div><ul class="sb-cats">${sigs}</ul></div>`:''}
+      ${d.thesis?`<div class="trc-reason"><div class="trc-reason-hd">🧠 Tesi operativa</div>${(''+d.thesis).replace(/[<>]/g,'')}</div>`:''}
+      ${d.risk_note?`<div class="trc-reason"><div class="trc-reason-hd">⚠️ Rischio</div>${(''+d.risk_note).replace(/[<>]/g,'')}</div>`:''}
+      <div class="timing-disc">Lettura AI del grafico (Llama 4 Scout vision) · i prezzi sono stime lette dall'asse · non è consulenza finanziaria</div>
     </div>`;
 }
 
@@ -8389,6 +8528,21 @@ async function loadWhyToday(ticker, btn) {
     "Live":"Live","Timing":"Timing","Portfolio":"Portfolio","Storico":"History","Storico Analisi":"Analysis History",
     "Radar VIP":"VIP Radar","Briefing":"Briefing","Top Buy":"Top Buy","Compro?":"Should I Buy?","Watchlist":"Watchlist",
     "Heatmap":"Heatmap","Mercati":"Markets","Calendario macro 2025–2026":"Macro calendar 2025–2026",
+    // Grafico AI
+    "Grafico AI":"AI Chart",
+    "Clicca, trascina o":"Click, drag or","incolla":"paste","uno screenshot":"a screenshot",
+    "PNG / JPG — un grafico a candele o a linea con l'asse dei prezzi visibile":"PNG / JPG — a candlestick or line chart with the price axis visible",
+    "Analizza il grafico":"Analyze the chart","PIANO OPERATIVO":"TRADE PLAN",
+    "Carica lo":"Upload","screenshot di un grafico":"a screenshot of a chart",
+    "(TradingView, Revolut, app broker…): l'AI legge pattern e livelli e ti dice":"(TradingView, Revolut, broker app…): the AI reads patterns and levels and tells you",
+    "se entrare, dove mettere stop-loss e take-profit":"when to enter, where to set stop-loss and take-profit",
+    "(facoltativo) ticker o domanda — es. NVDA, conviene entrare ora?":"(optional) ticker or question — e.g. NVDA, should I enter now?",
+    "Trend ribassista":"Downtrend","Laterale":"Sideways",
+    "Zona d'ingresso":"Entry zone","Perché lo stop qui":"Why the stop here",
+    "Pattern:":"Patterns:","Segnali tecnici":"Technical signals","Tesi operativa":"Trade thesis",
+    "L'AI sta leggendo pattern, livelli e candele…":"AI is reading patterns, levels and candles…",
+    "Questa immagine non sembra un grafico di prezzo. Carica lo screenshot di un grafico.":"This image doesn't look like a price chart. Upload a screenshot of a chart.",
+    "Lettura AI del grafico (Llama 4 Scout vision) · i prezzi sono stime lette dall'asse · non è consulenza finanziaria":"AI chart reading (Llama 4 Scout vision) · prices are estimates read from the axis · not financial advice",
     // Top Buy / Compro view
     "Scansione AI del mercato per trovare la":"AI market scan to find the",
     "singola migliore opportunità d'acquisto":"single best buy opportunity",

@@ -1,4 +1,4 @@
-const CACHE = 'masker-v84';
+const CACHE = 'masker-v85';
 const IMMUTABLE = ['/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', e => {
