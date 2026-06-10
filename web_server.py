@@ -56,16 +56,13 @@ async def _startup_load_cache():
         except Exception as e:
             print(f"[startup] Impossibile caricare last_scan.json: {e}")
 
-    # Lancia scan solo se non abbiamo già i dati di oggi (es. primo avvio o dopo mezzanotte)
-    if not scan_is_today:
-        asyncio.create_task(_refresh_scan_background(10))
-        if not loaded:
-            print("[startup] Nessun dato salvato — scan di avvio in background iniziato")
+    # ── Analisi A RICHIESTA: NON lanciamo nessuno scan in automatico. ──
+    # Lo scan parte solo quando l'utente clicca "Analizza ora" (→ chiamata a /api/scan,
+    # che avvia _refresh_scan_background su richiesta). Nessun task di background all'avvio.
+    if loaded:
+        print(f"[startup] Caricati dati salvati. Analisi on-demand: nessuno scan automatico.")
     else:
-        print("[startup] Dati odierni presenti — nessun nuovo scan (analisi fissata dal mattino)")
-
-    asyncio.create_task(_pdf_scheduler())
-    asyncio.create_task(_warm_influence())
+        print("[startup] Analisi on-demand: nessuno scan automatico, in attesa di richiesta.")
 
 
 async def _warm_influence():
