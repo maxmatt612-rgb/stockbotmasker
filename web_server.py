@@ -17,6 +17,13 @@ from pydantic import BaseModel
 
 from analyzer import get_enriched_analysis, scan_cheap_stocks, get_longterm_analysis
 
+# Carica le variabili dal file .env se presente (utile per l'esecuzione in locale).
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
 STATIC = Path(__file__).parent / "static"
 HISTORY_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "analysis_history.json"
 SCAN_FILE    = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "last_scan.json"
