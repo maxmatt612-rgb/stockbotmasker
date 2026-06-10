@@ -1530,7 +1530,7 @@ async def api_best_buy(horizon: str = "short"):
                 "Italiano, diretto, concreto. Niente disclaimer."
             )
             r = await groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile", max_tokens=180,
+                model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="low",
                 messages=[{"role": "system", "content": "Analista che indica la migliore opportunità d'acquisto. Conciso, italiano."},
                           {"role": "user", "content": prompt}])
             reasoning = r.choices[0].message.content.strip()
@@ -1608,7 +1608,7 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
                 "MOTIVO: [2 frasi concrete sul perché]\n"
             )
             r = await groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile", max_tokens=200,
+                model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="low",
                 messages=[{"role": "system", "content": "Trader che dà verdetti netti compra/aspetta/non comprare. Italiano, diretto."},
                           {"role": "user", "content": prompt}])
             txt = r.choices[0].message.content.strip()
@@ -2145,33 +2145,75 @@ async def api_deep_analysis(ticker: str):
         return JSONResponse({"error": "ticker non trovato"}, status_code=404)
     data = _clean(data)
 
-    news_titles = (data.get("news") or [])[:4]
+    news_titles = (data.get("news") or [])[:5]
     news_str = "\n".join(f"- {n}" for n in news_titles) or "Nessuna notizia recente disponibile."
+    ccy = data.get("currency", "USD")
+    sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+
+    def _v(x, fmt="{:.2f}", dash="N/D"):
+        try:
+            return fmt.format(x) if x is not None else dash
+        except Exception:
+            return dash
+
+    def _big(x):
+        try:
+            x = float(x)
+        except Exception:
+            return "N/D"
+        for u, dv in (("T", 1e12), ("B", 1e9), ("M", 1e6)):
+            if abs(x) >= dv:
+                return f"{x/dv:.1f}{u}"
+        return f"{x:.0f}"
+
+    cur = data.get("current_price") or 0
+    sma20, sma50 = data.get("sma_20"), data.get("sma_50")
+    if sma20 and sma50 and cur > sma20 > sma50:
+        trend = "rialzista (prezzo > SMA20 > SMA50)"
+    elif sma20 and sma50 and cur < sma20 < sma50:
+        trend = "ribassista (prezzo < SMA20 < SMA50)"
+    else:
+        trend = "misto / laterale"
 
     prompt = (
-        f"Analizza il titolo {t} ({data.get('name', t)}).\n"
-        f"Prezzo: ${data.get('current_price', 0):.2f} ({data.get('day_change_pct', 0):+.1f}% oggi)\n"
-        f"Settore: {data.get('sector', 'N/D')}\n"
-        f"RSI: {data.get('rsi', 50):.0f} | Rischio: {data.get('risk_level', 'N/D')} | "
-        f"Volatilità: {data.get('volatility', 0):.0f}%\n"
-        f"Performance: settimana {(data.get('week_return') or 0):+.1f}%, mese {(data.get('month_return') or 0):+.1f}%\n"
-        f"Prossimi earnings: {data.get('next_earnings_str', 'N/D')}\n"
-        f"Notizie recenti:\n{news_str}\n\n"
-        "Rispondi SOLO in questo formato ESATTO, in ITALIANO, conciso e concreto:\n"
-        "DESCRIZIONE: [cosa fa l'azienda in 1-2 frasi semplici]\n"
+        f"Analizza IN PROFONDITÀ il titolo {t} ({data.get('name', t)}), settore {data.get('sector', 'N/D')}.\n\n"
+        f"PREZZO E TREND:\n"
+        f"- Prezzo: {sym}{_v(cur)} ({(data.get('day_change_pct') or 0):+.1f}% oggi)\n"
+        f"- 52 settimane: min {sym}{_v(data.get('week_52_low'))} / max {sym}{_v(data.get('week_52_high'))}"
+        f" (distanza dal max: {_v(data.get('upside_52w'), '{:+.0f}')}%)\n"
+        f"- Medie mobili: SMA20 {sym}{_v(sma20)} · SMA50 {sym}{_v(sma50)} → trend {trend}\n"
+        f"- Performance: settimana {(data.get('week_return') or 0):+.1f}%, mese {(data.get('month_return') or 0):+.1f}%,"
+        f" YTD {(data.get('ytd_return') or 0):+.1f}%\n\n"
+        f"INDICATORI E RISCHIO:\n"
+        f"- RSI: {(data.get('rsi') or 50):.0f}/100 | Volatilità annua: {(data.get('volatility') or 0):.0f}%"
+        f" | Rischio: {data.get('risk_level', 'N/D')} | Beta: {_v(data.get('beta'))}\n"
+        f"- Score qualità Masker: {_v(data.get('score_10'), '{:.1f}')}/10\n\n"
+        f"FONDAMENTALI:\n"
+        f"- P/E: {_v(data.get('pe_ratio'))} (forward {_v(data.get('forward_pe'))}) | EPS: {_v(data.get('eps'))}"
+        f" | ROE: {_v(data.get('roe'))}\n"
+        f"- Margine netto: {_v(data.get('profit_margin'))} | Debito/Equity: {_v(data.get('debt_equity'))}"
+        f" | Dividend yield: {_v(data.get('dividend_yield'))}\n"
+        f"- Market cap: {_big(data.get('market_cap'))} | Ricavi: {_big(data.get('revenue'))}\n\n"
+        f"EVENTI E SENTIMENT:\n"
+        f"- Prossimi earnings: {data.get('next_earnings_str', 'N/D')} | Sentiment news: {data.get('news_sentiment_label', 'N/D')}\n"
+        f"- Notizie recenti:\n{news_str}\n\n"
+        "Ragiona sui dati (trend tecnico + momentum + fondamentali + rischio), poi rispondi SOLO in questo "
+        "formato ESATTO, in ITALIANO, concreto e SPECIFICO (cita i numeri reali sopra):\n"
+        "DESCRIZIONE: [cosa fa l'azienda in 1-2 frasi]\n"
         "VERDETTO: COMPRA oppure VENDI oppure ASPETTA\n"
         "CONFIDENZA: [numero intero 50-95]\n"
-        "PERCHE: [2 motivi concreti per questo verdetto]\n"
-        "RISCHI: [2 rischi specifici e reali]\n"
-        "CONCORRENTI: [3-4 aziende concorrenti, includi i TICKER in maiuscolo es: AMD, INTC, QCOM]\n"
-        "NOTIZIE: [1-2 frasi sulla situazione/notizie attuali del titolo]\n"
+        "PERCHE: [2-3 motivi concreti basati sui dati, cita i numeri]\n"
+        "RISCHI: [2-3 rischi specifici e reali]\n"
+        "CONCORRENTI: [3-4 aziende concorrenti con i TICKER in maiuscolo es: AMD, INTC, QCOM]\n"
+        "NOTIZIE: [1-2 frasi sulla situazione attuale]\n"
     )
     try:
         resp = await groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            max_tokens=520,
+            model="openai/gpt-oss-120b",
+            max_tokens=1800,
+            reasoning_effort="medium",
             messages=[
-                {"role": "system", "content": "Sei un analista finanziario esperto. Dai analisi complete ma concise, in italiano. Conosci bene i concorrenti delle aziende quotate. Sii diretto sul verdetto, niente giri di parole."},
+                {"role": "system", "content": "Sei un analista finanziario senior di Wall Street: esamini TUTTI i dati tecnici e fondamentali forniti e dai un verdetto netto, motivato e specifico, in italiano. Conosci bene i concorrenti delle aziende quotate. Niente giri di parole."},
                 {"role": "user", "content": prompt},
             ],
         )
