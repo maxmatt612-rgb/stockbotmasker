@@ -1,0 +1,24 @@
+# Configurazione per il deploy gratuito su Render (https://render.com)
+# Deploy: su Render → New → Blueprint → collega questo repo.
+# Le variabili con "sync: false" le inserisci tu nella dashboard (sono segrete).
+services:
+  - type: web
+    name: masker
+    runtime: python
+    plan: free
+    branch: master
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn web_server:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: JWT_SECRET
+        generateValue: true        # generata da Render in automatico
+      - key: GROQ_API_KEY
+        sync: false                # incollala tu (la stessa di Telegram)
+      - key: BOT_TOKEN
+        sync: false                # per il login Telegram (facoltativo)
+      - key: BOT_USERNAME
+        sync: false                # username del bot SENZA @ (facoltativo)
+      - key: FINNHUB_KEY
+        sync: false                # real-time prezzi USA (facoltativo)
