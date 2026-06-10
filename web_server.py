@@ -1643,6 +1643,85 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
     return result
 
 
+# ─── Consenso multi-AI: 3 modelli (Meta / OpenAI / Alibaba) votano sul titolo ──
+_CONSENSUS_MODELS = [
+    ("Llama 3.3 70B", "llama-3.3-70b-versatile", {}),
+    ("GPT-OSS 120B", "openai/gpt-oss-120b", {"reasoning_effort": "low"}),
+    ("Qwen3 32B", "qwen/qwen3-32b", {"reasoning_effort": "none"}),
+]
+
+
+def _parse_consensus_verdict(txt: str):
+    verdict, reason = "ASPETTA", ""
+    for line in (txt or "").split("\n"):
+        lu = line.strip().upper()
+        if lu.startswith("VERDETTO:") or lu.startswith("VERDICT:"):
+            v = line.split(":", 1)[1].strip().upper()
+            if "NON" in v or "DO NOT" in v or "DON'T" in v or "NOT BUY" in v:
+                verdict = "NON COMPRARE"
+            elif "COMPRA" in v or "BUY" in v:
+                verdict = "COMPRA"
+            else:
+                verdict = "ASPETTA"
+        elif lu.startswith("MOTIVO:") or lu.startswith("REASON:"):
+            reason = line.split(":", 1)[1].strip()
+    return verdict, reason[:200]
+
+
+@app.get("/api/stock/{ticker}/consensus")
+async def api_consensus(ticker: str):
+    """3 modelli AI diversi votano COMPRA/ASPETTA/NON COMPRARE sullo stesso titolo."""
+    if not groq_client:
+        return JSONResponse({"error": "AI non configurata"}, status_code=503)
+    t = ticker.upper()
+    key = f"consensus:{t}:{_lang()}"
+    if (c := _cached(key, 1200)) is not None:
+        return c
+    data = await asyncio.to_thread(get_enriched_analysis, t)
+    if not data:
+        return JSONResponse({"error": "Ticker non trovato"}, status_code=404)
+    data = _clean(data)
+    ccy = data.get("currency", "USD")
+    sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+    prompt = (
+        f"Titolo {t} ({data.get('name', t)}). Prezzo {sym}{(data.get('current_price') or 0):.2f}, "
+        f"RSI {(data.get('rsi') or 50):.0f}, rischio {data.get('risk_level', 'N/D')}, "
+        f"settimana {(data.get('week_return') or 0):+.1f}%, mese {(data.get('month_return') or 0):+.1f}%, "
+        f"trend {'rialzista' if data.get('uptrend') else 'incerto'}, "
+        f"volatilità {(data.get('volatility') or 0):.0f}%, sentiment news {data.get('news_sentiment_label', 'N/D')}.\n"
+        "Conviene comprare adesso? Rispondi SOLO con questo formato:\n"
+        "VERDETTO: COMPRA | ASPETTA | NON COMPRARE\n"
+        "MOTIVO: [una frase concreta]"
+    )
+
+    async def _ask(name, model, extra):
+        try:
+            r = await groq_client.chat.completions.create(
+                model=model, max_tokens=256, temperature=0.3,
+                messages=[{"role": "system", "content": "Trader esperto che dà un verdetto netto e conciso in italiano."},
+                          {"role": "user", "content": prompt}],
+                **extra)
+            v, reason = _parse_consensus_verdict(r.choices[0].message.content)
+            return {"name": name, "verdict": v, "reason": reason, "ok": True}
+        except Exception:
+            return {"name": name, "verdict": None, "reason": "", "ok": False}
+
+    results = await asyncio.gather(*[_ask(n, m, e) for n, m, e in _CONSENSUS_MODELS])
+    votes = [r["verdict"] for r in results if r["ok"] and r["verdict"]]
+    from collections import Counter
+    counts = Counter(votes)
+    top_verdict, agree = (counts.most_common(1)[0] if counts else ("ASPETTA", 0))
+    out = {
+        "ticker": t, "name": data.get("name", t), "currency": ccy,
+        "price": data.get("current_price"),
+        "consensus": top_verdict, "agree": agree, "total": len(votes),
+        "models": results,
+    }
+    out = _clean(out)
+    _store(key, out)
+    return out
+
+
 @app.get("/api/stock/{ticker}/deepreport")
 async def api_deep_report(ticker: str):
     """Report istituzionale a 13 sezioni con punteggi (Business Quality, Financials,

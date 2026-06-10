@@ -1744,6 +1744,21 @@ header{border-top:2px solid var(--primary)!important}
 .rt-dot{width:6px;height:6px;border-radius:50%;background:var(--green-b);box-shadow:0 0 8px var(--green-b);animation:livePulse 1.4s infinite}
 @keyframes rtFlash{0%{color:var(--green-b)}100%{color:inherit}}
 .rt-flash{animation:rtFlash .6s ease-out}
+/* ── Consenso multi-AI ── */
+.cons-cta{background:linear-gradient(135deg,#6d4aff,#9a7bff)!important}
+.cons-card{border:1px solid var(--border-hi);border-radius:12px;background:rgba(20,16,34,.6);margin-top:10px;overflow:hidden;animation:revealUp .4s ease both}
+.cons-hd{font-size:.74rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#b9a7ff;padding:10px 14px;border-bottom:1px solid var(--border)}
+.cons-verdict{text-align:center;font-family:var(--sans);font-size:1.15rem;font-weight:800;letter-spacing:.03em;padding:13px}
+.cons-verdict.yes{color:var(--green-b);background:rgba(31,217,155,.08)}
+.cons-verdict.no{color:var(--red-b);background:rgba(255,93,120,.08)}
+.cons-verdict.wait{color:var(--gold);background:rgba(245,183,60,.08)}
+.cons-list{padding:6px 14px 10px}
+.cons-row{padding:9px 0;border-top:1px solid var(--border)}
+.cons-row:first-child{border-top:none}
+.cons-mname{font-weight:700;font-size:.82rem;color:var(--text)}
+.cons-mv{float:right;font-weight:800;font-size:.8rem}
+.cons-mv.yes{color:var(--green-b)} .cons-mv.no{color:var(--red-b)} .cons-mv.wait{color:var(--gold)} .cons-mv.off{color:var(--text-dim);font-weight:600}
+.cons-reason{clear:both;font-size:.76rem;color:var(--text-dim);margin-top:4px;line-height:1.45}
 /* ── Decisioni AI: Top Buy & Compro? ── */
 .tool-head{max-width:680px;margin:0 auto 18px}
 .tool-title{font-family:var(--sans);font-size:1.5rem;font-weight:800;color:#fff;letter-spacing:.01em}
@@ -1967,7 +1982,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v85';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v86';color:var(--primary);opacity:.7}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
@@ -3174,6 +3189,9 @@ header .logo{display:none}
     <div id="deep-ai" class="deep-ai">
       <div class="deep-ai-loading">🧠 Analisi AI in corso…</div>
     </div>
+    <!-- Consenso multi-AI (3 modelli diversi votano) -->
+    <button class="dr-cta cons-cta" id="cons-cta" onclick="loadConsensus()">🧠 Consenso multi-AI — 3 modelli votano</button>
+    <div id="m-consensus"></div>
     <!-- Report istituzionale 13 sezioni -->
     <button class="dr-cta" id="dr-cta" onclick="loadDeepReport()">📋 Genera Report Istituzionale Completo — 13 sezioni</button>
     <div id="m-deepreport"></div>
@@ -3868,6 +3886,40 @@ function renderChartPro(d){
       ${d.thesis?`<div class="trc-reason"><div class="trc-reason-hd">🧠 Tesi operativa</div>${(''+d.thesis).replace(/[<>]/g,'')}</div>`:''}
       ${d.risk_note?`<div class="trc-reason"><div class="trc-reason-hd">⚠️ Rischio</div>${(''+d.risk_note).replace(/[<>]/g,'')}</div>`:''}
       <div class="timing-disc">Lettura AI del grafico (Llama 4 Scout vision) · i prezzi sono stime lette dall'asse · non è consulenza finanziaria</div>
+    </div>`;
+}
+
+// ── Consenso multi-AI: 3 modelli diversi votano sul titolo ──
+async function loadConsensus(){
+  const tk=_modalTicker; if(!tk) return;
+  const cta=document.getElementById('cons-cta'); if(cta) cta.style.display='none';
+  const el=document.getElementById('m-consensus'); if(!el) return;
+  el.innerHTML='<div class="deep-ai-loading">🧠 3 AI (Meta · OpenAI · Alibaba) stanno analizzando '+tk+'…</div>';
+  try{
+    const d=await fetch('/api/stock/'+tk+'/consensus').then(r=>r.ok?r.json():r.json().then(j=>({error:j.error||'errore'})));
+    if(!d||d.error){ el.innerHTML='<div class="deep-ai-loading" style="color:var(--red-b)">⚠️ '+((d&&d.error)||'Errore')+'</div>'; if(cta) cta.style.display='block'; return; }
+    renderConsensus(d);
+  }catch(e){ el.innerHTML='<div class="deep-ai-loading" style="color:var(--red-b)">⚠️ Errore di rete</div>'; if(cta) cta.style.display='block'; }
+}
+function renderConsensus(d){
+  const el=document.getElementById('m-consensus'); if(!el) return;
+  const vCls=v=>{const u=(v||'').toUpperCase();return u.includes('NON')?'no':(u.includes('COMPRA')||u.includes('BUY')?'yes':'wait');};
+  const vIco=v=>{const c=vCls(v);return c==='yes'?'✅':c==='no'?'⛔':'⏳';};
+  const cCls=vCls(d.consensus);
+  const rows=(d.models||[]).map(m=>{
+    if(!m.ok||!m.verdict) return `<div class="cons-row"><span class="cons-mname">${m.name}</span><span class="cons-mv off">— non disponibile</span></div>`;
+    return `<div class="cons-row">
+      <span class="cons-mname">${m.name}</span>
+      <span class="cons-mv ${vCls(m.verdict)}">${vIco(m.verdict)} ${m.verdict}</span>
+      ${m.reason?`<div class="cons-reason">${(''+m.reason).replace(/[<>]/g,'')}</div>`:''}
+    </div>`;
+  }).join('');
+  el.innerHTML=`
+    <div class="cons-card">
+      <div class="cons-hd">🧠 Consenso AI · 3 modelli</div>
+      <div class="cons-verdict ${cCls}">${vIco(d.consensus)} ${d.agree}/${d.total||3} → ${d.consensus||'ASPETTA'}</div>
+      <div class="cons-list">${rows}</div>
+      <div class="timing-disc">Modelli: Llama 3.3 (Meta) · GPT-OSS (OpenAI) · Qwen3 (Alibaba) · via Groq · non è consulenza finanziaria</div>
     </div>`;
 }
 
@@ -5031,6 +5083,8 @@ async function openModal(stock){
   // Reset report istituzionale (mostra di nuovo il pulsante per il nuovo titolo)
   const _drC=document.getElementById('dr-cta'); if(_drC) _drC.style.display='block';
   const _drR=document.getElementById('m-deepreport'); if(_drR) _drR.innerHTML='';
+  const _csC=document.getElementById('cons-cta'); if(_csC) _csC.style.display='block';
+  const _csR=document.getElementById('m-consensus'); if(_csR) _csR.innerHTML='';
 
   // Chart (con indicatori tecnici RSI / Bollinger)
   _renderChartWithIndicators(stock.ticker,_chartPeriod,_chartInterval,_chartType);
