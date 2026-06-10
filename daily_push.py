@@ -28,7 +28,18 @@ _MESI_IT = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
 
 TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("GROUP_CHAT_ID")
+# Topic opzionale: se il gruppo usa i "Topic" (forum), invia nel thread giusto.
+_raw_topic = os.getenv("TELEGRAM_TOPIC_ID") or os.getenv("TOPIC_ANALISI_ID") or ""
+TOPIC_ID = int(_raw_topic) if _raw_topic.strip().lstrip("-").isdigit() else None
 _TG_LIMIT = 3800  # margine sotto il limite Telegram di 4096 caratteri
+
+
+def _kw():
+    """Parametri comuni per send_message (HTML + eventuale topic del gruppo)."""
+    k = {"parse_mode": ParseMode.HTML}
+    if TOPIC_ID is not None:
+        k["message_thread_id"] = TOPIC_ID
+    return k
 
 
 async def _send_cards(bot, chat_id, header, cards, footer):
@@ -37,14 +48,14 @@ async def _send_cards(bot, chat_id, header, cards, footer):
     msg = header
     for card in cards:
         if len(msg) + len(sep) + len(card) > _TG_LIMIT:
-            await bot.send_message(chat_id, msg, parse_mode=ParseMode.HTML)
+            await bot.send_message(chat_id, msg, **_kw())
             msg = card
         else:
             msg = (msg + sep + card) if msg else card
     if msg:
-        await bot.send_message(chat_id, msg, parse_mode=ParseMode.HTML)
+        await bot.send_message(chat_id, msg, **_kw())
     if footer:
-        await bot.send_message(chat_id, footer, parse_mode=ParseMode.HTML)
+        await bot.send_message(chat_id, footer, **_kw())
 
 
 async def main():
@@ -62,7 +73,7 @@ async def main():
     if not risultati:
         await bot.send_message(int(CHAT_ID),
                                "⚠️ Scanner non disponibile stamattina. Riprova più tardi.",
-                               parse_mode=ParseMode.HTML)
+                               **_kw())
         return
 
     # 2 ── Arricchimento dati per ogni azione
@@ -77,7 +88,7 @@ async def main():
     if not enriched:
         await bot.send_message(int(CHAT_ID),
                                "⚠️ Nessun dato disponibile stamattina.",
-                               parse_mode=ParseMode.HTML)
+                               **_kw())
         return
 
     # 3 ── Verdetti AI (in parallelo)
