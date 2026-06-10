@@ -1722,6 +1722,107 @@ async def api_consensus(ticker: str):
     return out
 
 
+# ─── Dibattito Toro vs Orso (multi-agente leggero, stile TradingAgents) ────────
+def _stock_brief(t, data):
+    ccy = data.get("currency", "USD")
+    sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+
+    def v(x, f="{:.2f}", d="N/D"):
+        try:
+            return f.format(x) if x is not None else d
+        except Exception:
+            return d
+    cur = data.get("current_price") or 0
+    return (
+        f"{t} ({data.get('name', t)}), settore {data.get('sector', 'N/D')}. "
+        f"Prezzo {sym}{v(cur)} ({(data.get('day_change_pct') or 0):+.1f}% oggi). "
+        f"52 settimane {sym}{v(data.get('week_52_low'))}–{sym}{v(data.get('week_52_high'))}. "
+        f"SMA20 {sym}{v(data.get('sma_20'))}, SMA50 {sym}{v(data.get('sma_50'))}. "
+        f"RSI {(data.get('rsi') or 50):.0f}, volatilità {(data.get('volatility') or 0):.0f}%, "
+        f"rischio {data.get('risk_level', 'N/D')}, beta {v(data.get('beta'))}. "
+        f"Performance: settimana {(data.get('week_return') or 0):+.1f}%, mese {(data.get('month_return') or 0):+.1f}%, "
+        f"YTD {(data.get('ytd_return') or 0):+.1f}%. "
+        f"P/E {v(data.get('pe_ratio'))}, ROE {v(data.get('roe'))}, margine {v(data.get('profit_margin'))}, "
+        f"market cap {v(data.get('market_cap'), '{:.0f}')}. "
+        f"Earnings {data.get('next_earnings_str', 'N/D')}, sentiment news {data.get('news_sentiment_label', 'N/D')}."
+    )
+
+
+@app.get("/api/stock/{ticker}/debate")
+async def api_debate(ticker: str):
+    """Toro vs Orso: un'AI difende l'acquisto, una lo attacca, una terza giudica."""
+    if not groq_client:
+        return JSONResponse({"error": "AI non configurata"}, status_code=503)
+    t = ticker.upper()
+    key = f"debate:{t}:{_lang()}"
+    if (c := _cached(key, 1800)) is not None:
+        return c
+    data = await asyncio.to_thread(get_enriched_analysis, t)
+    if not data:
+        return JSONResponse({"error": "Ticker non trovato"}, status_code=404)
+    data = _clean(data)
+    brief = _stock_brief(t, data)
+
+    async def _side(role):
+        if role == "bull":
+            sysm = "Sei l'analista RIALZISTA (toro): costruisci la tesi più forte per COMPRARE il titolo."
+            ask = "A FAVORE dell'acquisto"
+        else:
+            sysm = "Sei l'analista RIBASSISTA (orso): costruisci la tesi più forte per NON comprare o vendere."
+            ask = "CONTRO l'acquisto"
+        pr = (f"Dati di {t}:\n{brief}\n\nDai i 3 argomenti più forti {ask}, concreti e con NUMERI. "
+              "Formato: esattamente 3 righe, ognuna inizia con '- '. Italiano, nient'altro.")
+        try:
+            r = await groq_client.chat.completions.create(
+                model="openai/gpt-oss-120b", max_tokens=900, reasoning_effort="low",
+                messages=[{"role": "system", "content": sysm}, {"role": "user", "content": pr}])
+            lines = [l.strip().lstrip("-•*").strip() for l in r.choices[0].message.content.split("\n")]
+            return [l for l in lines if len(l) > 3][:3]
+        except Exception:
+            return []
+
+    bull, bear = await asyncio.gather(_side("bull"), _side("bear"))
+
+    judge_pr = (
+        f"Titolo {t}. Dati:\n{brief}\n\nTESI TORO (rialzista):\n" + "\n".join("- " + b for b in bull) +
+        "\n\nTESI ORSO (ribassista):\n" + "\n".join("- " + b for b in bear) +
+        "\n\nSei il trader capo: pesa le due tesi e i dati, poi decidi. Rispondi SOLO:\n"
+        "VINCITORE: TORO | ORSO | PAREGGIO\n"
+        "VERDETTO: COMPRA | ASPETTA | NON COMPRARE\n"
+        "CONFIDENZA: [numero 50-95]\n"
+        "SINTESI: [2-3 frasi sul perché della decisione]"
+    )
+    winner, verdict, conf, synth = "PAREGGIO", "ASPETTA", 65, ""
+    try:
+        r = await groq_client.chat.completions.create(
+            model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="medium",
+            messages=[{"role": "system", "content": "Sei il trader capo: equilibrato, deciso, in italiano."},
+                      {"role": "user", "content": judge_pr}])
+        for line in r.choices[0].message.content.split("\n"):
+            lu = line.strip().upper()
+            if lu.startswith("VINCITORE:") or lu.startswith("WINNER:"):
+                w = lu.split(":", 1)[1]
+                winner = "TORO" if ("TORO" in w or "BULL" in w) else ("ORSO" if ("ORSO" in w or "BEAR" in w) else "PAREGGIO")
+            elif lu.startswith("VERDETTO:") or lu.startswith("VERDICT:"):
+                vv = lu.split(":", 1)[1]
+                verdict = "NON COMPRARE" if ("NON" in vv or "NOT" in vv or "DON'T" in vv) else ("COMPRA" if ("COMPRA" in vv or "BUY" in vv) else "ASPETTA")
+            elif lu.startswith("CONFIDENZA:") or lu.startswith("CONFIDENCE:"):
+                try:
+                    conf = max(50, min(95, int("".join(c for c in line if c.isdigit())[:2] or "65")))
+                except Exception:
+                    pass
+            elif lu.startswith("SINTESI:") or lu.startswith("SUMMARY:"):
+                synth = line.split(":", 1)[1].strip()
+    except Exception:
+        pass
+
+    out = {"ticker": t, "name": data.get("name", t), "bull": bull, "bear": bear,
+           "winner": winner, "verdict": verdict, "confidence": conf, "synthesis": synth}
+    out = _clean(out)
+    _store(key, out)
+    return out
+
+
 @app.get("/api/stock/{ticker}/deepreport")
 async def api_deep_report(ticker: str):
     """Report istituzionale a 13 sezioni con punteggi (Business Quality, Financials,

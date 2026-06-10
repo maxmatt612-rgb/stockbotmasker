@@ -1759,6 +1759,25 @@ header{border-top:2px solid var(--primary)!important}
 .cons-mv{float:right;font-weight:800;font-size:.8rem}
 .cons-mv.yes{color:var(--green-b)} .cons-mv.no{color:var(--red-b)} .cons-mv.wait{color:var(--gold)} .cons-mv.off{color:var(--text-dim);font-weight:600}
 .cons-reason{clear:both;font-size:.76rem;color:var(--text-dim);margin-top:4px;line-height:1.45}
+/* ── Dibattito Toro vs Orso ── */
+.deb-cta{background:linear-gradient(135deg,#c2410c,#ea580c)!important}
+.deb-card{border:1px solid var(--border-hi);border-radius:12px;background:rgba(20,16,12,.55);margin-top:10px;overflow:hidden;animation:revealUp .4s ease both}
+.deb-cols{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+.deb-col{background:rgba(14,21,31,.85);padding:12px 14px}
+.deb-col.bull{border-top:2px solid var(--green-b)}
+.deb-col.bear{border-top:2px solid var(--red-b)}
+.deb-col.win{background:rgba(255,255,255,.04)}
+.deb-col-hd{font-weight:800;font-size:.84rem;margin-bottom:8px}
+.deb-col.bull .deb-col-hd{color:var(--green-b)}
+.deb-col.bear .deb-col-hd{color:var(--red-b)}
+.deb-list{margin:0;padding-left:16px}
+.deb-list li{font-size:.78rem;color:var(--text);line-height:1.45;margin:5px 0}
+.deb-verdict{text-align:center;font-family:var(--sans);font-size:1.1rem;font-weight:800;letter-spacing:.03em;padding:13px;
+  display:flex;flex-direction:column;align-items:center;gap:5px;border-top:1px solid var(--border)}
+.deb-verdict.yes{color:var(--green-b);background:rgba(31,217,155,.08)}
+.deb-verdict.no{color:var(--red-b);background:rgba(255,93,120,.08)}
+.deb-verdict.wait{color:var(--gold);background:rgba(245,183,60,.08)}
+@media(max-width:560px){.deb-cols{grid-template-columns:1fr}}
 /* ── Decisioni AI: Top Buy & Compro? ── */
 .tool-head{max-width:680px;margin:0 auto 18px}
 .tool-title{font-family:var(--sans);font-size:1.5rem;font-weight:800;color:#fff;letter-spacing:.01em}
@@ -1982,7 +2001,7 @@ header{border-top:2px solid var(--primary)!important}
 /* ── Footer: tag versione mono ────────────────────────────────────────────── */
 footer{font-family:var(--mono);font-size:.62rem;letter-spacing:.03em;color:var(--text-dim);
   border-top:1px solid var(--border);text-transform:uppercase}
-footer::after{content:' · BUILD v87';color:var(--primary);opacity:.7}
+footer::after{content:' · BUILD v88';color:var(--primary);opacity:.7}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PROFESSIONAL REFRESH — rifinitura coerente livello prodotto fintech
@@ -3192,6 +3211,9 @@ header .logo{display:none}
     <!-- Consenso multi-AI (3 modelli diversi votano) -->
     <button class="dr-cta cons-cta" id="cons-cta" onclick="loadConsensus()">🧠 Consenso multi-AI — 3 modelli votano</button>
     <div id="m-consensus"></div>
+    <!-- Dibattito Toro vs Orso (multi-agente) -->
+    <button class="dr-cta deb-cta" id="deb-cta" onclick="loadDebate()">⚖️ Dibattito AI — Toro vs Orso</button>
+    <div id="m-debate"></div>
     <!-- Report istituzionale 13 sezioni -->
     <button class="dr-cta" id="dr-cta" onclick="loadDeepReport()">📋 Genera Report Istituzionale Completo — 13 sezioni</button>
     <div id="m-deepreport"></div>
@@ -3920,6 +3942,44 @@ function renderConsensus(d){
       <div class="cons-verdict ${cCls}">${vIco(d.consensus)} ${d.agree}/${d.total||3} → ${d.consensus||'ASPETTA'}</div>
       <div class="cons-list">${rows}</div>
       <div class="timing-disc">Modelli: Llama 3.3 (Meta) · GPT-OSS (OpenAI) · Qwen3 (Alibaba) · via Groq · non è consulenza finanziaria</div>
+    </div>`;
+}
+
+// ── Dibattito Toro vs Orso (multi-agente, stile TradingAgents) ──
+async function loadDebate(){
+  const tk=_modalTicker; if(!tk) return;
+  const cta=document.getElementById('deb-cta'); if(cta) cta.style.display='none';
+  const el=document.getElementById('m-debate'); if(!el) return;
+  el.innerHTML='<div class="deep-ai-loading">⚖️ Toro e Orso stanno discutendo su '+tk+'… (poi il giudice decide)</div>';
+  try{
+    const d=await fetch('/api/stock/'+tk+'/debate').then(r=>r.ok?r.json():r.json().then(j=>({error:j.error||'errore'})));
+    if(!d||d.error){ el.innerHTML='<div class="deep-ai-loading" style="color:var(--red-b)">⚠️ '+((d&&d.error)||'Errore')+'</div>'; if(cta) cta.style.display='block'; return; }
+    renderDebate(d);
+  }catch(e){ el.innerHTML='<div class="deep-ai-loading" style="color:var(--red-b)">⚠️ Errore di rete</div>'; if(cta) cta.style.display='block'; }
+}
+function renderDebate(d){
+  const el=document.getElementById('m-debate'); if(!el) return;
+  const u=(d.verdict||'').toUpperCase();
+  const vCls=u.includes('NON')?'no':(u.includes('COMPRA')||u.includes('BUY')?'yes':'wait');
+  const vIco=vCls==='yes'?'✅':vCls==='no'?'⛔':'⏳';
+  const win=(d.winner||'').toUpperCase();
+  const bullLi=(d.bull||[]).map(b=>`<li>${(''+b).replace(/[<>]/g,'')}</li>`).join('')||'<li>—</li>';
+  const bearLi=(d.bear||[]).map(b=>`<li>${(''+b).replace(/[<>]/g,'')}</li>`).join('')||'<li>—</li>';
+  el.innerHTML=`
+    <div class="deb-card">
+      <div class="deb-cols">
+        <div class="deb-col bull ${win.includes('TORO')?'win':''}">
+          <div class="deb-col-hd">🐂 Toro (compra)${win.includes('TORO')?' · 🏆':''}</div>
+          <ul class="deb-list">${bullLi}</ul>
+        </div>
+        <div class="deb-col bear ${win.includes('ORSO')?'win':''}">
+          <div class="deb-col-hd">🐻 Orso (non comprare)${win.includes('ORSO')?' · 🏆':''}</div>
+          <ul class="deb-list">${bearLi}</ul>
+        </div>
+      </div>
+      <div class="deb-verdict ${vCls}">👨‍⚖️ ${vIco} ${d.verdict||'ASPETTA'}${d.confidence!=null?`<span class="sb-conf">Confidenza <b>${d.confidence}%</b></span>`:''}</div>
+      ${d.synthesis?`<div class="trc-reason"><div class="trc-reason-hd">⚖️ Decisione del giudice</div>${(''+d.synthesis).replace(/[<>]/g,'')}</div>`:''}
+      <div class="timing-disc">3 agenti AI (GPT-OSS 120B) · Toro · Orso · Giudice · ispirato a TradingAgents · non è consulenza finanziaria</div>
     </div>`;
 }
 
@@ -5085,6 +5145,8 @@ async function openModal(stock){
   const _drR=document.getElementById('m-deepreport'); if(_drR) _drR.innerHTML='';
   const _csC=document.getElementById('cons-cta'); if(_csC) _csC.style.display='block';
   const _csR=document.getElementById('m-consensus'); if(_csR) _csR.innerHTML='';
+  const _dbC=document.getElementById('deb-cta'); if(_dbC) _dbC.style.display='block';
+  const _dbR=document.getElementById('m-debate'); if(_dbR) _dbR.innerHTML='';
 
   // Chart (con indicatori tecnici RSI / Bollinger)
   _renderChartWithIndicators(stock.ticker,_chartPeriod,_chartInterval,_chartType);
