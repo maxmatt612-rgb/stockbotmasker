@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-from analyzer import get_enriched_analysis, scan_cheap_stocks
+from analyzer import get_enriched_analysis, scan_cheap_stocks, get_longterm_analysis
 
 STATIC = Path(__file__).parent / "static"
 HISTORY_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "analysis_history.json"
@@ -27,14 +27,49 @@ app = FastAPI(title="Stock Bot Dashboard", docs_url=None, redoc_url=None)
 
 @app.on_event("startup")
 async def _startup_load_cache():
-    """Carica l'ultimo scan da disco al riavvio — così il primo accesso è istantaneo."""
+    """Carica l'ultimo scan da disco. Non rilancia il scan se i dati sono di oggi."""
+    loaded = False
+    scan_is_today = False
+
     if SCAN_FILE.exists():
         try:
             data = json.loads(SCAN_FILE.read_text(encoding="utf-8"))
             if data:
+                # Annota morning_price se mancante (compatibilità con vecchi file)
+                for s in data:
+                    if 'morning_price' not in s:
+                        s['morning_price'] = s.get('current_price')
+                global _morning_data
+                _morning_data = list(data)
                 _store("scan:10", data)
+                loaded = True
+                mtime = datetime.fromtimestamp(SCAN_FILE.stat().st_mtime, tz=timezone.utc)
+                scan_is_today = mtime.date() == datetime.now(tz=timezone.utc).date()
+                print(f"[startup] Caricati {len(data)} titoli — dati di oggi: {scan_is_today}")
         except Exception as e:
             print(f"[startup] Impossibile caricare last_scan.json: {e}")
+
+    # Lancia scan solo se non abbiamo già i dati di oggi (es. primo avvio o dopo mezzanotte)
+    if not scan_is_today:
+        asyncio.create_task(_refresh_scan_background(10))
+        if not loaded:
+            print("[startup] Nessun dato salvato — scan di avvio in background iniziato")
+    else:
+        print("[startup] Dati odierni presenti — nessun nuovo scan (analisi fissata dal mattino)")
+
+    asyncio.create_task(_pdf_scheduler())
+    asyncio.create_task(_warm_influence())
+
+
+async def _warm_influence():
+    """Pre-riscalda la cache del Radar VIP ~40s dopo l'avvio (così il primo click è istantaneo)."""
+    try:
+        await asyncio.sleep(40)
+        data = await asyncio.to_thread(_scan_influence)
+        _store("influence:scan", _clean(data))
+        print(f"[influence] cache pre-riscaldata: {len(data)} dichiarazioni")
+    except Exception as e:
+        print(f"[influence] warm errore: {e}")
 
 
 app.add_middleware(
@@ -51,6 +86,80 @@ try:
     groq_client = AsyncGroq(api_key=_GROQ_KEY) if _GROQ_KEY else None
 except Exception:
     groq_client = None
+
+# ─── Lingua richiesta (risposte AI in EN/IT in base al toggle del frontend) ───
+import contextvars as _ctxvars
+_REQ_LANG = _ctxvars.ContextVar("req_lang", default="it")
+
+
+def _lang() -> str:
+    try:
+        return _REQ_LANG.get()
+    except Exception:
+        return "it"
+
+
+class _LangASGIMiddleware:
+    """Middleware ASGI puro: legge ?lang= e lo mette nel contextvar.
+    Gira nello stesso task dell'endpoint, quindi il contextvar si propaga
+    in modo affidabile (a differenza di BaseHTTPMiddleware)."""
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http":
+            qs = scope.get("query_string", b"").decode("latin-1")
+            try:
+                from urllib.parse import parse_qs
+                lang = (parse_qs(qs).get("lang", ["it"])[0] or "it").lower()
+            except Exception:
+                lang = "it"
+            token = _REQ_LANG.set("en" if lang == "en" else "it")
+            try:
+                await self.app(scope, receive, send)
+            finally:
+                _REQ_LANG.reset(token)
+        else:
+            await self.app(scope, receive, send)
+
+
+app.add_middleware(_LangASGIMiddleware)
+
+
+@app.get("/api/realtime-token")
+async def api_realtime_token():
+    """Espone la chiave Finnhub (real-time websocket) letta dalle env var di Railway.
+    Se non impostata, ritorna stringa vuota → il frontend resta su polling Yahoo."""
+    return {"finnhub": os.getenv("FINNHUB_KEY", "")}
+
+
+# Wrapper Groq: quando lang=en inietta l'istruzione di rispondere in inglese
+# in OGNI chiamata AI (un solo punto, copre tutti gli endpoint presenti e futuri).
+if groq_client is not None:
+    try:
+        _orig_groq_create = groq_client.chat.completions.create
+
+        async def _groq_create_lang(*args, **kwargs):
+            if _lang() == "en":
+                msgs = kwargs.get("messages")
+                if isinstance(msgs, list) and msgs:
+                    directive = ("\n\nIMPORTANT: Write all explanatory / free-form text in fluent, natural ENGLISH "
+                                 "(not Italian). BUT keep any fixed verdict keywords, field labels or structured "
+                                 "tokens required by the format above EXACTLY as written in the instructions "
+                                 "(e.g. COMPRA, ASPETTA, NON COMPRARE, VERDETTO, LONG, SHORT) — do not translate those tokens.")
+                    injected = False
+                    for msg in msgs:
+                        if isinstance(msg, dict) and msg.get("role") == "system":
+                            msg["content"] = (msg.get("content") or "") + directive
+                            injected = True
+                            break
+                    if not injected:
+                        msgs.insert(0, {"role": "system", "content": "Respond entirely in fluent English."})
+            return await _orig_groq_create(*args, **kwargs)
+
+        groq_client.chat.completions.create = _groq_create_lang
+    except Exception:
+        pass
 
 # ─── Autenticazione Telegram + JWT ───────────────────────────────────────────
 # Variabili env richieste per il login:
@@ -116,7 +225,15 @@ def _write_users(d: dict):
 
 # ─── Cache semplice in memoria ────────────────────────────────────────────────
 _cache: dict[str, dict] = {}
-_SCAN_TTL     = 300    # 5 min — scanner
+_scan_in_progress: bool = False          # evita scan concorrenti
+_morning_data: list = []                 # dati scan mattutino — bloccati per la giornata
+
+# ─── PDF report in memoria ────────────────────────────────────────────────────
+_morning_pdf: Optional[bytes] = None
+_morning_pdf_ts: Optional[str] = None   # timestamp generazione
+_evening_pdf: Optional[bytes] = None
+_evening_pdf_ts: Optional[str] = None
+_SCAN_TTL     = 86400  # 24h — scan fissato dal mattino, non si aggiorna intraday
 _STOCK_TTL    = 180    # 3 min — analisi singola
 _AI_TTL       = 600    # 10 min — AI (chiamata Groq costosa)
 _FORECAST_TTL = 14400  # 4 h — previsione 7 giorni
@@ -194,17 +311,456 @@ def _save_scan_to_disk(data: list):
         print(f"[scan] Errore salvataggio su disco: {e}")
 
 
-async def _refresh_scan_background(top: int):
-    """Aggiorna il scan in background senza bloccare la risposta."""
+# ─── PDF generation ───────────────────────────────────────────────────────────
+
+def _stock_bias(score: float) -> tuple[str, tuple]:
+    """Restituisce (bias_label, rgb_color) in base allo score."""
+    if score >= 7:
+        return "RIALZO", (15, 120, 60)
+    if score >= 5:
+        return "LATERALE", (140, 100, 20)
+    return "RIBASSO", (180, 30, 30)
+
+
+def _build_pdf(stocks: list, title: str, subtitle: str) -> bytes:
+    """PDF analisi mattutina: stima direzionale + setup di trading per ogni titolo."""
+    from fpdf import FPDF
+
+    class PDF(FPDF):
+        def header(self):
+            self.set_fill_color(15, 15, 25)
+            self.rect(0, 0, 210, 28, 'F')
+            self.set_text_color(196, 166, 255)
+            self.set_font("Helvetica", "B", 15)
+            self.set_xy(10, 7)
+            self.cell(130, 8, "MASKER Stock Intelligence", ln=False)
+            self.set_font("Helvetica", "", 8)
+            self.set_text_color(140, 140, 160)
+            self.cell(0, 8, "ANALISI MATTUTINA", align="R", ln=True)
+            self.set_text_color(160, 160, 180)
+            self.set_font("Helvetica", "", 8)
+            self.set_x(10)
+            self.cell(0, 5, subtitle, ln=True)
+            self.ln(3)
+
+        def footer(self):
+            self.set_y(-12)
+            self.set_font("Helvetica", "I", 7)
+            self.set_text_color(120, 120, 140)
+            self.cell(0, 6, "Solo a scopo informativo — non costituisce consulenza finanziaria", align="C")
+
+    pdf = PDF()
+    pdf.set_margins(10, 32, 10)
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=16)
+
+    # ── Titolo + riepilogo ──────────────────────────────────────────────────
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.set_text_color(20, 20, 40)
+    pdf.cell(0, 8, title, ln=True)
+    pdf.ln(1)
+
+    avg_score = sum(s.get("score_10", 5) or 5 for s in stocks) / max(len(stocks), 1)
+    rialzo_n  = sum(1 for s in stocks if (s.get("score_10") or 5) >= 7)
+    laterale_n = sum(1 for s in stocks if 5 <= (s.get("score_10") or 5) < 7)
+    ribasso_n  = len(stocks) - rialzo_n - laterale_n
+
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_text_color(60, 60, 80)
+    pdf.cell(0, 5,
+        f"Titoli analizzati: {len(stocks)}   |   Score medio: {avg_score:.1f}/10   |   "
+        f"Stime: {rialzo_n} RIALZO  {laterale_n} LATERALE  {ribasso_n} RIBASSO",
+        ln=True)
+    pdf.ln(4)
+
+    # ── Tabella riepilogativa ───────────────────────────────────────────────
+    col_w = [18, 44, 24, 16, 16, 26, 20, 26]
+    headers = ["#", "Ticker / Nome", "Prezzo", "Score", "RSI", "STIMA OGGI", "Rischio", "Setup R/R"]
+    pdf.set_font("Helvetica", "B", 7.5)
+    pdf.set_fill_color(230, 228, 255)
+    pdf.set_text_color(40, 40, 90)
+    for i, h in enumerate(headers):
+        pdf.cell(col_w[i], 7, h, border=1, fill=True, align="C")
+    pdf.ln()
+
+    pdf.set_font("Helvetica", "", 8)
+    for rank, s in enumerate(stocks, 1):
+        score = s.get("score_10", 5) or 5
+        rsi   = s.get("rsi", 50) or 50
+        ccy   = s.get("currency", "USD")
+        sym   = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+        price = s.get("morning_price") or s.get("current_price") or 0
+        price_str = f"{sym}{price:.2f}" if price else "—"
+        bias, bias_rgb = _stock_bias(score)
+        ts = s.get("trade_setup")
+        rr_str = f"1:{ts['rr']}" if ts else "—"
+        name_short = (s.get("name") or s["ticker"])[:18]
+
+        pdf.set_fill_color(248, 247, 255) if rank % 2 == 0 else pdf.set_fill_color(255, 255, 255)
+        pdf.set_text_color(50, 50, 70)
+
+        pdf.cell(col_w[0], 6, f"#{rank}", border=1, fill=True, align="C")
+        pdf.cell(col_w[1], 6, f"{s['ticker']} — {name_short}", border=1, fill=True, align="L")
+        pdf.cell(col_w[2], 6, price_str, border=1, fill=True, align="C")
+        pdf.cell(col_w[3], 6, f"{score:.1f}/10", border=1, fill=True, align="C")
+        pdf.cell(col_w[4], 6, f"{rsi:.0f}", border=1, fill=True, align="C")
+
+        # Colonna STIMA (colorata)
+        pdf.set_text_color(*bias_rgb)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(col_w[5], 6, bias, border=1, fill=True, align="C")
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(50, 50, 70)
+
+        pdf.cell(col_w[6], 6, s.get("risk_level", "—"), border=1, fill=True, align="C")
+        pdf.cell(col_w[7], 6, rr_str, border=1, fill=True, align="C")
+        pdf.ln()
+
+    # ── Schede dettaglio ────────────────────────────────────────────────────
+    pdf.ln(6)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(20, 20, 40)
+    pdf.cell(0, 7, "Schede dettaglio — Stima e Setup", ln=True)
+    pdf.ln(1)
+
+    for rank, s in enumerate(stocks, 1):
+        if pdf.get_y() > 248:
+            pdf.add_page()
+
+        score = s.get("score_10", 5) or 5
+        rsi   = s.get("rsi", 50) or 50
+        vol   = s.get("vol_ratio", 1) or 1
+        ccy   = s.get("currency", "USD")
+        sym   = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+        price = s.get("morning_price") or s.get("current_price") or 0
+        bias, bias_rgb = _stock_bias(score)
+        name = s.get("name") or s["ticker"]
+
+        # Header titolo
+        pdf.set_fill_color(235, 233, 255)
+        pdf.set_text_color(30, 30, 60)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(0, 7, f"#{rank}  {s['ticker']}  —  {name}", fill=True, ln=True)
+
+        # Riga metriche
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(60, 60, 80)
+        metrics = (
+            f"  Prezzo mattino: {sym}{price:.2f}"
+            f"  |  Score: {score:.1f}/10"
+            f"  |  RSI: {rsi:.0f}"
+            f"  |  Vol: {vol:.1f}x media"
+            f"  |  Rischio: {s.get('risk_level','—')}"
+        )
+        pdf.cell(0, 5, metrics, ln=True)
+
+        # Badge STIMA
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_text_color(*bias_rgb)
+        arrow = "▲" if bias == "RIALZO" else ("▼" if bias == "RIBASSO" else "→")
+        pdf.cell(0, 6, f"  STIMA OGGI: {arrow} {bias}", ln=True)
+
+        # Trade setup
+        ts = s.get("trade_setup")
+        if ts:
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(50, 50, 70)
+            pdf.cell(0, 5,
+                f"  Setup: Entrata {sym}{ts['entry']:.2f}"
+                f"  |  Stop {sym}{ts['stop']:.2f} ({ts['stop_pct']}%)"
+                f"  |  Target {sym}{ts['target']:.2f} (+{ts['target_pct']}%)"
+                f"  |  R/R 1:{ts['rr']}",
+                ln=True)
+
+        # Segnali
+        signals = s.get("signals") or []
+        if signals:
+            pdf.set_font("Helvetica", "", 7.5)
+            pdf.set_text_color(90, 90, 110)
+            for sig in signals[:2]:
+                pdf.cell(0, 4.5, f"  • {sig}", ln=True)
+
+        pdf.ln(3)
+
+    return bytes(pdf.output())
+
+
+async def _generate_morning_pdf():
+    """Genera il PDF analisi mattutina dai dati bloccati al mattino."""
+    global _morning_pdf, _morning_pdf_ts
+    data = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
+    if not data:
+        print("[pdf] Nessun dato per il PDF mattutino")
+        return
+    now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
     try:
-        results = await asyncio.to_thread(scan_cheap_stocks, 40.0, top)
+        pdf_bytes = await asyncio.to_thread(
+            _build_pdf, data,
+            f"Analisi Mattutina — {datetime.now().strftime('%A %d %B %Y').capitalize()}",
+            f"Generato il {now_str} | Top {len(data)} titoli per score"
+        )
+        _morning_pdf = pdf_bytes
+        _morning_pdf_ts = now_str
+        print(f"[pdf] PDF mattutino generato ({len(pdf_bytes)//1024} KB)")
+    except Exception as e:
+        print(f"[pdf] Errore generazione PDF mattutino: {e}")
+
+
+async def _generate_evening_pdf():
+    """Genera il PDF recap serale: confronta prezzi mattino vs chiusura USA."""
+    global _evening_pdf, _evening_pdf_ts
+    import yfinance as yf
+    import pandas as pd
+
+    # Usa _morning_data (bloccato alle 7:30) se disponibile, altrimenti fallback cache
+    morning_data = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
+    if not morning_data:
+        print("[pdf] Nessun dato mattutino per il recap serale")
+        return
+
+    # Fetch prezzi di chiusura per tutti i ticker del mattino
+    tickers = [s["ticker"] for s in morning_data]
+    closing = {}
+    try:
+        raw = await asyncio.to_thread(
+            lambda: yf.download(tickers, period="1d", progress=False, auto_adjust=True)
+        )
+        if not raw.empty:
+            if isinstance(raw.columns, pd.MultiIndex):
+                close_df = raw["Close"]
+            else:
+                close_df = raw[["Close"]].rename(columns={"Close": tickers[0]})
+            for t in tickers:
+                if t in close_df.columns:
+                    s = close_df[t].dropna()
+                    if len(s):
+                        closing[t] = float(s.iloc[-1])
+    except Exception as e:
+        print(f"[evening] Errore fetch prezzi chiusura: {e}")
+
+    # Arricchisci con delta mattino→chiusura
+    enriched = []
+    for s in morning_data:
+        t = s["ticker"]
+        mp = s.get("current_price", 0)
+        ep = closing.get(t, mp)
+        delta = round((ep - mp) / mp * 100, 2) if mp > 0 else 0
+        enriched.append({**s, "evening_price": ep, "delta_pct": delta})
+    enriched.sort(key=lambda x: x.get("delta_pct", 0), reverse=True)
+
+    now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+    try:
+        pdf_bytes = await asyncio.to_thread(
+            _build_evening_pdf, enriched,
+            f"Recap Serale — {datetime.now().strftime('%A %d %B %Y').capitalize()}",
+            f"Chiusura mercati USA | Generato il {now_str}"
+        )
+        _evening_pdf = pdf_bytes
+        _evening_pdf_ts = now_str
+        print(f"[pdf] PDF serale generato ({len(pdf_bytes)//1024} KB)")
+    except Exception as e:
+        print(f"[pdf] Errore generazione PDF serale: {e}")
+
+
+def _build_evening_pdf(stocks: list, title: str, subtitle: str) -> bytes:
+    """PDF recap serale: confronta stima mattutina con risultato reale di chiusura."""
+    from fpdf import FPDF
+
+    def _prediction_correct(bias: str, delta: float) -> bool:
+        if bias == "RIALZO":
+            return delta > 0.3
+        if bias == "RIBASSO":
+            return delta < -0.3
+        # LATERALE: piccola variazione in entrambe le direzioni
+        return abs(delta) <= 2.0
+
+    class PDF(FPDF):
+        def header(self):
+            self.set_fill_color(15, 15, 25)
+            self.rect(0, 0, 210, 28, 'F')
+            self.set_text_color(196, 166, 255)
+            self.set_font("Helvetica", "B", 15)
+            self.set_xy(10, 7)
+            self.cell(130, 8, "MASKER Stock Intelligence", ln=False)
+            self.set_font("Helvetica", "", 8)
+            self.set_text_color(140, 140, 160)
+            self.cell(0, 8, "RECAP SERALE", align="R", ln=True)
+            self.set_text_color(160, 160, 180)
+            self.set_font("Helvetica", "", 8)
+            self.set_x(10)
+            self.cell(0, 5, subtitle, ln=True)
+            self.ln(3)
+
+        def footer(self):
+            self.set_y(-12)
+            self.set_font("Helvetica", "I", 7)
+            self.set_text_color(120, 120, 140)
+            self.cell(0, 6, "Solo a scopo informativo — non costituisce consulenza finanziaria", align="C")
+
+    pdf = PDF()
+    pdf.set_margins(10, 32, 10)
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=16)
+
+    # ── Titolo ──────────────────────────────────────────────────────────────
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.set_text_color(20, 20, 40)
+    pdf.cell(0, 8, title, ln=True)
+    pdf.ln(1)
+
+    # Pre-calcola stats
+    salite   = sum(1 for s in stocks if (s.get("delta_pct") or 0) > 0)
+    scese    = sum(1 for s in stocks if (s.get("delta_pct") or 0) < 0)
+    stabili  = len(stocks) - salite - scese
+    corrette = sum(
+        1 for s in stocks
+        if _prediction_correct(
+            _stock_bias(s.get("score_10", 5) or 5)[0],
+            s.get("delta_pct", 0) or 0
+        )
+    )
+
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_text_color(60, 60, 80)
+    pdf.cell(0, 5,
+        f"Titoli: {len(stocks)}   |   Salite: {salite}   Scese: {scese}   Stabili: {stabili}"
+        f"   |   Previsioni corrette: {corrette}/{len(stocks)}"
+        f"  ({round(corrette/max(len(stocks),1)*100)}%)",
+        ln=True)
+    pdf.ln(4)
+
+    # ── Tabella ─────────────────────────────────────────────────────────────
+    col_w = [18, 42, 22, 22, 22, 20, 24, 20]
+    headers = ["#", "Ticker / Nome", "P. Mattino", "P. Chiusura", "Delta %",
+               "Esito", "Stima", "Previsione"]
+    pdf.set_font("Helvetica", "B", 7.5)
+    pdf.set_fill_color(230, 228, 255)
+    pdf.set_text_color(40, 40, 90)
+    for i, h in enumerate(headers):
+        pdf.cell(col_w[i], 7, h, border=1, fill=True, align="C")
+    pdf.ln()
+
+    # Ordina: prima le salite, poi stabili, poi scese
+    sorted_stocks = sorted(stocks, key=lambda x: x.get("delta_pct", 0) or 0, reverse=True)
+
+    pdf.set_font("Helvetica", "", 8)
+    for rank, s in enumerate(sorted_stocks, 1):
+        delta = s.get("delta_pct", 0) or 0
+        ccy   = s.get("currency", "USD")
+        sym   = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+        score = s.get("score_10", 5) or 5
+        mp    = s.get("current_price") or s.get("morning_price") or 0
+        ep    = s.get("evening_price", mp) or mp
+        bias, _ = _stock_bias(score)
+        correct = _prediction_correct(bias, delta)
+        name_short = (s.get("name") or s["ticker"])[:16]
+
+        morning_str = f"{sym}{mp:.2f}" if mp else "—"
+        evening_str = f"{sym}{ep:.2f}" if ep else "—"
+        delta_str   = f"{'+' if delta >= 0 else ''}{delta:.2f}%"
+        esito_str   = "SALITA" if delta > 0 else ("SCESA" if delta < 0 else "STABILE")
+        prev_str    = "CORRETTO" if correct else "ERRATO"
+
+        pdf.set_fill_color(248, 247, 255) if rank % 2 == 0 else pdf.set_fill_color(255, 255, 255)
+        pdf.set_text_color(50, 50, 70)
+        pdf.cell(col_w[0], 6, f"#{rank}", border=1, fill=True, align="C")
+        pdf.cell(col_w[1], 6, f"{s['ticker']} — {name_short}", border=1, fill=True, align="L")
+        pdf.cell(col_w[2], 6, morning_str, border=1, fill=True, align="C")
+        pdf.cell(col_w[3], 6, evening_str, border=1, fill=True, align="C")
+
+        # Delta colorato
+        pdf.set_text_color(15, 110, 55) if delta >= 0 else pdf.set_text_color(170, 25, 25)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(col_w[4], 6, delta_str, border=1, fill=True, align="C")
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(50, 50, 70)
+
+        pdf.cell(col_w[5], 6, esito_str, border=1, fill=True, align="C")
+        # Stima mattutina
+        _, bias_rgb = _stock_bias(score)
+        pdf.set_text_color(*bias_rgb)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(col_w[6], 6, bias, border=1, fill=True, align="C")
+        pdf.set_font("Helvetica", "", 8)
+        # Previsione corretta?
+        pdf.set_text_color(15, 110, 55) if correct else pdf.set_text_color(170, 25, 25)
+        pdf.cell(col_w[7], 6, prev_str, border=1, fill=True, align="C")
+        pdf.set_text_color(50, 50, 70)
+        pdf.ln()
+
+    # ── Riepilogo ────────────────────────────────────────────────────────────
+    pdf.ln(5)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_fill_color(235, 233, 255)
+    pdf.set_text_color(30, 30, 60)
+    pdf.cell(0, 7, " Riepilogo giornata", fill=True, ln=True)
+    pdf.ln(1)
+    pdf.set_font("Helvetica", "", 8.5)
+    pdf.set_text_color(40, 40, 60)
+    pdf.cell(0, 5, f"  Salite: {salite}  |  Scese: {scese}  |  Stabili: {stabili}", ln=True)
+    pdf.cell(0, 5,
+        f"  Previsioni corrette: {corrette}/{len(stocks)} ({round(corrette/max(len(stocks),1)*100)}%)"
+        f"  —  {'Ottima giornata!' if corrette >= len(stocks)*0.7 else 'Giornata nella norma.'}",
+        ln=True)
+
+    return bytes(pdf.output())
+
+
+async def _pdf_scheduler():
+    """Scheduler giornaliero: 07:30 scan, 07:35 PDF mattina, 22:05 recap serale."""
+    while True:
+        now = datetime.now()
+        h, m = now.hour, now.minute
+        # 07:30 — scan mattutino (dati fissati per la giornata)
+        if h == 7 and m == 30:
+            print("[scheduler] Avvio scan mattutino 07:30")
+            asyncio.create_task(_refresh_scan_background(10))
+            await asyncio.sleep(60)
+        # 07:35 — PDF analisi mattutina (dopo che lo scan ha avuto 5 min)
+        elif h == 7 and m == 35:
+            await _generate_morning_pdf()
+            await asyncio.sleep(60)
+        # 22:05 — recap serale con confronto prezzi chiusura USA
+        elif h == 22 and m == 5:
+            await _generate_evening_pdf()
+            await asyncio.sleep(60)
+        else:
+            await asyncio.sleep(30)
+
+
+async def _refresh_scan_background(top: int):
+    """Aggiorna il scan in background senza bloccare la risposta.
+    Scansiona sempre top 100 per avere un pool completo per lo screening;
+    il display mostra solo i primi `top` (default 10)."""
+    global _scan_in_progress
+    if _scan_in_progress:
+        return  # già in corso, skip
+    _scan_in_progress = True
+    try:
+        # Analizza TUTTO l'universo (6000+): top_n=None → restituisce tutti i candidati
+        print(f"[scan_bg] Avvio scan universo completo, display={top}…")
+        results = await asyncio.to_thread(scan_cheap_stocks, 200.0, None)
         clean = _clean(results or [])
         if clean:
-            _store(f"scan:{top}", clean)
+            # Annota morning_price su tutti i titoli
+            for s in clean:
+                s['morning_price'] = s.get('current_price')
+            # Pool completo per lo screening (tutti i candidati analizzati)
+            _store("scan:full", clean)
+            # Top N per la view principale (vero top 10 dall'intero universo)
+            display = clean[:top]
             if top == 10:
-                _save_scan_to_disk(clean)
+                global _morning_data
+                _morning_data = list(display)
+                _save_scan_to_disk(display)
+            _store(f"scan:{top}", display)
+            print(f"[scan_bg] Completato: pool totale={len(clean)}, display={len(display)}")
+        else:
+            print("[scan_bg] Scan restituito vuoto")
     except Exception as e:
         print(f"[scan_bg] Errore: {e}")
+    finally:
+        _scan_in_progress = False
 
 
 @app.get("/api/scan")
@@ -218,13 +774,527 @@ async def api_scan(top: int = 10):
     if stale:
         asyncio.create_task(_refresh_scan_background(top))
         return stale["data"]
-    # Nessun dato: attendi il primo scan
-    results = await asyncio.to_thread(scan_cheap_stocks, 40.0, top)
+    # Nessun dato in cache: assicuriamoci che il background task sia avviato
+    # (potrebbe non essersi avviato se il startup event ha avuto problemi).
+    if not _scan_in_progress:
+        asyncio.create_task(_refresh_scan_background(top))
+    # Rispondi subito: il frontend mostra "in avvio" e riprova ogni 10s
+    return JSONResponse([], status_code=202)
+
+
+@app.post("/api/scan/force")
+async def api_scan_force():
+    """Invalida la cache dello scan e forza una nuova scansione in background."""
+    # Rimuovi dalla cache così il prossimo /api/scan vede dati stale → refresh
+    _cache.pop("scan:10", None)
+    if not _scan_in_progress:
+        asyncio.create_task(_refresh_scan_background(10))
+    return {"ok": True, "scan_in_progress": _scan_in_progress}
+
+
+@app.get("/api/scan/screen")
+async def api_scan_screen(
+    rsi_max: float = 100,
+    rsi_min: float = 0,
+    price_max: float = 200,
+    price_min: float = 0,
+    day_change_min: float = -100,
+    vol_min: float = 0,
+    score_min: float = 0,
+    ai_only: bool = False,
+    risk: str = "",
+):
+    """Filtra il pool mattutino (top 100) con i parametri specificati.
+    Restituisce fino a 30 titoli che soddisfano tutti i criteri."""
+    full = (_cache.get("scan:full") or {}).get("data") or []
+    if not full:
+        # Pool non ancora pronto (scan in corso)
+        return JSONResponse([], status_code=202)
+
+    filtered = []
+    for s in full:
+        if ai_only and not s.get("is_ai"):
+            continue
+        rsi = s.get("rsi", 50) or 50
+        if rsi > rsi_max or rsi < rsi_min:
+            continue
+        price = s.get("current_price", 0) or 0
+        if price > price_max or (price_min > 0 and price < price_min):
+            continue
+        if (s.get("day_change_pct", 0) or 0) < day_change_min:
+            continue
+        if (s.get("vol_ratio", 1) or 1) < vol_min:
+            continue
+        if (s.get("score_10", 5) or 5) < score_min:
+            continue
+        if risk and s.get("risk_level") != risk:
+            continue
+        filtered.append(s)
+
+    return _clean(filtered[:30])
+
+
+@app.get("/api/scan/etf")
+async def api_scan_etf():
+    """Scansione top 10 ETF per score giornaliero."""
+    key = "scan:etf"
+    if (c := _cached(key, _SCAN_TTL)) is not None:
+        return c
+    from config import ETF_UNIVERSE
+    results = await asyncio.to_thread(scan_cheap_stocks, 500.0, 10, ETF_UNIVERSE)
     clean = _clean(results or [])
-    _store(key, clean)
-    if top == 10:
-        _save_scan_to_disk(clean)
-    return clean
+    if clean:
+        _store(key, clean)
+    return clean or JSONResponse([], status_code=202)
+
+
+@app.get("/api/scan/evening")
+async def api_scan_evening():
+    """Stesso set di stock mattutino con PREZZI LIVE — usato sia di giorno che alla sera.
+    Restituisce gli stessi titoli in ordine identico, con evening_price (live) e delta_from_morning.
+    Cache 60s per non sovraccaricare yfinance (rate limiting)."""
+    morning = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
+    if not morning:
+        return JSONResponse([], status_code=404)
+
+    # Cache 60s: i prezzi live vengono aggiornati al massimo una volta al minuto
+    cached = _cached("scan:live", 60)
+    if cached is not None:
+        return cached
+
+    tickers = [s["ticker"] for s in morning]
+    closing: dict = {}
+    try:
+        import yfinance as yf
+        import pandas as pd
+        raw = await asyncio.to_thread(
+            lambda: yf.download(tickers, period="1d", progress=False, auto_adjust=False)
+        )
+        if not raw.empty:
+            if isinstance(raw.columns, pd.MultiIndex):
+                close_df = raw["Close"]
+            else:
+                # singolo ticker: colonna piatta
+                t0 = tickers[0] if tickers else "__"
+                close_df = raw[["Close"]].rename(columns={"Close": t0})
+            for t in tickers:
+                if t in close_df.columns:
+                    ser = close_df[t].dropna()
+                    if len(ser):
+                        closing[t] = float(ser.iloc[-1])
+    except Exception as e:
+        print(f"[evening] Errore fetch prezzi: {e}")
+
+    enriched = []
+    for s in morning:
+        t = s["ticker"]
+        mp = s.get("morning_price") or s.get("current_price") or 0
+        ep = closing.get(t, mp)
+        delta = round((ep - mp) / mp * 100, 2) if mp > 0 else 0
+        enriched.append({**s, "evening_price": round(ep, 4), "delta_from_morning": delta})
+
+    result = _clean(enriched)
+    _store("scan:live", result)
+    return result
+
+
+# ─── Radar VIP: dichiarazioni di figure pubbliche sui titoli ─────────────────
+_PUBLIC_FIGURES = [
+    # ── Politica USA ──
+    {"name": "Donald Trump",      "role": "Presidente USA",        "emoji": "🇺🇸", "keys": ["trump"]},
+    {"name": "Joe Biden",         "role": "Ex Presidente USA",     "emoji": "🇺🇸", "keys": ["joe biden", "biden"]},
+    {"name": "JD Vance",          "role": "Vicepresidente USA",    "emoji": "🇺🇸", "keys": ["jd vance", "vance"]},
+    {"name": "Nancy Pelosi",      "role": "Congresso USA",         "emoji": "🏛️", "keys": ["pelosi"]},
+    {"name": "Bernie Sanders",    "role": "Senato USA",            "emoji": "🏛️", "keys": ["bernie sanders", "sanders"]},
+    {"name": "Elizabeth Warren",  "role": "Senato USA",            "emoji": "🏛️", "keys": ["elizabeth warren"]},
+    {"name": "Robert Kennedy Jr", "role": "Segretario Salute USA", "emoji": "🏛️", "keys": ["robert kennedy", "rfk"]},
+    # ── Banche centrali / economia ──
+    {"name": "Jerome Powell",     "role": "Presidente Fed",        "emoji": "🏦", "keys": ["jerome powell", "powell"]},
+    {"name": "Scott Bessent",     "role": "Segretario Tesoro USA", "emoji": "🏦", "keys": ["bessent"]},
+    {"name": "Janet Yellen",      "role": "Ex Segretario Tesoro",  "emoji": "🏦", "keys": ["yellen"]},
+    {"name": "Christine Lagarde", "role": "Presidente BCE",        "emoji": "🇪🇺", "keys": ["lagarde"]},
+    # ── CEO Tech ──
+    {"name": "Elon Musk",         "role": "CEO Tesla / xAI",       "emoji": "🚀", "keys": ["elon musk", "musk"]},
+    {"name": "Jensen Huang",      "role": "CEO NVIDIA",            "emoji": "🤖", "keys": ["jensen huang", "huang"]},
+    {"name": "Tim Cook",          "role": "CEO Apple",             "emoji": "🍎", "keys": ["tim cook"]},
+    {"name": "Mark Zuckerberg",   "role": "CEO Meta",              "emoji": "📱", "keys": ["zuckerberg"]},
+    {"name": "Satya Nadella",     "role": "CEO Microsoft",         "emoji": "🪟", "keys": ["satya nadella", "nadella"]},
+    {"name": "Sundar Pichai",     "role": "CEO Google / Alphabet", "emoji": "🔍", "keys": ["sundar pichai", "pichai"]},
+    {"name": "Andy Jassy",        "role": "CEO Amazon",            "emoji": "📦", "keys": ["andy jassy", "jassy"]},
+    {"name": "Lisa Su",           "role": "CEO AMD",               "emoji": "⚙️", "keys": ["lisa su"]},
+    {"name": "Michael Dell",      "role": "CEO Dell",              "emoji": "💻", "keys": ["michael dell"]},
+    {"name": "Pat Gelsinger",     "role": "Ex CEO Intel",          "emoji": "🔧", "keys": ["gelsinger"]},
+    {"name": "Cristiano Amon",    "role": "CEO Qualcomm",          "emoji": "📲", "keys": ["cristiano amon", "amon"]},
+    {"name": "Hock Tan",          "role": "CEO Broadcom",          "emoji": "📡", "keys": ["hock tan"]},
+    {"name": "Marc Benioff",      "role": "CEO Salesforce",        "emoji": "☁️", "keys": ["benioff"]},
+    {"name": "Mary Barra",        "role": "CEO General Motors",    "emoji": "🚗", "keys": ["mary barra", "barra"]},
+    {"name": "Jim Farley",        "role": "CEO Ford",              "emoji": "🚙", "keys": ["jim farley"]},
+    # ── AI ──
+    {"name": "Sam Altman",        "role": "CEO OpenAI",            "emoji": "🧠", "keys": ["sam altman", "altman"]},
+    {"name": "Dario Amodei",      "role": "CEO Anthropic",         "emoji": "🧠", "keys": ["dario amodei", "amodei"]},
+    {"name": "Demis Hassabis",    "role": "CEO Google DeepMind",   "emoji": "🧠", "keys": ["hassabis"]},
+    {"name": "Masayoshi Son",     "role": "CEO SoftBank",          "emoji": "🌐", "keys": ["masayoshi son", "masa son"]},
+    # ── Investitori / Hedge fund ──
+    {"name": "Warren Buffett",    "role": "Berkshire Hathaway",    "emoji": "💰", "keys": ["warren buffett", "buffett"]},
+    {"name": "Cathie Wood",       "role": "ARK Invest",            "emoji": "📈", "keys": ["cathie wood"]},
+    {"name": "Michael Burry",     "role": "Scion (Big Short)",     "emoji": "🐻", "keys": ["michael burry", "burry"]},
+    {"name": "Bill Ackman",       "role": "Pershing Square",       "emoji": "🎯", "keys": ["ackman"]},
+    {"name": "Carl Icahn",        "role": "Icahn Enterprises",     "emoji": "🦈", "keys": ["icahn"]},
+    {"name": "Ray Dalio",         "role": "Bridgewater",           "emoji": "🌊", "keys": ["ray dalio", "dalio"]},
+    {"name": "Stanley Druckenmiller", "role": "Duquesne",         "emoji": "📊", "keys": ["druckenmiller"]},
+    {"name": "David Tepper",      "role": "Appaloosa",             "emoji": "📊", "keys": ["tepper"]},
+    {"name": "Ken Griffin",       "role": "Citadel",               "emoji": "🏰", "keys": ["ken griffin"]},
+    {"name": "Larry Fink",        "role": "CEO BlackRock",         "emoji": "🏦", "keys": ["larry fink", "fink"]},
+    {"name": "Jamie Dimon",       "role": "CEO JPMorgan",          "emoji": "🏦", "keys": ["jamie dimon", "dimon"]},
+    {"name": "Jim Cramer",        "role": "CNBC Mad Money",        "emoji": "📺", "keys": ["jim cramer", "cramer"]},
+    {"name": "Chamath Palihapitiya", "role": "Social Capital",    "emoji": "💸", "keys": ["chamath"]},
+    {"name": "Mark Cuban",        "role": "Investitore / Shark",   "emoji": "🦈", "keys": ["mark cuban", "cuban"]},
+    {"name": "Peter Thiel",       "role": "Founders Fund",         "emoji": "🔮", "keys": ["peter thiel", "thiel"]},
+    {"name": "Marc Andreessen",   "role": "a16z",                  "emoji": "🔮", "keys": ["andreessen"]},
+    # ── Crypto ──
+    {"name": "Michael Saylor",    "role": "Strategy (MSTR)",       "emoji": "₿", "keys": ["saylor"]},
+    {"name": "Brian Armstrong",   "role": "CEO Coinbase",          "emoji": "🪙", "keys": ["brian armstrong", "armstrong"]},
+    {"name": "Changpeng Zhao",    "role": "Binance (CZ)",          "emoji": "🪙", "keys": ["changpeng zhao", " cz "]},
+    {"name": "Vitalik Buterin",   "role": "Ethereum",              "emoji": "💎", "keys": ["vitalik", "buterin"]},
+]
+
+# Titoli ad alto profilo da monitorare per le dichiarazioni (~55, set affidabile)
+_INFLUENCE_TICKERS = [
+    # Mega cap tech / AI
+    "NVDA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "AVGO",
+    "AMD", "ARM", "TSM", "MU", "QCOM", "INTC", "SMCI", "MRVL", "DELL",
+    "ORCL", "PLTR", "CRM", "SNOW", "NET", "CRWD", "PANW",
+    # AI emergenti / quantum
+    "AI", "SOUN", "IONQ", "BBAI",
+    # Crypto / mining
+    "COIN", "MSTR", "MARA", "RIOT", "HOOD",
+    # Auto / EV
+    "F", "GM", "RIVN", "NIO",
+    # Consumer / internet
+    "NFLX", "DIS", "UBER", "ABNB", "BABA", "PYPL",
+    # Finance / banche
+    "JPM", "BAC", "GS", "V", "SOFI",
+    # Difesa / industriali / energia
+    "BA", "LMT", "GE", "XOM",
+    # Pharma / retail
+    "LLY", "PFE", "GME", "WMT",
+]
+
+
+def _scan_influence() -> list:
+    """Scandaglia le news dei titoli ad alto profilo cercando menzioni di figure pubbliche.
+    OTTIMIZZATO: news scaricate in PARALLELO (thread pool) e prezzi in UN'UNICA chiamata batch
+    solo per i titoli che hanno un match → molto più veloce."""
+    import yfinance as yf
+    from concurrent.futures import ThreadPoolExecutor
+
+    # 1. Scarica le news di tutti i titoli IN PARALLELO
+    def _fetch_news(tk):
+        try:
+            return tk, (yf.Ticker(tk).news or [])
+        except Exception:
+            return tk, []
+
+    news_by_tk = {}
+    try:
+        with ThreadPoolExecutor(max_workers=12) as ex:
+            for tk, news in ex.map(_fetch_news, _INFLUENCE_TICKERS):
+                news_by_tk[tk] = news
+    except Exception as e:
+        print(f"[influence] errore fetch news parallelo: {e}")
+
+    # 2. Cerca le menzioni di figure pubbliche
+    hits = []
+    seen = set()
+    for tk, news in news_by_tk.items():
+        for item in (news or [])[:10]:
+            c = item.get("content") if isinstance(item, dict) else None
+            if not isinstance(c, dict):
+                c = item if isinstance(item, dict) else {}
+            title = (c.get("title") or "").strip()
+            if not title:
+                continue
+            tl = title.lower()
+            for fig in _PUBLIC_FIGURES:
+                if any(k in tl for k in fig["keys"]):
+                    uid = (tk, title[:70])
+                    if uid in seen:
+                        continue
+                    seen.add(uid)
+                    pub = c.get("pubDate") or c.get("displayTime") or ""
+                    link = ""
+                    cu = c.get("canonicalUrl") or c.get("clickThroughUrl") or {}
+                    if isinstance(cu, dict):
+                        link = cu.get("url", "")
+                    provider = ""
+                    pv = c.get("provider") or {}
+                    if isinstance(pv, dict):
+                        provider = pv.get("displayName", "")
+                    hits.append({
+                        "figure": fig["name"], "role": fig["role"], "emoji": fig["emoji"],
+                        "ticker": tk, "title": title[:220],
+                        "published": pub, "source": provider, "link": link,
+                        "price": 0.0, "day_change": 0.0,
+                    })
+                    break
+
+    # 3. Prezzi: UN'UNICA chiamata batch solo per i titoli trovati
+    matched = list({h["ticker"] for h in hits})
+    prices = {}
+    if matched:
+        try:
+            import pandas as pd
+            raw = yf.download(matched, period="2d", interval="1d",
+                              auto_adjust=False, progress=False)
+            if not raw.empty:
+                close = (raw["Close"] if isinstance(raw.columns, pd.MultiIndex)
+                         else raw[["Close"]].rename(columns={"Close": matched[0]}))
+                for t in matched:
+                    if t in close.columns:
+                        v = close[t].dropna()
+                        if len(v) >= 2:
+                            cur, prev = float(v.iloc[-1]), float(v.iloc[-2])
+                            prices[t] = {"price": round(cur, 2),
+                                         "chg": round((cur - prev) / prev * 100, 2) if prev else 0.0}
+                        elif len(v) == 1:
+                            prices[t] = {"price": round(float(v.iloc[-1]), 2), "chg": 0.0}
+        except Exception as e:
+            print(f"[influence] errore prezzi batch: {e}")
+
+    for h in hits:
+        p = prices.get(h["ticker"])
+        if p:
+            h["price"], h["day_change"] = p["price"], p["chg"]
+
+    hits.sort(key=lambda x: x.get("published", ""), reverse=True)
+    return hits[:25]
+
+
+_influence_refreshing = False
+
+
+@app.get("/api/influence")
+async def api_influence():
+    """Radar VIP: dichiarazioni di figure pubbliche + impatto sul prezzo.
+    Stale-while-revalidate: restituisce subito i dati in cache e aggiorna in background
+    (l'utente non aspetta mai la scansione, tranne il primissimo caricamento a freddo)."""
+    global _influence_refreshing
+    entry = _cache.get("influence:scan")
+    fresh = _cached("influence:scan", 480)  # cache fresca 8 min
+    if fresh is not None:
+        return fresh
+
+    async def _refresh_bg():
+        global _influence_refreshing
+        try:
+            data = await asyncio.to_thread(_scan_influence)
+            _store("influence:scan", _clean(data))
+        except Exception as e:
+            print(f"[influence] refresh bg errore: {e}")
+        finally:
+            _influence_refreshing = False
+
+    # Cache scaduta ma presente → restituisci subito i vecchi dati e aggiorna in background
+    if entry is not None:
+        if not _influence_refreshing:
+            _influence_refreshing = True
+            asyncio.create_task(_refresh_bg())
+        return entry["data"]
+
+    # Nessun dato in cache (primo avvio): lancia in background e rispondi 202 (vuoto)
+    if not _influence_refreshing:
+        _influence_refreshing = True
+        asyncio.create_task(_refresh_bg())
+    return JSONResponse([], status_code=202)
+
+
+@app.get("/api/ai/news")
+async def api_ai_news(ticker: str = "", title: str = ""):
+    """Riassunto AI di una notizia o dichiarazione: cosa significa + impatto + sentiment.
+    Usato sia dal Radar VIP che dalle notizie nel dettaglio titolo. Cache 24h."""
+    title = (title or "").strip()
+    if not title:
+        return JSONResponse({"error": "Titolo mancante"}, status_code=400)
+    if not groq_client:
+        return JSONResponse({"error": "AI non disponibile"}, status_code=503)
+
+    key = "ainews:" + hashlib.md5(f"{ticker}|{title}".encode("utf-8")).hexdigest() + ":" + _lang()
+    if (c := _cached(key, 86400)) is not None:
+        return c
+
+    prompt = (
+        f"Notizia/dichiarazione riguardante il titolo {ticker or 'azionario'}:\n"
+        f"\"{title}\"\n\n"
+        "Spiega in ITALIANO in modo chiaro, concreto e diretto. Formato ESATTO:\n"
+        "SPIEGAZIONE: [2 frasi: cosa significa e perché conta per il titolo]\n"
+        "IMPATTO: [1 frase: probabile effetto sul prezzo, breve termine]\n"
+        "SENTIMENT: RIALZISTA oppure RIBASSISTA oppure NEUTRO\n"
+        "Niente disclaimer, niente premesse."
+    )
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=240,
+            messages=[
+                {"role": "system", "content": "Sei un analista finanziario che spiega notizie di mercato in modo conciso e diretto, in italiano. Vai dritto al punto."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        spiegazione = impatto = ""
+        sentiment = "neutro"
+        for line in text.split("\n"):
+            l = line.strip()
+            lu = l.upper()
+            if lu.startswith("SPIEGAZIONE:"):
+                spiegazione = l.split(":", 1)[1].strip()
+            elif lu.startswith("IMPATTO:"):
+                impatto = l.split(":", 1)[1].strip()
+            elif lu.startswith("SENTIMENT:"):
+                v = l.split(":", 1)[1].strip().upper()
+                if "RIALZ" in v:
+                    sentiment = "rialzista"
+                elif "RIBASS" in v:
+                    sentiment = "ribassista"
+                else:
+                    sentiment = "neutro"
+        result = {
+            "spiegazione": spiegazione or text,
+            "impatto": impatto,
+            "sentiment": sentiment,
+        }
+        _store(key, result)
+        return result
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/report/morning")
+async def api_report_morning():
+    """Scarica il PDF analisi mattutina. Se non ancora generato, lo genera ora."""
+    global _morning_pdf, _morning_pdf_ts
+    if _morning_pdf is None:
+        await _generate_morning_pdf()
+    if _morning_pdf is None:
+        return JSONResponse({"error": "Nessun dato disponibile per il PDF"}, status_code=404)
+    from fastapi.responses import Response
+    date_str = datetime.now().strftime("%Y%m%d")
+    return Response(
+        content=_morning_pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=masker_mattina_{date_str}.pdf"},
+    )
+
+
+@app.get("/api/report/evening")
+async def api_report_evening():
+    """Scarica il PDF recap serale. Se non ancora generato, lo genera ora."""
+    global _evening_pdf, _evening_pdf_ts
+    if _evening_pdf is None:
+        await _generate_evening_pdf()
+    if _evening_pdf is None:
+        return JSONResponse({"error": "Nessun dato disponibile per il PDF"}, status_code=404)
+    from fastapi.responses import Response
+    date_str = datetime.now().strftime("%Y%m%d")
+    return Response(
+        content=_evening_pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=masker_sera_{date_str}.pdf"},
+    )
+
+
+@app.get("/api/stock/{ticker}/insider")
+async def api_insider(ticker: str):
+    """Ultime transazioni insider (Form 4) via yfinance — cache 1h."""
+    t = ticker.upper()
+    key = f"insider:{t}"
+    if (c := _cached(key, 3600)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        try:
+            df = yf.Ticker(t).insider_transactions
+            if df is None or df.empty:
+                return []
+            rows = []
+            for _, row in df.head(15).iterrows():
+                rows.append({
+                    "date":        str(row.get("Start Date", ""))[:10],
+                    "insider":     str(row.get("Insider", ""))[:40],
+                    "relation":    str(row.get("Relationship", ""))[:30],
+                    "transaction": str(row.get("Transaction", "")),
+                    "shares":      int(row.get("Shares", 0) or 0),
+                    "value":       float(row.get("Value", 0) or 0),
+                })
+            return rows
+        except Exception as e:
+            print(f"[insider] {t}: {e}")
+            return []
+
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return _clean(data)
+
+
+@app.get("/api/stock/{ticker}/reddit")
+async def api_reddit(ticker: str):
+    """Mention count e sentiment su r/wallstreetbets — cache 30 min."""
+    t = ticker.upper()
+    key = f"reddit:{t}:{_lang()}"
+    if (c := _cached(key, 1800)) is not None:
+        return c
+
+    def _get():
+        import urllib.request, json as _j
+        url = (f"https://www.reddit.com/r/wallstreetbets/search.json"
+               f"?q={t}&sort=new&restrict_sr=true&t=week&limit=25")
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "MaskerStockBot/1.0"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = _j.loads(resp.read())
+            posts = data.get("data", {}).get("children", [])
+            pos_w = {"moon","bull","buy","calls","long","squeeze","rocket","up","win","profit","gain","pump"}
+            neg_w = {"bear","put","short","crash","dump","sell","down","loss","rekt","fail","drop","red"}
+            pos = neg = 0
+            titles = []
+            for p in posts[:10]:
+                title = p.get("data", {}).get("title", "")
+                titles.append(title[:90])
+                tl = title.lower()
+                for w in pos_w:
+                    if w in tl: pos += 1
+                for w in neg_w:
+                    if w in tl: neg += 1
+            sentiment = "bullish" if pos > neg else ("bearish" if neg > pos else "neutral")
+            return {"mentions": len(posts), "sentiment": sentiment,
+                    "pos_signals": pos, "neg_signals": neg, "posts": titles}
+        except Exception as e:
+            print(f"[reddit] {t}: {e}")
+            return {"mentions": 0, "sentiment": "neutral", "pos_signals": 0, "neg_signals": 0, "posts": []}
+
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return _clean(data)
+
+
+@app.get("/api/report/status")
+async def api_report_status():
+    """Restituisce lo stato dei PDF disponibili."""
+    return {
+        "morning": {"available": _morning_pdf is not None, "generated_at": _morning_pdf_ts},
+        "evening": {"available": _evening_pdf is not None, "generated_at": _evening_pdf_ts},
+    }
+
+
+@app.post("/api/report/generate")
+async def api_report_generate(kind: str = "morning"):
+    """Genera manualmente un PDF (morning o evening)."""
+    if kind == "evening":
+        asyncio.create_task(_generate_evening_pdf())
+    else:
+        asyncio.create_task(_generate_morning_pdf())
+    return {"ok": True, "generating": kind}
 
 
 @app.get("/api/stock/{ticker}")
@@ -268,7 +1338,7 @@ async def api_stock_history(ticker: str, period: str = "1mo"):
 async def api_ai(ticker: str):
     """Analisi AI: perché investire, rischi, conclusione SI/NO."""
     t = ticker.upper()
-    key = f"ai:{t}"
+    key = f"ai:{t}:{_lang()}"
     if (c := _cached(key, _AI_TTL)) is not None:
         return c
 
@@ -350,11 +1420,724 @@ async def api_ai(ticker: str):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@app.get("/api/stock/{ticker}/longterm")
+async def api_longterm(ticker: str):
+    """Analisi lungo termine: CAGR storici, proiezioni scenari, AI outlook 3-5 anni."""
+    t = ticker.upper()
+    key = f"longterm:{t}:{_lang()}"
+    if (c := _cached(key, 21600)) is not None:   # cache 6h
+        return c
+
+    data = await asyncio.to_thread(get_longterm_analysis, t)
+    if not data:
+        return JSONResponse({"error": "ticker non trovato"}, status_code=404)
+    data = _clean(data)
+
+    ai_outlook = None
+    if groq_client:
+        cagr_str = (
+            f"CAGR 1a: {data.get('cagr_1y') or 'N/D'}% | "
+            f"CAGR 3a: {data.get('cagr_3y') or 'N/D'}% | "
+            f"CAGR 5a: {data.get('cagr_5y') or 'N/D'}%"
+        )
+        target_str = f"Target analisti: ${data['target_mean']:.2f}" if data.get("target_mean") else "Target analisti: N/D"
+        etf_str = ""
+        if data.get("expense_ratio"):
+            etf_str = f"ETF — TER: {data['expense_ratio']}% | Rendimento 3a medio: {data.get('three_yr_avg') or 'N/D'}%"
+        growth_str = ""
+        if data.get("revenue_growth"):
+            growth_str = f"Crescita ricavi: +{data['revenue_growth']}% | Crescita EPS: {data.get('eps_growth') or 'N/D'}%"
+
+        prompt = (
+            f"Analisi lungo termine di {t}:\n"
+            f"Prezzo attuale: {data['current_price']:.2f} {data.get('currency','USD')}\n"
+            f"{cagr_str}\n"
+            f"Proiezione 3 anni (base): {data['projections'].get('3y_base'):.2f} | "
+            f"Bull: {data['projections'].get('3y_bull'):.2f} | "
+            f"Bear: {data['projections'].get('3y_bear'):.2f}\n"
+            f"{target_str}\n{etf_str}\n{growth_str}\n\n"
+            "Rispondi SOLO in questo formato (italiano, conciso):\n"
+            "OUTLOOK: [1 frase sull'outlook generale 3-5 anni]\n"
+            "BULL: [scenario ottimistico in 1 frase]\n"
+            "BEAR: [scenario pessimistico in 1 frase]\n"
+            "VERDICT: ACCUMULA oppure MANTIENI oppure EVITA\n"
+            "MOTIVO: [1 frase secca sul motivo principale]\n"
+        )
+        try:
+            resp = await groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                max_tokens=250,
+                messages=[
+                    {"role": "system", "content": "Sei un analista buy-side esperto di investimenti a lungo termine. Dai giudizi netti (ACCUMULA/MANTIENI/EVITA) basandoti su dati quantitativi. Rispondi in italiano."},
+                    {"role": "user",   "content": prompt},
+                ],
+            )
+            text = resp.choices[0].message.content.strip()
+            outlook = bull = bear = verdict = motivo = ""
+            for line in text.split("\n"):
+                l = line.strip()
+                if l.upper().startswith("OUTLOOK:"): outlook = l[8:].strip()
+                elif l.upper().startswith("BULL:"):   bull    = l[5:].strip()
+                elif l.upper().startswith("BEAR:"):   bear    = l[5:].strip()
+                elif l.upper().startswith("VERDICT:"): verdict = l[8:].strip().upper()
+                elif l.upper().startswith("MOTIVO:"): motivo  = l[7:].strip()
+            if verdict not in ("ACCUMULA", "MANTIENI", "EVITA"):
+                verdict = "MANTIENI"
+            ai_outlook = {"outlook": outlook, "bull": bull, "bear": bear, "verdict": verdict, "motivo": motivo}
+        except Exception as e:
+            print(f"[longterm ai] {e}")
+
+    data["ai"] = ai_outlook
+    _store(key, data)
+    return data
+
+
+@app.get("/api/best-buy")
+async def api_best_buy(horizon: str = "short"):
+    """Top Buy: l'AI trova il MIGLIOR acquisto adesso tra i titoli analizzati,
+    in base all'orizzonte (short = momentum/tecnico, long = trend solido+qualità)."""
+    horizon = "long" if horizon == "long" else "short"
+    key = f"bestbuy:{horizon}:{_lang()}"
+    if (c := _cached(key, 1200)) is not None:
+        return c
+    pool = ((_cache.get("scan:full") or {}).get("data")) or _morning_data or ((_cache.get("scan:10") or {}).get("data")) or []
+    if not pool:
+        return JSONResponse({"error": "Scansione non ancora pronta — riprova tra poco"}, status_code=202)
+
+    cands = [dict(s) for s in pool]
+    if horizon == "long":
+        q = [s for s in cands if s.get("uptrend") and (s.get("volatility", 100) or 100) < 70]
+        cands = q or cands
+    cands.sort(key=lambda s: (s.get("score", 0) or 0), reverse=True)
+    pick = cands[0]
+    runners = [{"ticker": s["ticker"], "score_10": s.get("score_10")} for s in cands[1:4]]
+
+    ts = pick.get("trade_setup") or {}
+    reasoning = ""
+    if groq_client:
+        try:
+            oriz = "breve termine (3-6 mesi)" if horizon == "short" else "lungo termine (12-24 mesi)"
+            prompt = (
+                f"Tra i titoli analizzati oggi, il migliore per {oriz} è {pick['ticker']} "
+                f"(prezzo ${pick.get('current_price',0):.2f}, score {pick.get('score_10','?')}/10, "
+                f"RSI {pick.get('rsi',50):.0f}, trend {'rialzista' if pick.get('uptrend') else 'misto'}, "
+                f"mese {(pick.get('month_return') or 0):+.0f}%).\n"
+                "Spiega in 2-3 frasi PERCHÉ è la migliore opportunità di acquisto adesso per questo orizzonte. "
+                "Italiano, diretto, concreto. Niente disclaimer."
+            )
+            r = await groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile", max_tokens=180,
+                messages=[{"role": "system", "content": "Analista che indica la migliore opportunità d'acquisto. Conciso, italiano."},
+                          {"role": "user", "content": prompt}])
+            reasoning = r.choices[0].message.content.strip()
+        except Exception:
+            pass
+
+    result = {
+        "horizon": horizon, "ticker": pick["ticker"], "name": pick.get("name", pick["ticker"]),
+        "price": pick.get("current_price"), "currency": pick.get("currency", "USD"),
+        "score_10": pick.get("score_10"), "rsi": pick.get("rsi"),
+        "month_return": pick.get("month_return"), "week_return": pick.get("week_return"),
+        "uptrend": pick.get("uptrend"), "risk_level": pick.get("risk_level"),
+        "entry": ts.get("entry"), "stop": ts.get("stop"), "target": ts.get("target"),
+        "stop_pct": ts.get("stop_pct"), "target_pct": ts.get("target_pct"), "rr": ts.get("rr"),
+        "reasoning": reasoning, "runners_up": runners,
+    }
+    result = _clean(result)
+    _store(key, result)
+    return result
+
+
+@app.get("/api/stock/{ticker}/should-buy")
+async def api_should_buy(ticker: str, horizon: str = "short"):
+    """Should I Buy: verdetto compra/non-compra con zona d'ingresso, stop-loss e catalizzatori."""
+    t = ticker.upper()
+    horizon = "long" if horizon == "long" else "short"
+    key = f"shouldbuy:{t}:{horizon}:{_lang()}"
+    if (c := _cached(key, 1200)) is not None:
+        return c
+    data = await asyncio.to_thread(get_enriched_analysis, t)
+    if not data:
+        return JSONResponse({"error": "Ticker non trovato"}, status_code=404)
+    data = _clean(data)
+
+    # Zona d'ingresso + stop da supporto/resistenza
+    def _levels():
+        import yfinance as yf
+        try:
+            h = yf.Ticker(t).history(period="3mo")
+            if h.empty:
+                return None, None
+            recent = h.tail(40)
+            return float(recent["Low"].min()), float(recent["High"].max())
+        except Exception:
+            return None, None
+    support, resistance = await asyncio.to_thread(_levels)
+    cur = data.get("current_price", 0) or 0
+    ccy = data.get("currency", "USD")
+    sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+    entry_low = round(max(support or cur * 0.96, cur * 0.95), 2)
+    entry_high = round(cur, 2)
+    stop = round((support or cur * 0.95) * 0.98, 2)
+
+    catalysts = []
+    if data.get("earnings_today"):
+        catalysts.append("⚠️ Earnings OGGI")
+    elif data.get("next_earnings_str"):
+        catalysts.append("📅 Earnings: " + data["next_earnings_str"])
+    if data.get("news_sentiment_label"):
+        catalysts.append("📰 Sentiment news: " + data["news_sentiment_label"])
+
+    verdict, conf, reasoning = "ASPETTA", 60, ""
+    if groq_client:
+        try:
+            oriz = "breve termine (3-6 mesi)" if horizon == "short" else "lungo termine (12-24 mesi)"
+            prompt = (
+                f"Devo comprare {t} ({data.get('name',t)}) per {oriz}?\n"
+                f"Prezzo {sym}{cur:.2f}, RSI {data.get('rsi',50):.0f}, rischio {data.get('risk_level','N/D')}, "
+                f"settimana {(data.get('week_return') or 0):+.1f}%, mese {(data.get('month_return') or 0):+.1f}%, "
+                f"supporto {sym}{(support or 0):.2f}, resistenza {sym}{(resistance or 0):.2f}, "
+                f"sentiment {data.get('news_sentiment_label','N/D')}, earnings {data.get('next_earnings_str','N/D')}.\n"
+                "Rispondi SOLO in questo formato:\n"
+                "VERDETTO: COMPRA oppure ASPETTA oppure NON COMPRARE\n"
+                "CONFIDENZA: [50-95]\n"
+                "MOTIVO: [2 frasi concrete sul perché]\n"
+            )
+            r = await groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile", max_tokens=200,
+                messages=[{"role": "system", "content": "Trader che dà verdetti netti compra/aspetta/non comprare. Italiano, diretto."},
+                          {"role": "user", "content": prompt}])
+            txt = r.choices[0].message.content.strip()
+            for line in txt.split("\n"):
+                lu = line.strip().upper()
+                if lu.startswith("VERDETTO:") or lu.startswith("VERDICT:"):
+                    v = line.split(":", 1)[1].strip().upper()
+                    if "NON" in v or "DO NOT" in v or "DON'T" in v or "NOT BUY" in v:
+                        verdict = "NON COMPRARE"
+                    elif "COMPRA" in v or "BUY" in v:
+                        verdict = "COMPRA"
+                    else:
+                        verdict = "ASPETTA"
+                elif lu.startswith("CONFIDENZA:") or lu.startswith("CONFIDENCE:"):
+                    try: conf = max(50, min(95, int("".join(ch for ch in line if ch.isdigit())[:2] or "60")))
+                    except Exception: pass
+                elif lu.startswith("MOTIVO:") or lu.startswith("REASON:"):
+                    reasoning = line.split(":", 1)[1].strip()
+        except Exception:
+            pass
+
+    result = {
+        "ticker": t, "name": data.get("name", t), "currency": ccy, "price": cur, "horizon": horizon,
+        "verdict": verdict, "confidence": conf, "reasoning": reasoning,
+        "entry_low": entry_low, "entry_high": entry_high, "stop": stop,
+        "support": round(support, 2) if support else None, "resistance": round(resistance, 2) if resistance else None,
+        "rsi": round(data.get("rsi", 50) or 50), "risk_level": data.get("risk_level"),
+        "catalysts": catalysts,
+    }
+    result = _clean(result)
+    _store(key, result)
+    return result
+
+
+@app.get("/api/stock/{ticker}/deepreport")
+async def api_deep_report(ticker: str):
+    """Report istituzionale a 13 sezioni con punteggi (Business Quality, Financials,
+    Growth, Valuation, Smart Money + Final Score /100, Risk Register, Position Sizing…).
+    Cache 4h. Generato dall'AI sui dati reali del titolo."""
+    t = ticker.upper()
+    key = f"deepreport:{t}:{_lang()}"
+    if (c := _cached(key, 14400)) is not None:
+        return c
+    if not groq_client:
+        return JSONResponse({"error": "AI non disponibile"}, status_code=503)
+
+    def _ctx():
+        import yfinance as yf
+        try:
+            info = yf.Ticker(t).info or {}
+        except Exception:
+            info = {}
+        g = info.get
+        pct = lambda v: f"{v*100:.1f}%" if isinstance(v, (int, float)) else "N/D"
+        price = g("currentPrice") or g("regularMarketPrice") or 0
+        return info, (
+            f"Titolo: {t} ({g('shortName') or t})\n"
+            f"Settore: {g('sector','N/D')} / {g('industry','N/D')}\n"
+            f"Prezzo: ${price}  |  Market cap: {g('marketCap','N/D')}  |  Beta: {g('beta','N/D')}\n"
+            f"Valutazione: P/E {g('trailingPE','N/D')}, P/E fwd {g('forwardPE','N/D')}, PEG {g('trailingPegRatio') or g('pegRatio','N/D')}, P/S {g('priceToSalesTrailing12Months','N/D')}, P/B {g('priceToBook','N/D')}\n"
+            f"Crescita: ricavi {pct(g('revenueGrowth'))}, utili {pct(g('earningsGrowth'))}\n"
+            f"Redditività: margine lordo {pct(g('grossMargins'))}, margine netto {pct(g('profitMargins'))}, ROE {pct(g('returnOnEquity'))}\n"
+            f"Salute: debito/equity {g('debtToEquity','N/D')}, free cash flow {g('freeCashflow','N/D')}, cassa {g('totalCash','N/D')}\n"
+            f"Target analisti: media ${g('targetMeanPrice','N/D')} (min ${g('targetLowPrice','N/D')} - max ${g('targetHighPrice','N/D')}), rating {g('recommendationKey','N/D')}, {g('numberOfAnalystOpinions','N/D')} analisti\n"
+            f"Ownership: istituzionali {pct(g('heldPercentInstitutions'))}, insider {pct(g('heldPercentInsiders'))}, short float {pct(g('shortPercentOfFloat'))}\n"
+            f"Dividendo: {g('dividendYield','N/D')}\n"
+            f"Business: {(g('longBusinessSummary') or '')[:600]}\n"
+        )
+
+    info, ctx = await asyncio.to_thread(_ctx)
+    if not info:
+        return JSONResponse({"error": "Dati non disponibili"}, status_code=404)
+
+    prompt = (
+        "Sei un analista istituzionale di Wall Street. Scrivi un REPORT completo sul titolo usando "
+        "ESCLUSIVAMENTE i dati forniti (più la tua conoscenza dell'azienda). In ITALIANO, conciso ma preciso.\n\n"
+        f"DATI:\n{ctx}\n\n"
+        "Rispondi SOLO con queste 13 sezioni, formato ESATTO (una per riga, dopo i due punti il contenuto, max 2-3 frasi a sezione):\n"
+        "VERDICT: [valutazione complessiva in una frase + se COMPRA/TIENI/EVITA]\n"
+        "BUSINESS_QUALITY|/25: [moat, clienti, qualità dei ricavi — assegna punteggio su 25]\n"
+        "FINANCIALS|/20: [ricavi, margini, cash flow, diluizione — punteggio su 20]\n"
+        "GROWTH|/20: [mercato (TAM), catalizzatori futuri, scenari — punteggio su 20]\n"
+        "VALUATION|/15: [multipli, è caro o economico, setup d'ingresso — punteggio su 15]\n"
+        "INSIDER: [attività insider: acquisti, pattern di vendita, ownership]\n"
+        "SMART_MONEY|/20: [istituzionali, validazione strategica/governativa — punteggio su 20]\n"
+        "POLITICAL: [trade del Congresso, venti di policy a favore/contro]\n"
+        "ALTERNATIVES: [confronto con i concorrenti/peer del settore]\n"
+        "RISK: [3 rischi principali, ognuno con severità ALTA/MEDIA/BASSA]\n"
+        "FINAL_SCORE|/100: [punteggio composito su 100 + decisione finale COMPRA o EVITA]\n"
+        "POSITION: [come allocare: % del portafoglio, entrata graduale, stop]\n"
+        "CHANGE_MY_MIND: [cosa ti farebbe cambiare idea — 1 trigger bull e 1 bear da monitorare]\n"
+    )
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=1700,
+            messages=[
+                {"role": "system", "content": "Sei un analista azionario istituzionale rigoroso e diretto. Assegni punteggi numerici onesti e dai una decisione netta. Italiano."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        keys = {"VERDICT": "verdict", "BUSINESS_QUALITY": "business", "FINANCIALS": "financials",
+                "GROWTH": "growth", "VALUATION": "valuation", "INSIDER": "insider",
+                "SMART_MONEY": "smart_money", "POLITICAL": "political", "ALTERNATIVES": "alternatives",
+                "RISK": "risk", "FINAL_SCORE": "final", "POSITION": "position", "CHANGE_MY_MIND": "change_mind"}
+        out = {v: {"text": "", "score": None, "max": None} for v in keys.values()}
+        cur = None
+        for line in text.split("\n"):
+            l = line.strip()
+            if not l:
+                continue
+            matched = False
+            for kk, field in keys.items():
+                if l.upper().startswith(kk + ":") or l.upper().startswith(kk + "|"):
+                    head, _, rest = l.partition(":")
+                    # estrai punteggio max dal formato KEY|/NN
+                    if "|" in head:
+                        mx = head.split("|", 1)[1].replace("/", "").strip()
+                        try: out[field]["max"] = int(mx)
+                        except Exception: pass
+                    out[field]["text"] = rest.strip()
+                    cur = field
+                    matched = True
+                    break
+            if not matched and cur:
+                out[cur]["text"] += " " + l
+
+        # estrai punteggi numerici dal testo (primo numero <= max)
+        import re as _re
+        for field in out:
+            mx = out[field]["max"]
+            if mx:
+                m = _re.search(r'(\d{1,3})\s*/\s*' + str(mx), out[field]["text"])
+                if not m:
+                    m = _re.search(r'\b(\d{1,3})\b', out[field]["text"])
+                if m:
+                    try: out[field]["score"] = min(int(m.group(1)), mx)
+                    except Exception: pass
+        result = {"ticker": t, "name": info.get("shortName", t), **out}
+        _store(key, result)
+        return result
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/stock/{ticker}/technicals")
+async def api_technicals(ticker: str):
+    """Analisi tecnica completa stile TradingView: ogni indicatore (RSI, MACD, Stoch,
+    CCI, Williams %R, ADX, momentum + medie mobili 10→200) con valore e segnale,
+    più riepilogo Oscillatori / Medie / Totale. Cache 5 min."""
+    t = ticker.upper()
+    key = f"tech:{t}"
+    if (c := _cached(key, 300)) is not None:
+        return c
+
+    def _compute():
+        import yfinance as yf
+        import pandas as pd
+        import numpy as np
+        try:
+            h = yf.Ticker(t).history(period="1y", interval="1d")
+        except Exception:
+            return None
+        if h is None or h.empty or len(h) < 30:
+            return None
+        c = h["Close"]; hi = h["High"]; lo = h["Low"]
+        price = float(c.iloc[-1])
+        osc = []   # oscillatori
+        mas = []   # medie mobili
+
+        def sig(label, value, s):
+            return {"name": label, "value": (None if value is None or (isinstance(value, float) and (value != value)) else round(float(value), 2)), "signal": s}
+
+        # RSI(14)
+        d = c.diff(); g = d.clip(lower=0).rolling(14).mean(); l = (-d.clip(upper=0)).rolling(14).mean()
+        rsi = float((100 - 100 / (1 + g / l)).iloc[-1])
+        osc.append(sig("RSI (14)", rsi, "sell" if rsi > 70 else "buy" if rsi < 30 else "neutral"))
+
+        # Stochastic %K(14)
+        ll = lo.rolling(14).min(); hh = hi.rolling(14).max()
+        k = float(((c - ll) / (hh - ll) * 100).iloc[-1])
+        osc.append(sig("Stocastico %K", k, "sell" if k > 80 else "buy" if k < 20 else "neutral"))
+
+        # CCI(20)
+        tp = (hi + lo + c) / 3
+        sma_tp = tp.rolling(20).mean()
+        md = (tp - sma_tp).abs().rolling(20).mean()
+        cci = float(((tp - sma_tp) / (0.015 * md)).iloc[-1])
+        osc.append(sig("CCI (20)", cci, "sell" if cci > 100 else "buy" if cci < -100 else "neutral"))
+
+        # Williams %R(14)
+        wr = float(((hh - c) / (hh - ll) * -100).iloc[-1])
+        osc.append(sig("Williams %R", wr, "buy" if wr < -80 else "sell" if wr > -20 else "neutral"))
+
+        # MACD(12,26,9)
+        e12 = c.ewm(span=12, adjust=False).mean(); e26 = c.ewm(span=26, adjust=False).mean()
+        macd = e12 - e26; macd_sig = macd.ewm(span=9, adjust=False).mean()
+        mval = float(macd.iloc[-1]); msig = float(macd_sig.iloc[-1])
+        osc.append(sig("MACD (12,26)", mval, "buy" if mval > msig else "sell"))
+
+        # Momentum(10)
+        mom = float((c - c.shift(10)).iloc[-1])
+        osc.append(sig("Momentum (10)", mom, "buy" if mom > 0 else "sell"))
+
+        # ADX(14) + DI
+        try:
+            up = hi.diff(); dn = -lo.diff()
+            plus_dm = ((up > dn) & (up > 0)) * up
+            minus_dm = ((dn > up) & (dn > 0)) * dn
+            tr = pd.concat([(hi - lo), (hi - c.shift()).abs(), (lo - c.shift()).abs()], axis=1).max(axis=1)
+            atr = tr.rolling(14).mean()
+            pdi = 100 * (plus_dm.rolling(14).mean() / atr)
+            mdi = 100 * (minus_dm.rolling(14).mean() / atr)
+            dx = (100 * (pdi - mdi).abs() / (pdi + mdi)).rolling(14).mean()
+            adx = float(dx.iloc[-1]); pdi_v = float(pdi.iloc[-1]); mdi_v = float(mdi.iloc[-1])
+            adx_sig = "neutral" if adx < 20 else ("buy" if pdi_v > mdi_v else "sell")
+            osc.append(sig("ADX (14)", adx, adx_sig))
+        except Exception:
+            pass
+
+        # Medie mobili (SMA + EMA) — price above=buy, below=sell
+        for p in (10, 20, 50, 100, 200):
+            if len(c) >= p:
+                sma = float(c.rolling(p).mean().iloc[-1])
+                mas.append(sig(f"SMA {p}", sma, "buy" if price > sma else "sell"))
+        for p in (10, 20, 50, 100):
+            if len(c) >= p:
+                ema = float(c.ewm(span=p, adjust=False).mean().iloc[-1])
+                mas.append(sig(f"EMA {p}", ema, "buy" if price > ema else "sell"))
+
+        def summarize(items):
+            b = sum(1 for x in items if x["signal"] == "buy")
+            s = sum(1 for x in items if x["signal"] == "sell")
+            ne = sum(1 for x in items if x["signal"] == "neutral")
+            tot = max(b + s + ne, 1)
+            score = (b - s) / tot
+            if score >= 0.5: lab = "STRONG BUY"
+            elif score >= 0.15: lab = "BUY"
+            elif score <= -0.5: lab = "STRONG SELL"
+            elif score <= -0.15: lab = "SELL"
+            else: lab = "NEUTRAL"
+            return {"buy": b, "sell": s, "neutral": ne, "label": lab, "score": round(score, 2)}
+
+        allitems = osc + mas
+        return {
+            "ticker": t, "price": round(price, 2),
+            "oscillators": osc, "moving_averages": mas,
+            "summary_osc": summarize(osc),
+            "summary_ma": summarize(mas),
+            "summary": summarize(allitems),
+        }
+
+    data = await asyncio.to_thread(_compute)
+    if not data:
+        return JSONResponse({"error": "Dati non disponibili"}, status_code=404)
+    result = _clean(data)
+    _store(key, result)
+    return result
+
+
+@app.get("/api/stock/{ticker}/report")
+async def api_report_sheet(ticker: str):
+    """Research Tear Sheet istituzionale: consenso analisti + target, valutazione,
+    crescita, redditività, salute finanziaria, ownership/short. Cache 2h."""
+    t = ticker.upper()
+    key = f"report:{t}"
+    if (c := _cached(key, 7200)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        try:
+            info = yf.Ticker(t).info or {}
+        except Exception:
+            info = {}
+        if not info or not (info.get("currentPrice") or info.get("regularMarketPrice")):
+            return None
+        g = info.get
+        price = g("currentPrice") or g("regularMarketPrice") or 0
+        tm = g("targetMeanPrice")
+        upside = round((tm - price) / price * 100, 1) if (tm and price) else None
+        pct = lambda v: round(v * 100, 1) if isinstance(v, (int, float)) else None
+        return {
+            "ticker": t, "name": g("shortName") or t, "currency": g("currency", "USD"),
+            "sector": g("sector"), "industry": g("industry"),
+            "price": round(price, 2),
+            "market_cap": g("marketCap"), "beta": g("beta"),
+            "wk_high": g("fiftyTwoWeekHigh"), "wk_low": g("fiftyTwoWeekLow"),
+            # Consenso analisti
+            "reco_key": g("recommendationKey"), "reco_mean": g("recommendationMean"),
+            "n_analysts": g("numberOfAnalystOpinions"),
+            "target_mean": tm, "target_high": g("targetHighPrice"), "target_low": g("targetLowPrice"),
+            "upside": upside,
+            # Valutazione
+            "pe": g("trailingPE"), "fwd_pe": g("forwardPE"),
+            "peg": g("trailingPegRatio") or g("pegRatio"),
+            "ps": g("priceToSalesTrailing12Months"), "pb": g("priceToBook"),
+            "ev_ebitda": g("enterpriseToEbitda"),
+            # Crescita
+            "rev_growth": pct(g("revenueGrowth")), "earn_growth": pct(g("earningsGrowth")),
+            # Redditività
+            "gross_margin": pct(g("grossMargins")), "profit_margin": pct(g("profitMargins")),
+            "oper_margin": pct(g("operatingMargins")),
+            "roe": pct(g("returnOnEquity")), "roa": pct(g("returnOnAssets")),
+            # Salute finanziaria
+            "debt_equity": g("debtToEquity"), "current_ratio": g("currentRatio"),
+            "fcf": g("freeCashflow"), "total_cash": g("totalCash"), "total_debt": g("totalDebt"),
+            # Dividendo
+            "div_yield": pct(g("dividendYield")) if (g("dividendYield") and g("dividendYield") < 1) else g("dividendYield"),
+            "payout": pct(g("payoutRatio")),
+            # Ownership / short
+            "inst_pct": pct(g("heldPercentInstitutions")), "insider_pct": pct(g("heldPercentInsiders")),
+            "short_float": pct(g("shortPercentOfFloat")),
+        }
+
+    data = await asyncio.to_thread(_get)
+    if not data:
+        return JSONResponse({"error": "Dati non disponibili"}, status_code=404)
+
+    # Composite quality score (0-100) — qualità del business
+    q = 0; n = 0
+    def _bump(cond_good, weight=1):
+        nonlocal q, n
+        n += weight
+        if cond_good: q += weight
+    if data["profit_margin"] is not None: _bump(data["profit_margin"] > 8)
+    if data["roe"] is not None: _bump(data["roe"] > 12)
+    if data["rev_growth"] is not None: _bump(data["rev_growth"] > 8)
+    if data["debt_equity"] is not None: _bump(data["debt_equity"] < 120)
+    if data["fcf"] is not None: _bump(data["fcf"] > 0)
+    if data["upside"] is not None: _bump(data["upside"] > 5)
+    data["quality"] = round(q / n * 100) if n else None
+
+    result = _clean(data)
+    _store(key, result)
+    return result
+
+
+@app.get("/api/stock/{ticker}/timing")
+async def api_timing(ticker: str):
+    """Tool di TIMING: dato un ticker, analizza i tecnici e dice QUANDO entrare
+    long e quando short (entra ora / aspetta pullback / aspetta conferma). Cache 30 min."""
+    t = ticker.upper()
+    key = f"timing:{t}:{_lang()}"
+    if (c := _cached(key, 1800)) is not None:
+        return c
+
+    data = await asyncio.to_thread(get_enriched_analysis, t)
+    if not data:
+        return JSONResponse({"error": "Ticker non trovato"}, status_code=404)
+    data = _clean(data)
+
+    # Supporto / Resistenza recenti
+    def _sr():
+        import yfinance as yf
+        try:
+            h = yf.Ticker(t).history(period="3mo")
+            if h.empty or len(h) < 10:
+                return None, None
+            recent = h.tail(40)
+            return float(recent["Low"].min()), float(recent["High"].max())
+        except Exception:
+            return None, None
+    support, resistance = await asyncio.to_thread(_sr)
+
+    cur = data.get("current_price", 0) or 0
+    rsi = data.get("rsi", 50) or 50
+    sma20 = data.get("sma_20")
+    sma50 = data.get("sma_50")
+    name = data.get("name", t)
+    ccy = data.get("currency", "USD")
+    dist_sup = round((cur - support) / cur * 100, 1) if (support and cur) else None
+    dist_res = round((resistance - cur) / cur * 100, 1) if (resistance and cur) else None
+
+    if not groq_client:
+        # Fallback rule-based se l'AI non è disponibile
+        if rsi < 35:
+            verdetto, lt, st = "MEGLIO LONG", "Entra ora o su rimbalzo (RSI ipervenduto)", "Aspetta un rimbalzo verso la resistenza"
+        elif rsi > 70:
+            verdetto, lt, st = "MEGLIO SHORT", "Aspetta un pullback verso il supporto", "Entra ora o su debolezza (RSI ipercomprato)"
+        else:
+            verdetto, lt, st = "ASPETTARE", "Aspetta conferma sopra la resistenza", "Aspetta conferma sotto il supporto"
+        result = {"ticker": t, "name": name, "currency": ccy, "price": cur,
+                  "rsi": round(rsi), "support": support, "resistance": resistance,
+                  "verdetto": verdetto, "long_timing": lt, "long_motivo": "",
+                  "short_timing": st, "short_motivo": "", "livello": resistance or cur,
+                  "ai": False}
+        _store(key, result)
+        return result
+
+    sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
+    prompt = (
+        f"Analisi di TIMING di trading per {t} ({name}).\n"
+        f"Prezzo attuale: {sym}{cur:.2f}\n"
+        f"RSI(14): {rsi:.0f}  |  Volatilità: {data.get('volatility',0):.0f}%\n"
+        f"Media 20gg: {('%.2f'%sma20) if sma20 else 'N/D'} | Media 50gg: {('%.2f'%sma50) if sma50 else 'N/D'}\n"
+        f"Performance: settimana {(data.get('week_return') or 0):+.1f}%, mese {(data.get('month_return') or 0):+.1f}%\n"
+        f"Supporto recente: {('%.2f'%support) if support else 'N/D'} ({dist_sup}% sotto) | "
+        f"Resistenza recente: {('%.2f'%resistance) if resistance else 'N/D'} ({dist_res}% sopra)\n"
+        f"Segnali: {', '.join((data.get('signals') or [])[:3]) or 'nessuno'}\n\n"
+        "Dimmi QUANDO conviene entrare. Rispondi SOLO in questo formato ESATTO, ITALIANO, conciso:\n"
+        "VERDETTO: [MEGLIO LONG oppure MEGLIO SHORT oppure ASPETTARE]\n"
+        "LONG_TIMING: [quando entrare LONG: es 'Ora' / 'Aspetta pullback verso "+sym+"X' / 'Aspetta 2-3 giorni' / 'Aspetta rottura sopra "+sym+"X']\n"
+        "LONG_MOTIVO: [1 frase breve]\n"
+        "SHORT_TIMING: [quando entrare SHORT, stesso stile]\n"
+        "SHORT_MOTIVO: [1 frase breve]\n"
+        "LIVELLO: [il prezzo chiave da sorvegliare, solo numero]\n"
+    )
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile", max_tokens=320,
+            messages=[
+                {"role": "system", "content": "Sei un trader tecnico esperto di market timing. Dai indicazioni concrete su QUANDO entrare (ora, aspetta un pullback a un prezzo, aspetta una rottura, aspetta N giorni). Conciso, in italiano. Le previsioni sono incerte."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        out = {"verdetto": "ASPETTARE", "long_timing": "", "long_motivo": "",
+               "short_timing": "", "short_motivo": "", "livello": resistance or cur}
+        for line in text.split("\n"):
+            l = line.strip()
+            lu = l.upper()
+            if lu.startswith("VERDETTO:"):
+                v = l.split(":", 1)[1].strip().upper()
+                out["verdetto"] = "MEGLIO LONG" if "LONG" in v else ("MEGLIO SHORT" if "SHORT" in v else "ASPETTARE")
+            elif lu.startswith("LONG_TIMING:"): out["long_timing"] = l.split(":", 1)[1].strip()
+            elif lu.startswith("LONG_MOTIVO:"): out["long_motivo"] = l.split(":", 1)[1].strip()
+            elif lu.startswith("SHORT_TIMING:"): out["short_timing"] = l.split(":", 1)[1].strip()
+            elif lu.startswith("SHORT_MOTIVO:"): out["short_motivo"] = l.split(":", 1)[1].strip()
+            elif lu.startswith("LIVELLO:"):
+                try: out["livello"] = float("".join(ch for ch in l.split(":",1)[1] if (ch.isdigit() or ch=="." )) or cur)
+                except Exception: pass
+        result = {"ticker": t, "name": name, "currency": ccy, "price": cur,
+                  "rsi": round(rsi), "support": support, "resistance": resistance, "ai": True, **out}
+        _store(key, result)
+        return result
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/stock/{ticker}/deep")
+async def api_deep_analysis(ticker: str):
+    """Analizzatore AI completo: descrizione azienda, verdetto, perché, rischi,
+    concorrenti (con ticker cliccabili) e notizie. Cache 1h."""
+    t = ticker.upper()
+    key = f"deep:{t}:{_lang()}"
+    if (c := _cached(key, 3600)) is not None:
+        return c
+    if not groq_client:
+        return JSONResponse({"error": "AI non disponibile"}, status_code=503)
+
+    data = await asyncio.to_thread(get_enriched_analysis, t)
+    if not data:
+        return JSONResponse({"error": "ticker non trovato"}, status_code=404)
+    data = _clean(data)
+
+    news_titles = (data.get("news") or [])[:4]
+    news_str = "\n".join(f"- {n}" for n in news_titles) or "Nessuna notizia recente disponibile."
+
+    prompt = (
+        f"Analizza il titolo {t} ({data.get('name', t)}).\n"
+        f"Prezzo: ${data.get('current_price', 0):.2f} ({data.get('day_change_pct', 0):+.1f}% oggi)\n"
+        f"Settore: {data.get('sector', 'N/D')}\n"
+        f"RSI: {data.get('rsi', 50):.0f} | Rischio: {data.get('risk_level', 'N/D')} | "
+        f"Volatilità: {data.get('volatility', 0):.0f}%\n"
+        f"Performance: settimana {(data.get('week_return') or 0):+.1f}%, mese {(data.get('month_return') or 0):+.1f}%\n"
+        f"Prossimi earnings: {data.get('next_earnings_str', 'N/D')}\n"
+        f"Notizie recenti:\n{news_str}\n\n"
+        "Rispondi SOLO in questo formato ESATTO, in ITALIANO, conciso e concreto:\n"
+        "DESCRIZIONE: [cosa fa l'azienda in 1-2 frasi semplici]\n"
+        "VERDETTO: COMPRA oppure VENDI oppure ASPETTA\n"
+        "CONFIDENZA: [numero intero 50-95]\n"
+        "PERCHE: [2 motivi concreti per questo verdetto]\n"
+        "RISCHI: [2 rischi specifici e reali]\n"
+        "CONCORRENTI: [3-4 aziende concorrenti, includi i TICKER in maiuscolo es: AMD, INTC, QCOM]\n"
+        "NOTIZIE: [1-2 frasi sulla situazione/notizie attuali del titolo]\n"
+    )
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=520,
+            messages=[
+                {"role": "system", "content": "Sei un analista finanziario esperto. Dai analisi complete ma concise, in italiano. Conosci bene i concorrenti delle aziende quotate. Sii diretto sul verdetto, niente giri di parole."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        sec = {"descrizione": "", "verdetto": "ASPETTA", "confidenza": 70,
+               "perche": "", "rischi": "", "concorrenti": "", "notizie": ""}
+        cur = None
+        for line in text.split("\n"):
+            l = line.strip()
+            lu = l.upper()
+            if lu.startswith("DESCRIZIONE:"):
+                sec["descrizione"] = l.split(":", 1)[1].strip(); cur = "descrizione"
+            elif lu.startswith("VERDETTO:"):
+                v = l.split(":", 1)[1].strip().upper()
+                sec["verdetto"] = "COMPRA" if "COMPRA" in v else ("VENDI" if "VENDI" in v else "ASPETTA")
+                cur = None
+            elif lu.startswith("CONFIDENZA:"):
+                try:
+                    sec["confidenza"] = max(50, min(95, int("".join(ch for ch in l if ch.isdigit())[:2] or "70")))
+                except Exception:
+                    pass
+                cur = None
+            elif lu.startswith("PERCHE") or lu.startswith("PERCHÉ"):
+                sec["perche"] = l.split(":", 1)[1].strip() if ":" in l else ""; cur = "perche"
+            elif lu.startswith("RISCHI:"):
+                sec["rischi"] = l.split(":", 1)[1].strip(); cur = "rischi"
+            elif lu.startswith("CONCORRENTI:"):
+                sec["concorrenti"] = l.split(":", 1)[1].strip(); cur = "concorrenti"
+            elif lu.startswith("NOTIZIE:"):
+                sec["notizie"] = l.split(":", 1)[1].strip(); cur = "notizie"
+            elif cur and l:
+                sec[cur] += " " + l
+
+        import re as _re
+        comp_tickers = [c for c in _re.findall(r'\b[A-Z]{2,5}\b', sec["concorrenti"]) if c != t]
+        # dedup preservando ordine
+        comp_tickers = list(dict.fromkeys(comp_tickers))[:5]
+        result = {**sec, "concorrenti_tickers": comp_tickers, "ticker": t, "name": data.get("name", t)}
+        _store(key, result)
+        return result
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.get("/api/stock/{ticker}/why-today")
 async def api_why_today(ticker: str):
     """3 bullet points: perché il titolo si è mosso oggi (AI, cached 30 min)."""
     t = ticker.upper()
-    key = f"why:{t}"
+    key = f"why:{t}:{_lang()}"
     if (c := _cached(key, _AI_TTL)) is not None:
         return c
 
@@ -1127,6 +2910,103 @@ async def api_analyze_chart(body: ChartAnalysisBody):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+# ─── Analisi grafico PRO (output strutturato: entry / SL / TP / verdetto) ─────
+
+_CHART_PRO_SYSTEM = (
+    "Sei un trader tecnico professionista (price action + analisi tecnica classica). "
+    "Esamini lo SCREENSHOT di un grafico di prezzo e produci un piano operativo concreto. "
+    "Considera TUTTE le tecniche rilevanti che vedi nel grafico:\n"
+    "- Trend e struttura: massimi/minimi crescenti o decrescenti, trendline, canali, medie mobili.\n"
+    "- Supporti/Resistenze, zone di domanda/offerta, pivot, numeri tondi.\n"
+    "- Pattern grafici: testa-spalle (e inverso), doppio/triplo massimo-minimo, triangoli "
+    "(ascendente/discendente/simmetrico), flag, pennant, cunei (wedge), cup & handle, canali, rettangoli.\n"
+    "- Candlestick: engulfing, hammer/shooting star, doji, morning/evening star, pin bar.\n"
+    "- Indicatori se visibili: RSI (ipercomprato/ipervenduto, divergenze), MACD, Bande di Bollinger, volume.\n"
+    "- Fibonacci (ritracciamenti/estensioni) se presenti o deducibili.\n"
+    "- Breakout, pullback, retest, falsi breakout.\n"
+    "- Gestione del rischio: stop-loss sotto/sopra l'invalidazione tecnica, take-profit a resistenze/supporti, rapporto rischio/rendimento (R/R).\n\n"
+    "Leggi i PREZZI dall'asse del grafico (sono stime ragionevoli, non valori esatti). "
+    "Se l'immagine NON è un grafico di prezzo, imposta is_chart=false.\n\n"
+    "Rispondi SOLO con un oggetto JSON valido (nessun testo prima o dopo), con questo schema esatto:\n"
+    "{\n"
+    '  "is_chart": true,\n'
+    '  "asset_guess": "ticker o nome se visibile, altrimenti null",\n'
+    '  "timeframe": "stima del timeframe (es. giornaliero, 4h, settimanale)",\n'
+    '  "trend": "rialzista|ribassista|laterale",\n'
+    '  "verdict": "COMPRA|ASPETTA|NON COMPRARE",\n'
+    '  "confidence": 0-100,\n'
+    '  "entry_low": numero, "entry_high": numero,\n'
+    '  "stop_loss": numero, "stop_reason": "perché lì (invalidazione tecnica)",\n'
+    '  "take_profits": [{"price": numero, "rr": "1:2", "note": "a quale livello"}],\n'
+    '  "support": numero, "resistance": numero,\n'
+    '  "patterns": ["pattern identificati"],\n'
+    '  "signals": ["osservazioni su RSI/volume/candele/medie"],\n'
+    '  "thesis": "tesi operativa in 1-2 frasi",\n'
+    '  "risk_note": "rischio principale da monitorare"\n'
+    "}\n"
+    "Usa numeri (non stringhe) per prezzi e confidence. Da 2 a 3 take_profits. "
+    "Verdict: COMPRA se setup long valido con buon R/R, NON COMPRARE se il quadro è negativo/short, "
+    "ASPETTA se serve una conferma (breakout/pullback)."
+)
+
+
+def _extract_json(text: str):
+    """Estrae il primo oggetto JSON bilanciato da un testo."""
+    import json as _json
+    if not text:
+        return None
+    s = text.find("{")
+    if s == -1:
+        return None
+    depth = 0
+    for i in range(s, len(text)):
+        c = text[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return _json.loads(text[s:i + 1])
+                except Exception:
+                    return None
+    return None
+
+
+@app.post("/api/chart-pro")
+async def api_chart_pro(body: ChartAnalysisBody):
+    if not groq_client:
+        return JSONResponse({"error": "GROQ_API_KEY non configurata"}, status_code=503)
+    img = body.image_b64
+    if not img.startswith("data:"):
+        img = f"data:image/jpeg;base64,{img}"
+    user_text = "Analizza questo grafico e restituisci il piano operativo in JSON come da istruzioni."
+    if body.question:
+        user_text += f"\nNota dell'utente: {body.question}"
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[
+                {"role": "system", "content": _CHART_PRO_SYSTEM},
+                {"role": "user", "content": [
+                    {"type": "text", "text": user_text},
+                    {"type": "image_url", "image_url": {"url": img}},
+                ]},
+            ],
+            max_tokens=1000,
+            temperature=0.3,
+        )
+        raw = resp.choices[0].message.content.strip()
+        data = _extract_json(raw)
+        if not data:
+            # fallback: ritorna il testo grezzo se il modello non ha dato JSON
+            return {"is_chart": True, "raw": raw, "parsed": False}
+        data["parsed"] = True
+        return _clean(data)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 # ─── Confessionale finanziario ────────────────────────────────────────────────
 
 class ConfessionaleBody(BaseModel):
@@ -1708,7 +3588,7 @@ async def api_watchlist_judge(body: WatchlistJudgeBody):
     if not groq_client:
         return JSONResponse({"error": "AI non disponibile"}, status_code=503)
 
-    key = "wljudge:" + ",".join(sorted(tickers))
+    key = "wljudge:" + ",".join(sorted(tickers)) + ":" + _lang()
     if (c := _cached(key, 1800)) is not None:
         return c
 
@@ -2277,7 +4157,7 @@ async def api_compare(body: CompareBody):
     t2 = body.ticker2.upper().strip()
     if not t1 or not t2 or t1 == t2:
         return JSONResponse({"error": "Servono due ticker diversi"}, status_code=400)
-    key = f"compare:{t1}:{t2}"
+    key = f"compare:{t1}:{t2}:{_lang()}"
     if (c := _cached(key, 1800)) is not None:
         return c
 
@@ -2386,7 +4266,7 @@ async def api_compare(body: CompareBody):
 @app.get("/api/briefing")
 async def api_briefing():
     """AI genera un briefing di mercato giornaliero basato sugli indici principali."""
-    key = "briefing:daily"
+    key = f"briefing:daily:{_lang()}"
     if (c := _cached(key, 3600)) is not None:
         return c
 
@@ -2478,9 +4358,12 @@ async def pwa_manifest():
     return FileResponse(str(STATIC / "manifest.json"), media_type="application/manifest+json")
 
 
+_NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+
+
 @app.get("/sw.js")
 async def pwa_sw():
-    return FileResponse(str(STATIC / "sw.js"), media_type="application/javascript")
+    return FileResponse(str(STATIC / "sw.js"), media_type="application/javascript", headers=_NO_CACHE)
 
 
 @app.get("/icon.svg")
@@ -2497,7 +4380,7 @@ async def health():
 
 @app.get("/")
 async def root():
-    return FileResponse(str(STATIC / "index.html"))
+    return FileResponse(str(STATIC / "index.html"), headers=_NO_CACHE)
 
 
 @app.get("/landing")

@@ -1,6 +1,8 @@
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
+import time
+import re
 
 
 # ─── Analisi standard ────────────────────────────────────────────────────────
@@ -406,17 +408,135 @@ def _sign(v: float) -> str:
 
 # ─── Scanner mercato ─────────────────────────────────────────────────────────
 
-def scan_cheap_stocks(max_price: float = 40.0, top_n: int = 10) -> list:
-    from config import REVOLUT_UNIVERSE
+# ── Universo dinamico US: cache in RAM (scaricato una volta al giorno) ────────
+_US_UNIVERSE_CACHE: list | None = None
+_US_UNIVERSE_TS: float = 0.0
+_US_UNIVERSE_TTL = 86400  # 24 h
 
+
+def _get_full_us_universe() -> list:
+    """Scarica tutti i ticker azionari NASDAQ+NYSE in tempo reale (cache in RAM 24h).
+    Fonte: ftp.nasdaqtrader.com — file pubblici, aggiornati ogni sera.
+    Esclude automaticamente: ETF, warrant, preferred share, test issue, simboli speciali."""
+    global _US_UNIVERSE_CACHE, _US_UNIVERSE_TS
+    import urllib.request, io, csv
+
+    if _US_UNIVERSE_CACHE and (time.time() - _US_UNIVERSE_TS) < _US_UNIVERSE_TTL:
+        return _US_UNIVERSE_CACHE
+
+    tickers: list[str] = []
+    _URLS = [
+        "https://ftp.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt",   # NASDAQ
+        "https://ftp.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt",    # NYSE / AMEX / altri
+    ]
+    # Solo simboli puri: 1-5 lettere, opzionalmente .X per classe (es. BRK.B)
+    _VALID = re.compile(r'^[A-Z]{1,5}(\.[A-Z])?$')
+
+    for url in _URLS:
+        try:
+            with urllib.request.urlopen(url, timeout=15) as resp:
+                content = resp.read().decode("utf-8")
+            reader = csv.DictReader(io.StringIO(content), delimiter="|")
+            for row in reader:
+                sym = (row.get("Symbol") or row.get("ACT Symbol") or "").strip()
+                if not sym or not _VALID.match(sym):
+                    continue
+                if row.get("ETF", "N") == "Y":
+                    continue
+                if row.get("Test Issue", "N") == "Y":
+                    continue
+                tickers.append(sym)
+        except Exception as e:
+            print(f"[universe] Errore download {url}: {e}")
+
+    tickers = list(dict.fromkeys(tickers))  # dedup mantenendo ordine
+
+    if tickers:
+        _US_UNIVERSE_CACHE = tickers
+        _US_UNIVERSE_TS = time.time()
+        print(f"[universe] {len(tickers)} ticker US scaricati (NASDAQ+NYSE+AMEX)")
+    else:
+        print("[universe] Download fallito — fallback lista statica da config")
+        from config import REVOLUT_UNIVERSE
+        _US_UNIVERSE_CACHE = REVOLUT_UNIVERSE
+        _US_UNIVERSE_TS = time.time()
+
+    return _US_UNIVERSE_CACHE
+
+
+_CURRENCY_BY_SUFFIX = {
+    "MI": "EUR", "PA": "EUR", "DE": "EUR", "AS": "EUR",
+    "MC": "EUR", "BR": "EUR", "LS": "EUR", "VI": "EUR",
+    "ST": "SEK", "CO": "DKK", "ZU": "CHF", "HE": "EUR",
+    "L":  "GBP",
+}
+
+def _ticker_currency(ticker: str) -> str:
+    if "." in ticker:
+        return _CURRENCY_BY_SUFFIX.get(ticker.rsplit(".", 1)[-1].upper(), "USD")
+    return "USD"
+
+
+def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, universe: list = None) -> list:
+    """Scansiona il mercato in 2 fasi quando l'universo è grande (es. ~6.000 titoli):
+    Fase 1 — pre-filtro rapido per prezzo (batch 2d): scarta tutto ciò che è sopra max_price.
+    Fase 2 — analisi tecnica completa solo per i candidati rimasti.
+    Se viene passato un universo esplicito (es. ETF_UNIVERSE) viene usata una sola fase."""
+    from config import EUROPEAN_UNIVERSE, AI_UNIVERSE
+    _AI_SET = set(AI_UNIVERSE)   # lookup O(1)
+
+    if universe is not None:
+        # Universo esplicito piccolo (ETF, watchlist…): analisi diretta, una fase
+        tickers = universe
+        use_two_phase = False
+    else:
+        # Universo dinamico completo: NASDAQ+NYSE+AMEX + mercati europei
+        us = _get_full_us_universe()
+        tickers = list(dict.fromkeys(us + EUROPEAN_UNIVERSE))
+        use_two_phase = True
+
+    # ── Fase 1: pre-filtro rapido per prezzo (solo se universo grande) ─────────
+    if use_two_phase and len(tickers) > 500:
+        t0 = time.time()
+        candidates: list[str] = []
+        chunks_p1 = [tickers[i:i+100] for i in range(0, len(tickers), 100)]
+
+        for chunk in chunks_p1:
+            try:
+                raw = yf.download(
+                    chunk, period="2d", interval="1d",
+                    auto_adjust=True, progress=False
+                )
+                if raw.empty or not isinstance(raw.columns, pd.MultiIndex):
+                    continue
+                close_df = raw["Close"]
+                for t in chunk:
+                    if t not in close_df.columns:
+                        continue
+                    vals = close_df[t].dropna()
+                    if not len(vals):
+                        continue
+                    price = float(vals.iloc[-1])
+                    if 0 < price <= max_price:
+                        candidates.append(t)
+            except Exception as e:
+                print(f"[scan_p1] errore chunk: {e}")
+                continue
+
+        elapsed = time.time() - t0
+        print(f"[scan] Fase 1: {len(candidates)}/{len(tickers)} candidati "
+              f"<= ${max_price:.0f} in {elapsed:.1f}s")
+        tickers = candidates
+
+    # ── Fase 2: analisi tecnica completa ──────────────────────────────────────
     risultati = []
-    chunks = [REVOLUT_UNIVERSE[i:i+50] for i in range(0, len(REVOLUT_UNIVERSE), 50)]
+    chunks = [tickers[i:i+50] for i in range(0, len(tickers), 50)]
 
     for chunk in chunks:
         try:
             raw = yf.download(
                 tickers=chunk,
-                period="1mo",
+                period="4mo",
                 interval="1d",
                 auto_adjust=True,
                 progress=False,
@@ -424,7 +544,6 @@ def scan_cheap_stocks(max_price: float = 40.0, top_n: int = 10) -> list:
             if raw.empty:
                 continue
 
-            # Normalizza colonne (batch vs singolo ticker)
             if isinstance(raw.columns, pd.MultiIndex):
                 close_df = raw["Close"]
                 volume_df = raw["Volume"]
@@ -443,7 +562,8 @@ def scan_cheap_stocks(max_price: float = 40.0, top_n: int = 10) -> list:
                         continue
 
                     current_price = float(close.iloc[-1])
-                    if current_price <= 0 or current_price > max_price:
+                    # Floor a $3: sotto è territorio penny stock (raramente "buone")
+                    if current_price < 3.0 or current_price > max_price:
                         continue
 
                     prev_close = float(close.iloc[-2])
@@ -461,43 +581,30 @@ def scan_cheap_stocks(max_price: float = 40.0, top_n: int = 10) -> list:
                     else:
                         rsi = 50.0
 
-                    # Volume ratio
+                    # Volume ratio + LIQUIDITÀ (filtro qualità: scarta penny/junk illiquidi)
                     vol_ratio = 1.0
+                    avg_vol = 0.0
                     if len(volume) >= 5:
-                        avg_vol = float(volume.rolling(10).mean().iloc[-1])
-                        if avg_vol > 0:
-                            vol_ratio = float(volume.iloc[-1]) / avg_vol
+                        avg_vol = float(volume.rolling(min(20, len(volume))).mean().iloc[-1])
+                        last_vol = float(volume.iloc[-1])
+                        avg10 = float(volume.rolling(min(10, len(volume))).mean().iloc[-1])
+                        if avg10 > 0:
+                            vol_ratio = last_vol / avg10
+                    avg_dollar_vol = avg_vol * current_price
+                    # GATE liquidità: sotto ~$3M/giorno di controvalore = troppo illiquido → scarta
+                    if avg_dollar_vol < 3_000_000:
+                        continue
 
-                    # Media mobile 20gg
-                    above_sma20 = False
-                    if len(close) >= 20:
-                        sma20 = float(close.rolling(20).mean().iloc[-1])
-                        above_sma20 = current_price > sma20
+                    # Medie mobili 20 e 50 giorni (qualità del trend)
+                    sma20 = float(close.rolling(min(20, len(close))).mean().iloc[-1])
+                    sma50 = float(close.rolling(50).mean().iloc[-1]) if len(close) >= 50 else sma20
+                    above_sma20 = current_price > sma20
+                    above_sma50 = current_price > sma50
+                    uptrend_align = sma20 > sma50
 
-                    # Punteggio momento — tracked per component
-                    score = 0
-                    rsi_pts = 0
-                    if rsi < 35:      rsi_pts = 3
-                    elif rsi < 45:    rsi_pts = 2
-                    elif rsi > 70:    rsi_pts = -3
-                    elif rsi > 60:    rsi_pts = -1
-                    score += rsi_pts
-
-                    mom_pts = 0
-                    if day_change_pct > 3:    mom_pts = 3
-                    elif day_change_pct > 1:  mom_pts = 2
-                    elif day_change_pct > 0:  mom_pts = 1
-                    elif day_change_pct < -3: mom_pts = -2
-                    score += mom_pts
-
-                    vol_pts = 0
-                    if vol_ratio > 2.5:   vol_pts = 3
-                    elif vol_ratio > 1.5: vol_pts = 2
-                    elif vol_ratio > 1.2: vol_pts = 1
-                    score += vol_pts
-
-                    trend_pts = 1 if above_sma20 else 0
-                    score += trend_pts
+                    # Rendimenti multi-timeframe (forza COSTANTE, non un singolo pop)
+                    week_return = float((current_price - close.iloc[-6]) / close.iloc[-6] * 100) if len(close) >= 6 else 0.0
+                    month_return = float((current_price - close.iloc[-22]) / close.iloc[-22] * 100) if len(close) >= 22 else 0.0
 
                     # Rischio
                     returns = close.pct_change().dropna()
@@ -509,10 +616,87 @@ def scan_cheap_stocks(max_price: float = 40.0, top_n: int = 10) -> list:
                     else:
                         risk_level, risk_emoji = "Alto", "🔴"
 
-                    # Normalizza score grezzo (-5..10) → 0-10
-                    score_10 = round(min(10.0, max(0.0, (score + 5) / 15 * 10)), 1)
+                    # ════════════════════════════════════════════════════════════
+                    # NUOVO SCORING — premia QUALITÀ del trend e forza costante,
+                    # non il "pop" di un singolo giorno (che spesso è un pump che svanisce)
+                    # ════════════════════════════════════════════════════════════
+                    score = 0
 
-                    # Trade setup matematico ("Cosa farei io")
+                    # 1) QUALITÀ DEL TREND (la spina dorsale dei titoli buoni) — max +4
+                    trend_pts = 0
+                    if above_sma20:   trend_pts += 1
+                    if above_sma50:   trend_pts += 1
+                    if uptrend_align: trend_pts += 1
+                    if above_sma20 and above_sma50 and uptrend_align: trend_pts += 1  # trend pulito
+                    score += trend_pts
+
+                    # 2) MOMENTUM MULTI-TIMEFRAME (forza costante settimana+mese) — max +4
+                    mom_pts = 0
+                    if week_return > 0:    mom_pts += 1
+                    if week_return > 5:    mom_pts += 1
+                    if month_return > 0:   mom_pts += 1
+                    if month_return > 10:  mom_pts += 1
+                    if month_return < -15: mom_pts -= 1   # downtrend forte = penalità
+                    score += mom_pts
+
+                    # 3) RSI in ZONA SANA (non gli estremi: né ipercomprato né coltello che cade)
+                    rsi_pts = 0
+                    if 45 <= rsi <= 65:    rsi_pts = 2     # zona ideale
+                    elif 40 <= rsi < 45:   rsi_pts = 1     # pullback leggero in trend
+                    elif rsi > 75:         rsi_pts = -3    # esteso / ipercomprato
+                    elif rsi > 70:         rsi_pts = -1
+                    elif rsi < 30:         rsi_pts = -2    # falling knife: penalizza, non premiare
+                    score += rsi_pts
+
+                    # 4) VOLUME come CONFERMA (solo se il prezzo sale) — modesto
+                    vol_pts = 1 if (vol_ratio > 1.5 and day_change_pct > 0) else 0
+                    score += vol_pts
+
+                    # 5) SANITÀ DELLA VOLATILITÀ
+                    if 15 <= volatility <= 50:   score += 1    # volatilità sana
+                    elif volatility > 90:        score -= 2    # territorio pump/junk
+                    elif volatility > 70:        score -= 1
+                    # spike parabolico in un giorno = rischio di inseguire il top
+                    if day_change_pct > 9:       score -= 1
+
+                    # ── Volatilità anomala: ultimi 5gg vs mese intero ─────────
+                    recent_vol = float(returns.iloc[-5:].std() * (252**0.5) * 100) if len(returns) >= 5 else volatility
+                    low_vol_alert = (recent_vol < volatility * 0.45) and (volatility > 25)
+
+                    # ── Giorno della settimana: rendimento medio Mon-Fri ──────
+                    dow_ret: dict[int, list] = {0:[], 1:[], 2:[], 3:[], 4:[]}
+                    for i in range(1, len(close)):
+                        try:
+                            d = close.index[i].weekday()
+                            r = float((close.iloc[i] - close.iloc[i-1]) / close.iloc[i-1] * 100)
+                            if 0 <= d <= 4 and not pd.isna(r):
+                                dow_ret[d].append(r)
+                        except Exception:
+                            pass
+                    dow_avg = {d: round(sum(v)/len(v), 2) if v else 0.0 for d, v in dow_ret.items()}
+
+                    # ── Doppio segnale (basato su qualità del trend) ──────────
+                    bull_sigs = 0
+                    bear_sigs = 0
+                    if above_sma20 and above_sma50: bull_sigs += 1
+                    elif not above_sma20 and not above_sma50: bear_sigs += 1
+                    if uptrend_align: bull_sigs += 1
+                    else:             bear_sigs += 1
+                    if week_return > 0 and month_return > 0: bull_sigs += 1
+                    elif week_return < 0 and month_return < 0: bear_sigs += 1
+                    if 45 <= rsi <= 65: bull_sigs += 1
+                    elif rsi > 75 or rsi < 30: bear_sigs += 1
+                    double_signal = "bull" if bull_sigs >= 3 else ("bear" if bear_sigs >= 3 else "")
+
+                    # Bonus AI: piccolo boost per aziende AI-focused
+                    is_ai = ticker in _AI_SET
+                    if is_ai:
+                        score += 1
+
+                    # Normalizza (range grezzo ~ -7..+13) → 0-10
+                    score_10 = round(min(10.0, max(0.0, (score + 7) / 20 * 10)), 1)
+
+                    # Trade setup
                     daily_vol_pct = volatility / (252 ** 0.5) / 100
                     daily_vol_dollar = current_price * daily_vol_pct
                     stop_mult = 1.5 if volatility < 30 else (2.0 if volatility < 60 else 2.5)
@@ -532,6 +716,7 @@ def scan_cheap_stocks(max_price: float = 40.0, top_n: int = 10) -> list:
                     risultati.append({
                         "ticker": ticker,
                         "current_price": current_price,
+                        "currency": _ticker_currency(ticker),
                         "day_change_pct": day_change_pct,
                         "rsi": rsi,
                         "vol_ratio": vol_ratio,
@@ -540,6 +725,17 @@ def scan_cheap_stocks(max_price: float = 40.0, top_n: int = 10) -> list:
                         "risk_emoji": risk_emoji,
                         "risk_level": risk_level,
                         "volatility": volatility,
+                        "is_ai": is_ai,
+                        "low_vol_alert": low_vol_alert,
+                        "double_signal": double_signal,
+                        "bull_signals": bull_sigs,
+                        "bear_signals": bear_sigs,
+                        "dow_avg": dow_avg,
+                        "week_return": round(week_return, 1),
+                        "month_return": round(month_return, 1),
+                        "above_sma50": above_sma50,
+                        "uptrend": above_sma20 and above_sma50 and uptrend_align,
+                        "avg_dollar_vol": round(avg_dollar_vol),
                         "score_breakdown": {
                             "rsi": rsi_pts,
                             "momentum": mom_pts,
@@ -551,11 +747,11 @@ def scan_cheap_stocks(max_price: float = 40.0, top_n: int = 10) -> list:
                 except Exception:
                     continue
         except Exception as e:
-            print(f"[scan] Errore chunk: {e}")
+            print(f"[scan_p2] Errore chunk: {e}")
             continue
 
     risultati.sort(key=lambda x: x["score"], reverse=True)
-    return risultati[:top_n]
+    return risultati if top_n is None else risultati[:top_n]
 
 
 # ─── Analisi arricchita (report mattutino) ───────────────────────────────────
@@ -569,6 +765,7 @@ def get_enriched_analysis(ticker: str) -> dict | None:
     # ── Earnings oggi + prossima data earnings ──
     earnings_today = False
     next_earnings_str = None
+    days_to_earnings = None
     try:
         stock = yf.Ticker(ticker.upper())
         cal = stock.calendar
@@ -594,6 +791,10 @@ def get_enriched_analysis(ticker: str) -> dict | None:
             _MESI = ["gen", "feb", "mar", "apr", "mag", "giu",
                      "lug", "ago", "set", "ott", "nov", "dic"]
             next_earnings_str = f"{nxt.day} {_MESI[nxt.month - 1]} {nxt.year}"
+            try:
+                days_to_earnings = (nxt - today).days
+            except Exception:
+                days_to_earnings = None
     except Exception:
         pass
 
@@ -649,6 +850,7 @@ def get_enriched_analysis(ticker: str) -> dict | None:
     base.update({
         "earnings_today": earnings_today,
         "next_earnings_str": next_earnings_str,
+        "days_to_earnings": days_to_earnings,
         "news_sentiment": news_sentiment,
         "news_sentiment_emoji": news_emoji,
         "news_sentiment_label": news_label,
@@ -828,6 +1030,92 @@ def format_scan_card(d: dict, ai: dict, rank: int) -> str:
         lines.append(f"• {_h(bullet1)}")
     lines.append(f"📅 Stima: {daily_sign}{daily_pct:.1f}% → ${daily_price:.2f} | 📊 {target_str}")
     return "\n".join(lines)
+
+
+# ─── Analisi lungo termine ───────────────────────────────────────────────────
+
+def _cagr(hist, trading_days: int) -> float | None:
+    """CAGR su N giorni di trading (approssimazione anni = days/252)."""
+    if len(hist) < trading_days:
+        return None
+    p0 = float(hist["Close"].iloc[-trading_days])
+    p1 = float(hist["Close"].iloc[-1])
+    if p0 <= 0:
+        return None
+    years = trading_days / 252
+    return ((p1 / p0) ** (1 / years) - 1) * 100
+
+
+def get_longterm_analysis(ticker: str) -> dict | None:
+    """Rendimenti storici CAGR, proiezioni scenari e dati fondamentali pluriennali."""
+    try:
+        stock = yf.Ticker(ticker.upper())
+        hist = stock.history(period="5y")
+        if hist.empty or len(hist) < 20:
+            return None
+
+        info = stock.info
+        current_price = float(hist["Close"].iloc[-1])
+
+        cagr_1y = _cagr(hist, 252)
+        cagr_3y = _cagr(hist, 252 * 3)
+        cagr_5y = _cagr(hist, 252 * 5)
+
+        # Proiezione scenari a 3 anni
+        base_rate = (cagr_3y or cagr_1y or 7.0) / 100
+        proj = {}
+        for label, mult, years in [
+            ("1y_base", 1.0, 1), ("1y_bull", 1.5, 1), ("1y_bear", 0.4, 1),
+            ("3y_base", 1.0, 3), ("3y_bull", 1.5, 3), ("3y_bear", 0.4, 3),
+            ("5y_base", 1.0, 5), ("5y_bull", 1.5, 5), ("5y_bear", 0.4, 5),
+        ]:
+            r = base_rate * mult
+            proj[label] = round(current_price * (1 + r) ** years, 2)
+
+        # ETF specifico
+        three_yr_avg = info.get("threeYearAverageReturn")
+        five_yr_avg  = info.get("fiveYearAverageReturn")
+        expense_ratio = info.get("expenseRatio")
+        fund_family   = info.get("fundFamily")
+        category      = info.get("category") or info.get("quoteType")
+
+        # Fondamentali azioni
+        target_mean = info.get("targetMeanPrice")
+        target_high = info.get("targetHighPrice")
+        target_low  = info.get("targetLowPrice")
+        rev_growth  = info.get("revenueGrowth")
+        eps_growth  = info.get("earningsGrowth")
+        fwd_pe      = info.get("forwardPE")
+
+        upside_target = None
+        if target_mean and current_price > 0:
+            upside_target = round((target_mean - current_price) / current_price * 100, 1)
+
+        return {
+            "ticker": ticker.upper(),
+            "current_price": current_price,
+            "currency": info.get("currency", "USD"),
+            "cagr_1y": round(cagr_1y, 1) if cagr_1y is not None else None,
+            "cagr_3y": round(cagr_3y, 1) if cagr_3y is not None else None,
+            "cagr_5y": round(cagr_5y, 1) if cagr_5y is not None else None,
+            "projections": proj,
+            "target_mean": target_mean,
+            "target_high": target_high,
+            "target_low": target_low,
+            "upside_target": upside_target,
+            "revenue_growth": round(rev_growth * 100, 1) if rev_growth else None,
+            "eps_growth":     round(eps_growth * 100, 1) if eps_growth else None,
+            "forward_pe": round(fwd_pe, 1) if fwd_pe else None,
+            # ETF
+            "three_yr_avg": round(three_yr_avg * 100, 1) if three_yr_avg else None,
+            "five_yr_avg":  round(five_yr_avg  * 100, 1) if five_yr_avg  else None,
+            "expense_ratio": round(expense_ratio * 100, 2) if expense_ratio else None,
+            "fund_family":  fund_family,
+            "category":     category,
+        }
+    except Exception as e:
+        print(f"[longterm] Errore {ticker}: {e}")
+        return None
 
 
 def format_report_line(d: dict) -> str:
