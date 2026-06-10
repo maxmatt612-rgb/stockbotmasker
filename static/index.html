@@ -5513,6 +5513,32 @@ function manualRetry(){
   loadData().then(r=>startCountdown(r==='retry'?3:60));
 }
 
+// ── Analisi a richiesta: stato iniziale con pulsante ──────────────────────────
+function showAnalyzeIdle(){
+  clearInterval(cdTimer);
+  const grid=document.getElementById('grid');
+  if(!grid) return;
+  grid.innerHTML=
+    '<div class="empty-state" style="grid-column:1/-1">'+
+    '<span class="icon">📊</span>'+
+    '<div style="font-weight:800;font-size:1.05rem;margin-bottom:6px">Analisi a richiesta</div>'+
+    '<div style="font-size:.82rem;color:var(--text-dim);margin-bottom:16px;max-width:340px">Il sito non analizza da solo. Clicca quando vuoi le migliori azioni del momento (~1-2 min).</div>'+
+    '<button class="why-today-btn" onclick="startAnalysis()" style="max-width:260px;font-size:.9rem;padding:12px 20px">▶️ Analizza ora</button>'+
+    '</div>';
+}
+function startAnalysis(){
+  clearInterval(cdTimer);
+  const grid=document.getElementById('grid');
+  if(grid) grid.innerHTML=
+    '<div class="empty-state" style="grid-column:1/-1">'+
+    '<span class="icon" style="animation:spin 1.2s linear infinite;display:inline-block">⏳</span>'+
+    '<div style="font-weight:700;margin-bottom:6px">Analisi in corso…</div>'+
+    '<div style="font-size:.76rem;color:var(--text-dim)">Sto scaricando e analizzando i titoli. Può richiedere 1-2 minuti.</div>'+
+    '</div>';
+  cardsData=[];
+  loadData().then(r=>startCountdown(r==='retry'?3:60));
+}
+
 // ── Refresh pill state ────────────────────────────────────────────────────────
 function _markRefreshFailed(isError){
   const dot=document.getElementById('refresh-dot');
@@ -6909,7 +6935,7 @@ setInterval(()=>{updateMarketStatus();loadIndices();},60000);
 setTimeout(loadLiveMovers,2500);
 setInterval(loadLiveMovers,150000);
 initFX();
-loadData().then(r=>startCountdown(r==='retry'?3:60));
+showAnalyzeIdle();   // Analisi A RICHIESTA: non parte da sola, l'utente clicca "Analizza ora"
 loadAccuracy();
 loadBacktest();
 initAuth();
