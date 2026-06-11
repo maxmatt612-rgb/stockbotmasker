@@ -32,8 +32,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;background:none;border:n
 header.top{position:sticky;top:0;z-index:50;background:rgba(10,12,15,.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
 .top-in{max-width:1200px;margin:0 auto;padding:0 24px;height:60px;display:flex;align-items:center;gap:22px}
 .brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.brand .mk{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent),#345fc0);
-  display:grid;place-items:center;font-weight:700;font-size:.9rem;color:#fff;box-shadow:0 2px 10px rgba(76,135,245,.35)}
+.brand .mk{width:30px;height:30px;border-radius:8px;display:block}
 .brand .nm{font-weight:600;font-size:1.06rem;letter-spacing:-.01em}
 .brand .nm span{color:var(--faint);font-weight:400}
 .search{position:relative;margin-left:auto;width:280px;max-width:42vw}
@@ -213,7 +212,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
 
 <header class="top">
   <div class="top-in">
-    <div class="brand"><div class="mk">M</div><div class="nm">Masker <span>· Intelligence</span></div></div>
+    <div class="brand"><img class="mk" src="/icon.svg" alt="Masker"><div class="nm">Masker <span>· Intelligence</span></div></div>
     <div class="search">
       <span class="si">⌕</span>
       <input id="q" placeholder="Cerca un titolo (AAPL, ENI.MI…)" autocomplete="off" spellcheck="false">
@@ -224,9 +223,15 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
 <div class="tape"><div class="tape-track" id="tape"></div></div>
 <nav class="tabs"><div class="tabs-in" id="nav">
   <button class="tab active" data-v="market">Mercato</button>
+  <button class="tab" data-v="timing">Timing</button>
   <button class="tab" data-v="topbuy">Miglior acquisto</button>
   <button class="tab" data-v="shouldbuy">Compro?</button>
   <button class="tab" data-v="chartai">Grafico AI</button>
+  <button class="tab" data-v="movers">Mercati</button>
+  <button class="tab" data-v="briefing">Briefing</button>
+  <button class="tab" data-v="radar">Radar VIP</button>
+  <button class="tab" data-v="portfolio">Portafoglio</button>
+  <button class="tab" data-v="chat">Chat AI</button>
 </div></nav>
 
 <main class="wrap">
@@ -298,6 +303,64 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
     <div id="cai-res" style="margin-top:18px"></div>
   </section>
 
+  <section data-view="timing" hidden>
+    <div class="lead"><div><div class="eyebrow">Market timing</div><h2>Quando entrare</h2>
+      <p>L'AI analizza i tecnici e indica quando conviene entrare long e quando short.</p></div></div>
+    <div class="panel">
+      <div class="flab">Ticker</div>
+      <input class="inp" id="tm-tk" placeholder="Es. NVDA" autocapitalize="characters" spellcheck="false">
+      <button class="btn" style="margin-top:14px;width:100%" onclick="runTiming()">Analizza il timing</button>
+    </div>
+    <div id="tm-res" style="margin-top:18px"></div>
+  </section>
+
+  <section data-view="movers" hidden>
+    <div class="lead"><div><div class="eyebrow">Movimenti di giornata</div><h2>Chi sale e chi scende</h2>
+      <p>I titoli che si muovono di più oggi, per area geografica.</p></div></div>
+    <div id="mv-res"><div class="lline">Caricamento…</div></div>
+  </section>
+
+  <section data-view="briefing" hidden>
+    <div class="lead"><div><div class="eyebrow">Briefing</div><h2>Il punto sui mercati</h2>
+      <p>Sintesi AI della giornata: indici, temi e cosa guardare.</p></div></div>
+    <div id="br-res"><div class="lline">Caricamento briefing…</div></div>
+  </section>
+
+  <section data-view="radar" hidden>
+    <div class="lead"><div><div class="eyebrow">Radar VIP</div><h2>Dichiarazioni di figure pubbliche</h2>
+      <p>Menzioni di titoli da parte di figure influenti, con orario e impatto. Fonte: news finanziarie.</p></div></div>
+    <div id="rd-res"><div class="lline">Scansione in corso…</div></div>
+  </section>
+
+  <section data-view="portfolio" hidden>
+    <div class="lead"><div><div class="eyebrow">Portafoglio</div><h2>Le tue posizioni</h2>
+      <p>Aggiungi le tue azioni: prezzo, P&L e una valutazione AI. Si salva nel browser.</p></div>
+      <button class="btn ghost" onclick="pfEval()">Valuta con AI</button></div>
+    <div class="panel">
+      <div class="tf-row" style="grid-template-columns:1fr 1fr 1fr auto">
+        <input class="inp" id="pf-tk" placeholder="Ticker" autocapitalize="characters">
+        <input class="inp" id="pf-px" placeholder="Prezzo acquisto" type="number" step="0.0001">
+        <input class="inp" id="pf-qt" placeholder="Quantità" type="number" step="1">
+        <button class="btn" onclick="pfAdd()">+ Aggiungi</button>
+      </div>
+    </div>
+    <div id="pf-sum" style="margin-top:18px"></div>
+    <div id="pf-grid" class="grid"></div>
+    <div id="pf-ai" style="margin-top:18px"></div>
+  </section>
+
+  <section data-view="chat" hidden>
+    <div class="lead"><div><div class="eyebrow">Assistente AI</div><h2>Chiedi all'AI</h2>
+      <p>Domande su titoli, settori o strategie. L'AI conosce i dati di mercato.</p></div></div>
+    <div class="panel" style="max-width:740px">
+      <div id="chat-log" style="min-height:120px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:14px"></div>
+      <div style="display:flex;gap:8px">
+        <input class="inp" id="chat-in" placeholder="Scrivi una domanda…" style="flex:1">
+        <button class="btn" onclick="chatSend()">Invia</button>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
@@ -334,9 +397,17 @@ async function J(u,o){try{const r=await fetch(u,o);return await r.json();}catch(
 const esc=s=>(''+(s??'')).replace(/[<>]/g,'');
 
 // nav
+const _loaded={};
 $('#nav').addEventListener('click',e=>{const b=e.target.closest('.tab');if(!b)return;
   $$('.tab').forEach(x=>x.classList.toggle('active',x===b));
-  const v=b.dataset.v;$$('section[data-view]').forEach(s=>s.hidden=s.dataset.view!==v);});
+  const v=b.dataset.v;$$('section[data-view]').forEach(s=>s.hidden=s.dataset.view!==v);
+  if(!_loaded[v]){_loaded[v]=true;
+    if(v==='movers')loadMovers();
+    if(v==='briefing')loadBriefing();
+    if(v==='radar')loadRadar();
+    if(v==='portfolio')pfRender();
+  }
+});
 
 // tape (indici: oggetto {KEY:{price,chg,label}} oppure array)
 (async()=>{
@@ -573,6 +644,157 @@ async function doSearch(v){
   $('#qdrop').innerHTML=arr.slice(0,7).map(r=>{const t=r.symbol||r.ticker;return `<div class="sd-item" data-tk="${esc(t)}"><span class="sd-tk">${esc(t)}</span><span class="sd-nm">${esc(r.name||r.shortname||'')}</span></div>`;}).join('');
   $$('#qdrop .sd-item').forEach(el=>el.onclick=()=>{$('#qdrop').classList.remove('open');$('#q').value='';openStock(el.dataset.tk);});
   $('#qdrop').classList.add('open');
+}
+
+// ── Timing ──
+$('#tm-tk').addEventListener('keydown',e=>{if(e.key==='Enter')runTiming();});
+async function runTiming(){
+  const tk=($('#tm-tk').value||'').trim().toUpperCase();if(!tk){$('#tm-tk').focus();return;}
+  const r=$('#tm-res');r.innerHTML='<div class="lline">Analisi del timing di '+esc(tk)+'…</div>';
+  const d=await J('/api/stock/'+tk+'/timing');
+  if(d.__err||d.error){r.innerHTML=`<div class="lline">${esc((d&&d.error)||'Ticker non trovato')}</div>`;return;}
+  const u=(d.verdetto||'').toUpperCase();const vc=u.includes('LONG')?'v-yes':u.includes('SHORT')?'v-no':'v-wait';
+  r.innerHTML=`<div class="res">
+    <div class="res-hd"><div><span class="res-tk">${esc(d.ticker)}</span><span class="res-nm">${esc((d.name||'').slice(0,26))}</span></div><span class="res-px">${fx(d.price,d.currency)}</span></div>
+    <div class="verdict ${vc}">${esc(d.verdetto||'ASPETTARE')}</div>
+    <div class="cells">
+      <div class="cell g"><div class="l">Entrare LONG</div><div class="v" style="font-size:.85rem;font-family:var(--sans)">${esc(d.long_timing||'—')}</div></div>
+      <div class="cell r"><div class="l">Entrare SHORT</div><div class="v" style="font-size:.85rem;font-family:var(--sans)">${esc(d.short_timing||'—')}</div></div>
+    </div>
+    ${d.long_motivo?`<div class="prose"><div class="h">Perché long</div>${esc(d.long_motivo)}</div>`:''}
+    ${d.short_motivo?`<div class="prose"><div class="h">Perché short</div>${esc(d.short_motivo)}</div>`:''}
+    <div class="cells">
+      ${d.rsi!=null?cell('RSI',(+d.rsi).toFixed(0)):''}
+      ${d.support!=null?cell('Supporto',fx(d.support,d.currency)):''}
+      ${d.resistance!=null?cell('Resistenza',fx(d.resistance,d.currency)):''}
+    </div>
+    <div class="chips"><button class="chip" onclick="openStock('${esc(d.ticker)}')">Apri dettaglio completo →</button></div>
+    <div class="fnote">${d.ai?'Analisi AI':'Analisi tecnica'} · il timing è una stima · non è consulenza finanziaria</div></div>`;
+}
+
+// ── Mercati (movers) ──
+async function loadMovers(){
+  const r=$('#mv-res');const d=await J('/api/market/movers');
+  if(d.__err||!d){r.innerHTML='<div class="lline">Dati non disponibili.</div>';return;}
+  const regs=Object.values(d).filter(x=>x&&(x.top||x.bottom));
+  if(!regs.length){r.innerHTML='<div class="lline">Nessun dato.</div>';return;}
+  const row=(m,pos)=>`<div class="card" style="cursor:pointer;padding:11px 14px" onclick="openStock('${esc(m.ticker)}')">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <span class="card-tk" style="font-size:1rem">${esc(m.ticker)}</span>
+      <span class="mono ${pos?'pos':'neg'}" style="font-size:.85rem">${fp(m.chg)}</span></div>
+    <div class="mono" style="font-size:.78rem;color:var(--dim);margin-top:3px">${(+m.price).toFixed(2)}</div></div>`;
+  r.innerHTML=regs.map(reg=>`
+    <div style="margin-bottom:24px">
+      <div class="flab" style="margin-bottom:12px">${esc(reg.label||'')}</div>
+      <div style="font-size:.7rem;color:var(--pos);font-weight:600;margin-bottom:8px">▲ Migliori</div>
+      <div class="grid" style="margin-top:0;margin-bottom:14px">${(reg.top||[]).map(m=>row(m,1)).join('')}</div>
+      <div style="font-size:.7rem;color:var(--neg);font-weight:600;margin-bottom:8px">▼ Peggiori</div>
+      <div class="grid" style="margin-top:0">${(reg.bottom||[]).map(m=>row(m,0)).join('')}</div>
+    </div>`).join('');
+}
+
+// ── Briefing ──
+async function loadBriefing(){
+  const r=$('#br-res');const d=await J('/api/briefing');
+  if(d.__err||d.error){r.innerHTML='<div class="lline">Briefing non disponibile.</div>';return;}
+  const idx=(d.indices||[]).map(s=>`<li>${esc(s)}</li>`).join('');
+  const extra=['apertura','corpo','chiusura','conclusione','outlook','sintesi'].filter(k=>d[k]).map(k=>`<div class="prose"><div class="h">${k}</div>${esc(d[k])}</div>`).join('');
+  r.innerHTML=`<div class="res" style="max-width:760px">
+    <div class="res-kick">${esc(d.date||'Oggi')}</div>
+    ${d.titolo?`<div style="padding:16px 18px;font-size:1.2rem;font-weight:600">${esc(d.titolo)}</div>`:''}
+    ${extra}
+    ${idx?`<div class="prose"><div class="h">Indici</div><ul style="padding-left:18px;font-family:var(--mono);font-size:.82rem;line-height:1.7">${idx}</ul></div>`:''}
+    <div class="fnote">Sintesi AI · dati Yahoo Finance · non è consulenza finanziaria</div></div>`;
+}
+
+// ── Radar VIP ──
+async function loadRadar(){
+  const r=$('#rd-res');const d=await J('/api/influence');
+  const arr=Array.isArray(d)?d:(d&&d.items)||[];
+  if(!arr.length){r.innerHTML='<div class="empty"><span class="ic">○</span><h3>Nessuna dichiarazione recente</h3><p>Il radar raccoglie menzioni di titoli da figure pubbliche. Riprova più tardi.</p></div>';return;}
+  r.innerHTML='<div class="grid">'+arr.slice(0,30).map(it=>{
+    const tk=it.ticker||it.symbol||'';
+    return `<div class="card" onclick="${tk?`openStock('${esc(tk)}')`:''}">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span class="card-tk" style="font-size:1rem">${esc(tk||it.figure||'—')}</span>
+        ${it.time?`<span class="mono" style="font-size:.7rem;color:var(--faint)">${esc(it.time)}</span>`:''}</div>
+      ${it.figure&&tk?`<div class="card-nm">${esc(it.figure)}</div>`:''}
+      ${it.title||it.quote?`<div style="font-size:.8rem;color:var(--dim);margin-top:8px;line-height:1.45">"${esc(it.title||it.quote)}"</div>`:''}
+    </div>`;}).join('')+'</div>';
+}
+
+// ── Portafoglio ──
+function pf(){try{return JSON.parse(localStorage.getItem('masker_pf_v2')||'[]');}catch(_){return[];}}
+function pfSave(a){localStorage.setItem('masker_pf_v2',JSON.stringify(a));}
+function pfAdd(){
+  const t=($('#pf-tk').value||'').trim().toUpperCase(),px=parseFloat($('#pf-px').value),qt=parseFloat($('#pf-qt').value);
+  if(!t||isNaN(px)||isNaN(qt)||px<=0||qt<=0){alert('Inserisci ticker, prezzo e quantità validi.');return;}
+  const a=pf();a.push({ticker:t,buyPrice:px,qty:qt});pfSave(a);
+  $('#pf-tk').value='';$('#pf-px').value='';$('#pf-qt').value='';pfRender();
+}
+function pfDel(i){const a=pf();a.splice(i,1);pfSave(a);pfRender();}
+async function pfRender(){
+  const a=pf(),g=$('#pf-grid'),sum=$('#pf-sum');$('#pf-ai').innerHTML='';
+  if(!a.length){sum.innerHTML='';g.innerHTML='<div class="empty"><span class="ic">○</span><h3>Portafoglio vuoto</h3><p>Aggiungi le tue posizioni qui sopra.</p></div>';return;}
+  g.innerHTML=Array(a.length).fill('<div class="skel"></div>').join('');
+  const q=await J('/api/batch_quotes?tickers='+a.map(p=>p.ticker).join(','));
+  let inv=0,val=0;
+  const cards=a.map((p,i)=>{
+    const cur=(q&&q[p.ticker]&&q[p.ticker].price)||0;
+    const cost=p.buyPrice*p.qty,now=cur*p.qty,pl=now-cost,plp=cost>0?pl/cost*100:0;
+    inv+=cost;val+=now;
+    return `<div class="card" style="cursor:default">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span class="card-tk" style="cursor:pointer" onclick="openStock('${esc(p.ticker)}')">${esc(p.ticker)}</span>
+        <span class="dw-x" style="font-size:.9rem;padding:0 4px" onclick="pfDel(${i})">✕</span></div>
+      <div class="card-nm">${p.qty} × ${(+p.buyPrice).toFixed(2)}</div>
+      <div class="card-row"><span class="card-price">${cur?cur.toFixed(2):'—'}</span><span class="card-chg ${pl>=0?'pos':'neg'}">${fp(plp)}</span></div>
+      <div class="card-foot"><span class="rk">P&L</span><span class="rsi ${pl>=0?'pos':'neg'}" style="margin-left:auto">${pl>=0?'+':''}${pl.toFixed(2)}</span></div></div>`;
+  }).join('');
+  const totPl=val-inv,totPlp=inv>0?totPl/inv*100:0;
+  sum.innerHTML=`<div class="cells" style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+    ${cell('Investito',inv.toFixed(2))}${cell('Valore attuale',val.toFixed(2))}
+    <div class="cell ${totPl>=0?'g':'r'}"><div class="l">P&L totale</div><div class="v">${totPl>=0?'+':''}${totPl.toFixed(2)} (${fp(totPlp)})</div></div>
+    ${cell('Posizioni',a.length)}</div>`;
+  g.innerHTML=cards;
+}
+async function pfEval(){
+  const a=pf();if(!a.length){alert('Aggiungi prima delle posizioni.');return;}
+  const ai=$('#pf-ai');ai.innerHTML='<div class="lline">Valutazione AI del portafoglio…</div>';
+  const q=await J('/api/batch_quotes?tickers='+a.map(p=>p.ticker).join(','));
+  const positions=a.map(p=>({ticker:p.ticker,buyPrice:p.buyPrice,qty:p.qty,currentPrice:(q&&q[p.ticker]&&q[p.ticker].price)||0,name:p.ticker}));
+  const d=await J('/api/portfolio/evaluate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({positions,level:'intermedio'})});
+  if(d.__err||d.error){ai.innerHTML=`<div class="lline">${esc((d&&d.error)||'Valutazione non disponibile')}</div>`;return;}
+  const v=(d.verdict||'NEUTRO').toUpperCase();const vc=v.includes('POSITIV')?'v-yes':v.includes('ATTENZ')?'v-no':'v-wait';
+  ai.innerHTML=`<div class="res" style="max-width:none">
+    <div class="res-kick">Valutazione AI</div>
+    ${d.verdict?`<div class="verdict ${vc}">${esc(d.verdict)}</div>`:''}
+    ${d.panoramica?`<div class="prose"><div class="h">Panoramica</div>${esc(d.panoramica)}</div>`:''}
+    ${d.rischi?`<div class="prose"><div class="h">Rischi</div>${esc(d.rischi)}</div>`:''}
+    ${d.consigli?`<div class="prose"><div class="h">Consigli</div>${esc(d.consigli)}</div>`:''}
+    <div class="fnote">Analisi AI · non è consulenza finanziaria</div></div>`;
+}
+
+// ── Chat AI ──
+let chatHist=[];
+$('#chat-in').addEventListener('keydown',e=>{if(e.key==='Enter')chatSend();});
+function chatMsg(role,txt){
+  const me=role==='user';
+  return `<div style="align-self:${me?'flex-end':'flex-start'};max-width:82%;background:${me?'var(--accent-soft)':'var(--surface-2)'};border:1px solid ${me?'rgba(76,135,245,.3)':'var(--border)'};border-radius:11px;padding:9px 13px;font-size:.86rem;line-height:1.5;white-space:pre-wrap">${esc(txt)}</div>`;
+}
+async function chatSend(){
+  const inp=$('#chat-in'),v=(inp.value||'').trim();if(!v)return;
+  inp.value='';const log=$('#chat-log');
+  chatHist.push({role:'user',content:v});
+  log.insertAdjacentHTML('beforeend',chatMsg('user',v));
+  log.insertAdjacentHTML('beforeend','<div id="chat-wait" style="align-self:flex-start;color:var(--dim);font-size:.82rem;font-style:italic">sta scrivendo…</div>');
+  log.scrollTop=log.scrollHeight;
+  const d=await J('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:v,history:chatHist.slice(-8)})});
+  const w=document.getElementById('chat-wait');if(w)w.remove();
+  const reply=(d&&(d.reply||d.response||d.answer))||'Errore: nessuna risposta.';
+  chatHist.push({role:'assistant',content:reply});
+  log.insertAdjacentHTML('beforeend',chatMsg('assistant',reply));
+  log.scrollTop=log.scrollHeight;
 }
 </script>
 </body>
