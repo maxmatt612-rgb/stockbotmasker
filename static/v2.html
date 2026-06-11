@@ -189,6 +189,12 @@ footer.foot{margin-left:212px}
 .stat{background:var(--surface);padding:11px 14px}
 .stat .l{font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin-bottom:3px}
 .stat .v{font-family:var(--mono);font-size:.95rem}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px 8px;margin-bottom:16px}
+.chart-box{height:150px}
+.chart-tf{display:flex;gap:4px;justify-content:flex-end;margin-top:8px}
+.ctf{font-family:var(--mono);font-size:.72rem;color:var(--dim);padding:4px 11px;border-radius:6px;border:1px solid transparent;transition:.15s}
+.ctf:hover{color:var(--text);background:var(--surface-2)}
+.ctf.on{color:var(--accent);background:var(--accent-soft);border-color:rgba(76,135,245,.3)}
 .aibtn{width:100%;text-align:left;display:flex;align-items:center;gap:12px;padding:13px 15px;margin-bottom:9px;
   border:1px solid var(--border);border-radius:9px;background:var(--surface);transition:.15s}
 .aibtn:hover{border-color:var(--accent);background:var(--surface-2)}
@@ -499,6 +505,10 @@ function goTab(t){const b=$$('.dw-tab').find(x=>x.dataset.t===t);if(b){$$('.dw-t
 function renderSintesi(){
   const d=curData||{};const st=(l,v)=>`<div class="stat"><div class="l">${l}</div><div class="v">${v}</div></div>`;
   $('#dw-body').innerHTML=`
+    <div class="chart-card">
+      <div class="chart-box" id="dw-chart"><div class="lline" style="padding:34px 0">Caricamento grafico…</div></div>
+      <div class="chart-tf" id="dw-chart-tf">${['1S','1M','3M','1A'].map(t=>`<button class="ctf ${t===chartTF?'on':''}" data-p="${t}" onclick="loadChart('${t}')">${t}</button>`).join('')}</div>
+    </div>
     <div class="stat-grid">
       ${st('Score',d.score_10!=null?(+d.score_10).toFixed(1)+' / 10':'—')}
       ${st('Rischio',(d.risk_emoji||'')+' '+(d.risk_level||'—'))}
@@ -517,6 +527,38 @@ function renderSintesi(){
     <button class="aibtn" onclick="goTab('ai')"><span class="bdg">AI</span><span><span class="t">Analisi completa</span><div class="s">1 modello forte (GPT-OSS 120B) + tutti i dati</div></span><span class="ar">→</span></button>
     <button class="aibtn" onclick="goTab('consenso')"><span class="bdg">×3</span><span><span class="t">Consenso 3 AI</span><div class="s">Llama · GPT-OSS · Qwen votano</div></span><span class="ar">→</span></button>
     <button class="aibtn" onclick="goTab('dibattito')"><span class="bdg">⚖</span><span><span class="t">Dibattito Toro vs Orso</span><div class="s">Due tesi e un giudice decidono</div></span><span class="ar">→</span></button>`;
+  loadChart(chartTF);
+}
+// ── Grafico prezzi (SVG, nessuna libreria) ──
+const _TF={'1S':['5d','1h'],'1M':['1mo','1d'],'3M':['3mo','1d'],'1A':['1y','1d']};
+let chartTF='1M';
+function svgArea(closes,ccy){
+  if(!closes||closes.length<2)return '<div class="lline" style="padding:30px 0">Grafico non disponibile</div>';
+  const W=560,H=150,pad=5;const mn=Math.min(...closes),mx=Math.max(...closes),rng=(mx-mn)||1,n=closes.length;
+  const X=i=>pad+(i/(n-1))*(W-2*pad), Y=v=>pad+(1-(v-mn)/rng)*(H-2*pad);
+  const pts=closes.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  const area=`${X(0).toFixed(1)},${H} ${pts} ${X(n-1).toFixed(1)},${H}`;
+  const up=closes[n-1]>=closes[0], col=up?'#33c281':'#f0635a';
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:150px;display:block">
+    <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${col}" stop-opacity=".22"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    <polygon points="${area}" fill="url(#cg)"/>
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+  </svg>
+  <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:.66rem;color:var(--faint);padding:2px 2px 0">
+    <span>min ${ccySym(ccy)}${mn.toFixed(2)}</span><span>max ${ccySym(ccy)}${mx.toFixed(2)}</span></div>`;
+}
+async function loadChart(tf){
+  chartTF=tf;const reqTk=curTk;
+  $$('#dw-chart-tf .ctf').forEach(b=>b.classList.toggle('on',b.dataset.p===tf));
+  const box=$('#dw-chart');if(!box)return;
+  box.innerHTML='<div class="lline" style="padding:34px 0">Caricamento grafico…</div>';
+  const [p,i]=_TF[tf]||_TF['1M'];
+  const d=await J(`/api/stock/${reqTk}/ohlc?period=${p}&interval=${i}`);
+  if(curTk!==reqTk)return; // titolo cambiato nel frattempo
+  const box2=$('#dw-chart');if(!box2)return;
+  if(!Array.isArray(d)||d.length<2){box2.innerHTML='<div class="lline" style="padding:30px 0">Grafico non disponibile</div>';return;}
+  box2.innerHTML=svgArea(d.map(x=>x.close).filter(v=>v!=null),(curData&&curData.currency)||'USD');
 }
 
 const vcls=v=>{const u=(v||'').toUpperCase();return u.includes('NON')?'v-no':(u.includes('COMPRA')||u.includes('BUY')?'v-yes':'v-wait');};
