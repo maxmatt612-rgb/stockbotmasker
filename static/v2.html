@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Masker — Stock Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0c0f; --surface:#11151a; --surface-2:#161b21; --surface-3:#1d232b;
+  --border:#232a33; --border-2:#2d353f;
+  --text:#e7ebf0; --dim:#97a1ad; --faint:#626c78;
+  --accent:#4c87f5; --accent-2:#73a3f8; --accent-soft:rgba(76,135,245,.12);
+  --pos:#33c281; --neg:#f0635a; --warn:#e3b341;
+  --sans:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',monospace;
+  --r:10px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{background:var(--bg);-webkit-text-size-adjust:100%}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.5;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;min-height:100vh}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;color:inherit;background:none;border:none}
+::selection{background:var(--accent-soft);color:#fff}
+.mono{font-family:var(--mono);font-feature-settings:"tnum" 1}
+.pos{color:var(--pos)} .neg{color:var(--neg)}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px 110px}
+
+/* ── Header ── */
+header.top{position:sticky;top:0;z-index:50;background:rgba(10,12,15,.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.top-in{max-width:1200px;margin:0 auto;padding:0 24px;height:60px;display:flex;align-items:center;gap:22px}
+.brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.brand .mk{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent),#345fc0);
+  display:grid;place-items:center;font-weight:700;font-size:.9rem;color:#fff;box-shadow:0 2px 10px rgba(76,135,245,.35)}
+.brand .nm{font-weight:600;font-size:1.06rem;letter-spacing:-.01em}
+.brand .nm span{color:var(--faint);font-weight:400}
+.search{position:relative;margin-left:auto;width:280px;max-width:42vw}
+.search input{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);
+  font-family:var(--sans);font-size:.85rem;padding:9px 12px 9px 34px;outline:none;transition:border-color .15s,background .15s}
+.search input:focus{border-color:var(--accent);background:var(--surface-3)}
+.search .si{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--faint);font-size:.9rem}
+.search input::placeholder{color:var(--faint)}
+.search-drop{position:absolute;top:42px;left:0;right:0;background:var(--surface-3);border:1px solid var(--border-2);border-radius:9px;
+  overflow:hidden;display:none;box-shadow:0 18px 50px rgba(0,0,0,.55);z-index:60}
+.search-drop.open{display:block}
+.sd-item{padding:10px 13px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.sd-item:last-child{border-bottom:none}
+.sd-item:hover{background:var(--surface-2)}
+.sd-tk{font-family:var(--mono);font-weight:600;font-size:.84rem}
+.sd-nm{font-size:.72rem;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── Tape ── */
+.tape{border-bottom:1px solid var(--border);background:var(--surface);overflow:hidden;position:sticky;top:60px;z-index:40}
+.tape-track{display:flex;gap:30px;padding:7px 0;white-space:nowrap;width:max-content;animation:tape 55s linear infinite}
+.tape:hover .tape-track{animation-play-state:paused}
+@keyframes tape{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tape-item{font-size:.72rem;font-family:var(--mono);color:var(--dim)}
+.tape-item b{color:var(--text);font-weight:500;margin-right:6px}
+
+/* ── Nav ── */
+nav.tabs{position:sticky;top:90px;z-index:30;background:rgba(10,12,15,.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.tabs-in{max-width:1200px;margin:0 auto;padding:0 24px;display:flex;gap:4px;overflow-x:auto}
+.tab{font-size:.86rem;font-weight:500;color:var(--dim);padding:14px 14px 12px;position:relative;white-space:nowrap;transition:color .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--text)}
+.tab.active::after{content:"";position:absolute;left:14px;right:14px;bottom:-1px;height:2px;background:var(--accent);border-radius:2px}
+
+/* ── Lead ── */
+.lead{padding:30px 0 16px;display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.lead h2{font-size:1.45rem;font-weight:600;letter-spacing:-.01em}
+.lead p{color:var(--dim);font-size:.85rem;max-width:540px;margin-top:5px}
+.eyebrow{font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:8px}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-family:var(--sans);font-weight:600;font-size:.85rem;
+  padding:10px 18px;border-radius:8px;border:1px solid var(--accent);color:#fff;background:var(--accent);
+  transition:background .15s,border-color .15s,transform .08s}
+.btn:hover{background:var(--accent-2);border-color:var(--accent-2)}
+.btn:active{transform:translateY(1px)}
+.btn.ghost{background:transparent;border-color:var(--border-2);color:var(--text)}
+.btn.ghost:hover{background:var(--surface-2);border-color:var(--faint)}
+.btn[disabled]{opacity:.45;pointer-events:none}
+
+/* ── Grid cards ── */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(244px,1fr));gap:13px;margin-top:18px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:15px 16px;
+  cursor:pointer;position:relative;transition:border-color .15s,transform .15s,background .15s}
+.card:hover{border-color:var(--border-2);transform:translateY(-2px);background:var(--surface-2)}
+.card .rank{position:absolute;top:13px;right:15px;font-family:var(--mono);font-size:.72rem;color:var(--faint);font-weight:500}
+.card-tk{font-family:var(--mono);font-weight:600;font-size:1.18rem}
+.card-nm{font-size:.71rem;color:var(--dim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:165px}
+.card-row{display:flex;align-items:baseline;justify-content:space-between;margin-top:14px}
+.card-price{font-family:var(--mono);font-size:1.1rem;font-weight:500}
+.card-chg{font-family:var(--mono);font-size:.82rem;font-weight:500}
+.card-foot{display:flex;align-items:center;gap:9px;margin-top:12px;padding-top:11px;border-top:1px solid var(--border)}
+.score{font-family:var(--mono);font-size:.72rem;font-weight:600;color:#06210f;background:var(--pos);padding:2px 7px;border-radius:5px}
+.score.mid{background:var(--warn);color:#241c00} .score.low{background:var(--neg);color:#2a0a08}
+.rk{font-size:.66rem;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+.card .rsi{margin-left:auto;font-family:var(--mono);font-size:.7rem;color:var(--faint)}
+
+/* ── Empty / loading ── */
+.empty{grid-column:1/-1;text-align:center;padding:60px 20px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface)}
+.empty .ic{font-size:1.7rem;display:block;margin-bottom:14px;color:var(--faint)}
+.empty h3{font-size:1.15rem;font-weight:600;margin-bottom:7px}
+.empty p{color:var(--dim);font-size:.84rem;max-width:380px;margin:0 auto 18px}
+.spin{display:inline-block;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.skel{height:140px;border-radius:var(--r);background:linear-gradient(100deg,var(--surface) 30%,var(--surface-2) 50%,var(--surface) 70%);
+  background-size:200% 100%;animation:sh 1.3s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+
+/* ── Panel / form ── */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;max-width:600px;margin-top:18px}
+.flab{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:600;margin-bottom:10px}
+.tf-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tf{border:1px solid var(--border);border-radius:9px;padding:13px;cursor:pointer;background:var(--surface-2);transition:.15s}
+.tf:hover{border-color:var(--border-2)}
+.tf.on{border-color:var(--accent);background:var(--accent-soft)}
+.tf b{display:block;font-size:.95rem;font-weight:600}
+.tf span{font-size:.74rem;color:var(--dim)}
+.inp{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;color:var(--text);
+  font-family:var(--mono);font-size:.92rem;padding:12px 14px;outline:none}
+.inp:focus{border-color:var(--accent)}
+.inp::placeholder{color:var(--faint);font-family:var(--sans)}
+
+/* ── Result ── */
+.res{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;max-width:660px;
+  animation:rise .35s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.res-kick{font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:600;
+  padding:11px 18px;border-bottom:1px solid var(--border);background:var(--accent-soft)}
+.res-hd{display:flex;align-items:baseline;justify-content:space-between;padding:16px 18px;gap:12px}
+.res-tk{font-family:var(--mono);font-size:1.55rem;font-weight:600}
+.res-nm{font-size:.71rem;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);margin-left:9px}
+.res-px{font-family:var(--mono);font-size:1.3rem}
+.verdict{text-align:center;font-size:1.25rem;font-weight:700;padding:16px;display:flex;flex-direction:column;align-items:center;gap:5px}
+.verdict small{font-family:var(--mono);font-size:.7rem;font-weight:400;letter-spacing:.04em;color:var(--dim);text-transform:uppercase}
+.v-yes{color:var(--pos);background:rgba(51,194,129,.08)} .v-no{color:var(--neg);background:rgba(240,99,90,.08)} .v-wait{color:var(--warn);background:rgba(227,179,65,.08)}
+.cells{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.cell{background:var(--surface);padding:12px 17px}
+.cell .l{font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin-bottom:4px}
+.cell .v{font-family:var(--mono);font-size:1rem;font-weight:500}
+.cell.g .v{color:var(--pos)} .cell.r .v{color:var(--neg)}
+.prose{padding:15px 18px;font-size:.87rem;line-height:1.6;border-top:1px solid var(--border)}
+.prose .h{font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:7px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;padding:13px 18px;border-top:1px solid var(--border);align-items:center}
+.chip{font-family:var(--mono);font-size:.74rem;border:1px solid var(--border-2);padding:4px 10px;border-radius:6px;color:var(--text);cursor:pointer}
+.chip:hover{border-color:var(--accent)}
+.fnote{font-size:.66rem;color:var(--faint);padding:11px 18px;line-height:1.5;border-top:1px solid var(--border)}
+.lline{text-align:center;color:var(--dim);font-size:.85rem;padding:32px}
+
+/* ── Drawer ── */
+.scrim{position:fixed;inset:0;background:rgba(5,7,10,.6);backdrop-filter:blur(2px);z-index:80;opacity:0;pointer-events:none;transition:opacity .22s}
+.scrim.open{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;height:100%;width:min(560px,100%);background:var(--bg);z-index:90;border-left:1px solid var(--border);
+  transform:translateX(100%);transition:transform .3s cubic-bezier(.2,.9,.3,1);display:flex;flex-direction:column;box-shadow:-24px 0 60px rgba(0,0,0,.5)}
+.drawer.open{transform:none}
+.dw-top{padding:17px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.dw-tk{font-family:var(--mono);font-size:1.45rem;font-weight:600}
+.dw-nm{font-size:.71rem;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);margin-top:2px}
+.dw-px{font-family:var(--mono);font-size:1.55rem;font-weight:500;margin-top:7px}
+.dw-x{font-size:1.15rem;color:var(--dim);line-height:1;padding:5px 9px;border-radius:7px}
+.dw-x:hover{background:var(--surface-2);color:var(--text)}
+.dw-tabs{display:flex;gap:2px;padding:0 16px;border-bottom:1px solid var(--border);overflow-x:auto}
+.dw-tab{font-size:.78rem;font-weight:500;color:var(--dim);padding:12px 11px;white-space:nowrap;position:relative}
+.dw-tab.on{color:var(--text)}
+.dw-tab.on::after{content:"";position:absolute;left:7px;right:7px;bottom:-1px;height:2px;background:var(--accent)}
+.dw-body{flex:1;overflow-y:auto;padding:18px 22px 60px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:18px}
+.stat{background:var(--surface);padding:11px 14px}
+.stat .l{font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin-bottom:3px}
+.stat .v{font-family:var(--mono);font-size:.95rem}
+.aibtn{width:100%;text-align:left;display:flex;align-items:center;gap:12px;padding:13px 15px;margin-bottom:9px;
+  border:1px solid var(--border);border-radius:9px;background:var(--surface);transition:.15s}
+.aibtn:hover{border-color:var(--accent);background:var(--surface-2)}
+.aibtn .t{font-size:.92rem;font-weight:600}
+.aibtn .s{font-size:.72rem;color:var(--dim);margin-top:1px}
+.aibtn .ar{margin-left:auto;color:var(--accent);font-size:1.05rem}
+.aibtn .bdg{width:30px;height:30px;border-radius:7px;background:var(--surface-3);display:grid;place-items:center;font-family:var(--mono);font-weight:600;font-size:.78rem;color:var(--accent);flex-shrink:0}
+
+.deb{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.deb-c{background:var(--surface);padding:13px 15px}
+.deb-c.bull{border-top:2px solid var(--pos)} .deb-c.bear{border-top:2px solid var(--neg)}
+.deb-c h4{font-size:.92rem;font-weight:600;margin-bottom:8px} .deb-c.bull h4{color:var(--pos)} .deb-c.bear h4{color:var(--neg)}
+.deb-c ul{padding-left:16px} .deb-c li{font-size:.78rem;line-height:1.45;margin:5px 0}
+.deb-c.win{background:var(--surface-2)}
+.modrow{padding:10px 0;border-top:1px solid var(--border)}
+.modrow:first-child{border-top:none}
+.modrow .nm{font-weight:600;font-size:.84rem}
+.modrow .vd{float:right;font-family:var(--mono);font-weight:600;font-size:.8rem}
+.modrow .rs{clear:both;font-size:.75rem;color:var(--dim);margin-top:3px;line-height:1.45}
+
+.drop{border:1px dashed var(--border-2);border-radius:9px;background:var(--surface-2);cursor:pointer;transition:.15s;overflow:hidden}
+.drop:hover,.drop.drag{border-color:var(--accent);background:var(--surface-3)}
+.drop-in{display:flex;flex-direction:column;align-items:center;gap:7px;padding:36px 18px;text-align:center}
+.drop-in .ic{font-size:1.7rem;color:var(--faint)}
+.drop img{max-width:100%;max-height:320px;display:block;margin:0 auto}
+
+footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-size:.68rem;line-height:1.7;border-top:1px solid var(--border);margin-top:24px}
+
+@media(max-width:680px){
+  .lead h2{font-size:1.25rem}
+  .cells,.stat-grid,.deb{grid-template-columns:1fr}
+  .tf-row{grid-template-columns:1fr}
+  .search{width:auto;flex:1}
+  .brand .nm span{display:none}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand"><div class="mk">M</div><div class="nm">Masker <span>· Intelligence</span></div></div>
+    <div class="search">
+      <span class="si">⌕</span>
+      <input id="q" placeholder="Cerca un titolo (AAPL, ENI.MI…)" autocomplete="off" spellcheck="false">
+      <div class="search-drop" id="qdrop"></div>
+    </div>
+  </div>
+</header>
+<div class="tape"><div class="tape-track" id="tape"></div></div>
+<nav class="tabs"><div class="tabs-in" id="nav">
+  <button class="tab active" data-v="market">Mercato</button>
+  <button class="tab" data-v="topbuy">Miglior acquisto</button>
+  <button class="tab" data-v="shouldbuy">Compro?</button>
+  <button class="tab" data-v="chartai">Grafico AI</button>
+</div></nav>
+
+<main class="wrap">
+
+  <section data-view="market">
+    <div class="lead">
+      <div>
+        <div class="eyebrow">Scanner di mercato</div>
+        <h2>Le migliori opportunità del momento</h2>
+        <p>Scansione AI dell'intero mercato con punteggio di qualità, rischio e momentum. Parte quando lo chiedi tu.</p>
+      </div>
+      <button class="btn" id="scanBtn">Analizza ora</button>
+    </div>
+    <div class="grid" id="grid">
+      <div class="empty">
+        <span class="ic">○</span>
+        <h3>Analisi a richiesta</h3>
+        <p>Il listino non si aggiorna automaticamente. Avvia la scansione per vedere i titoli migliori adesso.</p>
+        <button class="btn" onclick="runScan()">Analizza ora</button>
+      </div>
+    </div>
+  </section>
+
+  <section data-view="topbuy" hidden>
+    <div class="lead"><div><div class="eyebrow">Decisione AI</div><h2>Il miglior acquisto adesso</h2>
+      <p>L'AI scandaglia il mercato e indica la singola opportunità migliore per il tuo orizzonte.</p></div></div>
+    <div class="panel">
+      <div class="flab">Orizzonte d'investimento</div>
+      <div class="tf-row" id="tb-tf">
+        <div class="tf on" data-h="short"><b>Breve termine</b><span>3–6 mesi</span></div>
+        <div class="tf" data-h="long"><b>Lungo termine</b><span>12–24 mesi</span></div>
+      </div>
+      <button class="btn" style="margin-top:18px;width:100%" onclick="runTopBuy()">Ottieni il consiglio</button>
+    </div>
+    <div id="tb-res" style="margin-top:18px"></div>
+  </section>
+
+  <section data-view="shouldbuy" hidden>
+    <div class="lead"><div><div class="eyebrow">Verdetto</div><h2>Compro o no?</h2>
+      <p>Giudizio basato sui dati con zona d'ingresso, stop-loss e catalizzatori.</p></div></div>
+    <div class="panel">
+      <div class="flab">Ticker</div>
+      <input class="inp" id="sb-tk" placeholder="Es. TSLA" autocapitalize="characters" spellcheck="false">
+      <div class="flab" style="margin-top:16px">Orizzonte</div>
+      <div class="tf-row" id="sb-tf">
+        <div class="tf on" data-h="short"><b>Breve termine</b><span>3–6 mesi</span></div>
+        <div class="tf" data-h="long"><b>Lungo termine</b><span>12–24 mesi</span></div>
+      </div>
+      <button class="btn" style="margin-top:18px;width:100%" onclick="runShouldBuy()">Analizza</button>
+    </div>
+    <div id="sb-res" style="margin-top:18px"></div>
+  </section>
+
+  <section data-view="chartai" hidden>
+    <div class="lead"><div><div class="eyebrow">Visione AI</div><h2>Analisi del grafico</h2>
+      <p>Carica lo screenshot di un grafico: l'AI riconosce pattern e livelli e indica entry, stop-loss e take-profit.</p></div></div>
+    <div class="panel">
+      <div class="drop" id="drop">
+        <input type="file" id="file" accept="image/*" hidden>
+        <div class="drop-in" id="dropin">
+          <span class="ic">⬚</span>
+          <div style="font-weight:600;font-size:.9rem">Clicca, trascina o incolla (Ctrl+V) uno screenshot</div>
+          <div style="font-size:.74rem;color:var(--dim)">PNG / JPG — un grafico con l'asse dei prezzi visibile</div>
+        </div>
+        <div id="preview" style="display:none;padding:8px"><img id="pimg" src="" alt=""></div>
+      </div>
+      <button class="btn" id="caiBtn" style="margin-top:14px;width:100%" disabled>Analizza il grafico</button>
+    </div>
+    <div id="cai-res" style="margin-top:18px"></div>
+  </section>
+
+</main>
+
+<div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div class="dw-top">
+    <div>
+      <div class="dw-tk" id="dw-tk">—</div>
+      <div class="dw-nm" id="dw-nm">—</div>
+      <div class="dw-px" id="dw-px">—</div>
+    </div>
+    <button class="dw-x" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="dw-tabs" id="dw-tabs">
+    <button class="dw-tab on" data-t="sintesi">Sintesi</button>
+    <button class="dw-tab" data-t="ai">Analisi AI</button>
+    <button class="dw-tab" data-t="consenso">Consenso</button>
+    <button class="dw-tab" data-t="dibattito">Dibattito</button>
+    <button class="dw-tab" data-t="compro">Compro?</button>
+  </div>
+  <div class="dw-body" id="dw-body"></div>
+</aside>
+
+<footer class="foot">
+  Dati: Yahoo Finance · Intelligenza: Groq (Llama · GPT-OSS · Qwen)<br>
+  Solo a scopo informativo. Non è consulenza finanziaria.
+</footer>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const ccySym=c=>c==='EUR'?'€':c==='GBP'?'£':c==='CHF'?'CHF ':'$';
+const fx=(v,c)=>v==null||isNaN(+v)?'—':ccySym(c)+(+v<1?(+v).toFixed(4):(+v).toFixed(2));
+const fp=v=>v==null||isNaN(+v)?'—':(+v>=0?'+':'')+(+v).toFixed(2)+'%';
+async function J(u,o){try{const r=await fetch(u,o);return await r.json();}catch(e){return{__err:1};}}
+const esc=s=>(''+(s??'')).replace(/[<>]/g,'');
+
+// nav
+$('#nav').addEventListener('click',e=>{const b=e.target.closest('.tab');if(!b)return;
+  $$('.tab').forEach(x=>x.classList.toggle('active',x===b));
+  const v=b.dataset.v;$$('section[data-view]').forEach(s=>s.hidden=s.dataset.view!==v);});
+
+// tape (indici: oggetto {KEY:{price,chg,label}} oppure array)
+(async()=>{
+  const d=await J('/api/market/indices');
+  let arr=[];
+  if(Array.isArray(d))arr=d;
+  else if(d&&typeof d==='object'&&!d.__err)arr=Object.values(d);
+  arr=arr.filter(i=>i&&i.price!=null);
+  if(!arr.length){$('#tape').innerHTML='<span class="tape-item" style="padding-left:24px;color:var(--faint)">Mercati non disponibili</span>';return;}
+  const html=arr.map(i=>{const ch=i.chg??i.change_pct??0;const cl=ch>=0?'pos':'neg';
+    return `<span class="tape-item"><b>${esc(i.label||i.name||i.symbol)}</b>${(+i.price).toFixed(2)} <span class="${cl}">${fp(ch)}</span></span>`;}).join('');
+  $('#tape').innerHTML=html+html;
+})();
+
+// ── Scan ──
+let scanTimer=null;
+function runScan(){clearTimeout(scanTimer);$('#grid').innerHTML=Array(8).fill('<div class="skel"></div>').join('');poll();}
+$('#scanBtn').onclick=runScan;
+async function poll(){
+  const d=await J('/api/scan?top=10');
+  if(!Array.isArray(d)||!d.length){
+    $('#grid').innerHTML=`<div class="empty"><span class="ic spin">◌</span><h3>Analisi in corso</h3><p>Scansione del mercato in corso (~1-2 min). I titoli compariranno qui.</p></div>`;
+    scanTimer=setTimeout(poll,4000);return;
+  }
+  $('#grid').innerHTML=d.map((s,i)=>cardHTML(s,i+1)).join('');
+}
+function cardHTML(s,rank){
+  const ch=s.day_change_pct??0, cl=ch>=0?'pos':'neg';
+  const sc=s.score_10; const scl=sc>=7.5?'':sc>=6?'mid':'low';
+  return `<div class="card" onclick="openStock('${s.ticker}')">
+    ${rank?`<div class="rank">#${rank}</div>`:''}
+    <div class="card-tk">${esc(s.ticker)}</div>
+    <div class="card-nm">${esc(s.name||s.ticker)}</div>
+    <div class="card-row"><span class="card-price">${fx(s.current_price,s.currency)}</span><span class="card-chg ${cl}">${fp(ch)}</span></div>
+    <div class="card-foot">
+      ${sc!=null?`<span class="score ${scl}">${(+sc).toFixed(1)}</span>`:''}
+      <span class="rk">${esc(s.risk_level||'')}</span>
+      ${s.rsi!=null?`<span class="rsi">RSI ${(+s.rsi).toFixed(0)}</span>`:''}
+    </div></div>`;
+}
+
+// ── Drawer ──
+let curTk=null, curData=null, dwLoaded={};
+async function openStock(tk){
+  curTk=tk; dwLoaded={};
+  $('#scrim').classList.add('open'); $('#drawer').classList.add('open');
+  $('#dw-tk').textContent=tk; $('#dw-nm').textContent='Caricamento…'; $('#dw-px').textContent='…';
+  $$('.dw-tab').forEach((t,i)=>t.classList.toggle('on',i===0)); $('#dw-tabs').dataset.cur='sintesi';
+  $('#dw-body').innerHTML='<div class="lline">Caricamento dati…</div>';
+  const d=await J('/api/stock/'+tk);
+  curData=d&&!d.__err?d:{};
+  $('#dw-nm').textContent=curData.name||tk;
+  $('#dw-px').innerHTML=`${fx(curData.current_price,curData.currency)} <span class="${(curData.day_change_pct??0)>=0?'pos':'neg'}" style="font-size:.92rem">${fp(curData.day_change_pct)}</span>`;
+  if($('#dw-tabs').dataset.cur==='sintesi')renderSintesi();
+}
+function closeDrawer(){$('#scrim').classList.remove('open');$('#drawer').classList.remove('open');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
+$('#dw-tabs').addEventListener('click',e=>{const b=e.target.closest('.dw-tab');if(!b)return;
+  $$('.dw-tab').forEach(x=>x.classList.toggle('on',x===b));setDwTab(b.dataset.t);});
+function setDwTab(t){$('#dw-tabs').dataset.cur=t;
+  if(t==='sintesi')return renderSintesi();
+  if(t==='ai'){if(dwLoaded.ai)return;dwLoaded.ai=1;loadDeep();}
+  if(t==='consenso'){if(dwLoaded.cons)return;dwLoaded.cons=1;loadCons();}
+  if(t==='dibattito'){if(dwLoaded.deb)return;dwLoaded.deb=1;loadDebate();}
+  if(t==='compro'){if(dwLoaded.cmp)return;dwLoaded.cmp=1;loadCompro();}
+}
+function goTab(t){const b=$$('.dw-tab').find(x=>x.dataset.t===t);if(b){$$('.dw-tab').forEach(x=>x.classList.toggle('on',x===b));setDwTab(t);}}
+function renderSintesi(){
+  const d=curData||{};const st=(l,v)=>`<div class="stat"><div class="l">${l}</div><div class="v">${v}</div></div>`;
+  $('#dw-body').innerHTML=`
+    <div class="stat-grid">
+      ${st('Score',d.score_10!=null?(+d.score_10).toFixed(1)+' / 10':'—')}
+      ${st('Rischio',(d.risk_emoji||'')+' '+(d.risk_level||'—'))}
+      ${st('RSI (14)',d.rsi!=null?(+d.rsi).toFixed(0):'—')}
+      ${st('Volatilità',d.volatility!=null?(+d.volatility).toFixed(0)+'%':'—')}
+      ${st('Settimana',fp(d.week_return))}
+      ${st('Mese',fp(d.month_return))}
+      ${st('52w min',fx(d.week_52_low,d.currency))}
+      ${st('52w max',fx(d.week_52_high,d.currency))}
+      ${st('P/E',d.pe_ratio!=null?(+d.pe_ratio).toFixed(1):'—')}
+      ${st('Beta',d.beta!=null?(+d.beta).toFixed(2):'—')}
+      ${st('Settore',d.sector||'—')}
+      ${st('Earnings',d.next_earnings_str||'—')}
+    </div>
+    <div class="flab">Strumenti AI</div>
+    <button class="aibtn" onclick="goTab('ai')"><span class="bdg">AI</span><span><span class="t">Analisi completa</span><div class="s">1 modello forte (GPT-OSS 120B) + tutti i dati</div></span><span class="ar">→</span></button>
+    <button class="aibtn" onclick="goTab('consenso')"><span class="bdg">×3</span><span><span class="t">Consenso 3 AI</span><div class="s">Llama · GPT-OSS · Qwen votano</div></span><span class="ar">→</span></button>
+    <button class="aibtn" onclick="goTab('dibattito')"><span class="bdg">⚖</span><span><span class="t">Dibattito Toro vs Orso</span><div class="s">Due tesi e un giudice decidono</div></span><span class="ar">→</span></button>`;
+}
+
+const vcls=v=>{const u=(v||'').toUpperCase();return u.includes('NON')?'v-no':(u.includes('COMPRA')||u.includes('BUY')?'v-yes':'v-wait');};
+const vico=v=>{const c=vcls(v);return c==='v-yes'?'▲':c==='v-no'?'▼':'■';};
+
+async function loadDeep(){
+  const b=$('#dw-body');b.innerHTML='<div class="lline">Analisi approfondita in corso…</div>';
+  const d=await J('/api/stock/'+curTk+'/deep');if(d.__err||d.error){b.innerHTML='<div class="lline">Analisi non disponibile.</div>';return;}
+  b.innerHTML=`<div class="res" style="max-width:none">
+    <div class="verdict ${vcls(d.verdetto)}">${vico(d.verdetto)} ${esc(d.verdetto||'ASPETTA')}<small>Confidenza ${d.confidenza??'—'}%</small></div>
+    <div class="prose"><div class="h">Cos'è</div>${esc(d.descrizione)}</div>
+    <div class="prose"><div class="h">Perché</div>${esc(d.perche)}</div>
+    <div class="prose"><div class="h">Rischi</div>${esc(d.rischi)}</div>
+    ${d.notizie?`<div class="prose"><div class="h">Situazione</div>${esc(d.notizie)}</div>`:''}
+    ${(d.concorrenti_tickers||[]).length?`<div class="chips"><span style="font-size:.7rem;color:var(--dim)">Concorrenti:</span>${d.concorrenti_tickers.map(c=>`<span class="chip" onclick="openStock('${c}')">${esc(c)}</span>`).join('')}</div>`:''}
+    <div class="fnote">GPT-OSS 120B con ragionamento · su dati reali · non è consulenza finanziaria</div></div>`;
+}
+async function loadCons(){
+  const b=$('#dw-body');b.innerHTML='<div class="lline">3 modelli (Meta · OpenAI · Alibaba) stanno valutando…</div>';
+  const d=await J('/api/stock/'+curTk+'/consensus');if(d.__err||d.error){b.innerHTML='<div class="lline">Consenso non disponibile.</div>';return;}
+  const rows=(d.models||[]).map(m=>m.ok&&m.verdict?
+    `<div class="modrow"><span class="nm">${esc(m.name)}</span><span class="vd ${vcls(m.verdict)==='v-yes'?'pos':vcls(m.verdict)==='v-no'?'neg':''}">${vico(m.verdict)} ${esc(m.verdict)}</span>${m.reason?`<div class="rs">${esc(m.reason)}</div>`:''}</div>`
+    :`<div class="modrow"><span class="nm">${esc(m.name)}</span><span class="vd" style="color:var(--faint)">— n/d</span></div>`).join('');
+  b.innerHTML=`<div class="res" style="max-width:none">
+    <div class="res-kick">Consenso · 3 modelli</div>
+    <div class="verdict ${vcls(d.consensus)}">${vico(d.consensus)} ${d.agree}/${d.total||3} · ${esc(d.consensus||'ASPETTA')}</div>
+    <div class="prose">${rows}</div>
+    <div class="fnote">Llama 3.3 (Meta) · GPT-OSS 120B (OpenAI) · Qwen3 (Alibaba) · via Groq</div></div>`;
+}
+async function loadDebate(){
+  const b=$('#dw-body');b.innerHTML='<div class="lline">Toro e Orso discutono… poi il giudice decide.</div>';
+  const d=await J('/api/stock/'+curTk+'/debate');if(d.__err||d.error){b.innerHTML='<div class="lline">Dibattito non disponibile.</div>';return;}
+  const w=(d.winner||'').toUpperCase();const li=a=>(a||[]).map(x=>`<li>${esc(x)}</li>`).join('')||'<li>—</li>';
+  b.innerHTML=`<div class="res" style="max-width:none">
+    <div class="deb">
+      <div class="deb-c bull ${w.includes('TORO')?'win':''}"><h4>Toro · compra ${w.includes('TORO')?'✓':''}</h4><ul>${li(d.bull)}</ul></div>
+      <div class="deb-c bear ${w.includes('ORSO')?'win':''}"><h4>Orso · non comprare ${w.includes('ORSO')?'✓':''}</h4><ul>${li(d.bear)}</ul></div>
+    </div>
+    <div class="verdict ${vcls(d.verdict)}" style="border-top:1px solid var(--border)">${vico(d.verdict)} ${esc(d.verdict||'ASPETTA')}<small>Giudice · confidenza ${d.confidence??'—'}%</small></div>
+    ${d.synthesis?`<div class="prose"><div class="h">Decisione del giudice</div>${esc(d.synthesis)}</div>`:''}
+    <div class="fnote">3 agenti AI (GPT-OSS 120B) · ispirato a TradingAgents</div></div>`;
+}
+async function loadCompro(){
+  const b=$('#dw-body');b.innerHTML='<div class="lline">Verdetto in corso…</div>';
+  const d=await J('/api/stock/'+curTk+'/should-buy?horizon=short');if(d.__err||d.error){b.innerHTML='<div class="lline">Non disponibile.</div>';return;}
+  b.innerHTML=shouldHTML(d);
+}
+
+// ── Top Buy ──
+let tbH='short';
+$('#tb-tf').addEventListener('click',e=>{const t=e.target.closest('.tf');if(!t)return;tbH=t.dataset.h;$$('#tb-tf .tf').forEach(x=>x.classList.toggle('on',x===t));});
+async function runTopBuy(){
+  const r=$('#tb-res');r.innerHTML='<div class="lline">Scansione del mercato per il miglior acquisto…</div>';
+  const d=await J('/api/best-buy?horizon='+tbH);
+  if(d.__err){r.innerHTML='<div class="lline">Errore di rete.</div>';return;}
+  if(d.error){r.innerHTML=`<div class="lline">${esc(d.error)}</div>`;return;}
+  const up=(d.runners_up||[]).map(s=>`<span class="chip" onclick="openStock('${s.ticker}')">${esc(s.ticker)}${s.score_10!=null?' '+(+s.score_10).toFixed(1):''}</span>`).join('');
+  r.innerHTML=`<div class="res">
+    <div class="res-kick">Miglior acquisto · ${tbH==='long'?'lungo':'breve'} termine</div>
+    <div class="res-hd"><div><span class="res-tk">${esc(d.ticker)}</span><span class="res-nm">${esc((d.name||'').slice(0,26))}</span></div><span class="res-px">${fx(d.price,d.currency)}</span></div>
+    <div class="cells">
+      ${d.score_10!=null?cell('Score',(+d.score_10).toFixed(1)+' / 10'):''}
+      ${d.entry!=null?cell('Ingresso',fx(d.entry,d.currency)):''}
+      ${d.stop!=null?cell('Stop-loss',fx(d.stop,d.currency),'r'):''}
+      ${d.target!=null?cell('Obiettivo',fx(d.target,d.currency),'g'):''}
+    </div>
+    ${d.reasoning?`<div class="prose"><div class="h">Perché questo</div>${esc(d.reasoning)}</div>`:''}
+    ${up?`<div class="chips"><span style="font-size:.7rem;color:var(--dim)">Alternative:</span>${up}</div>`:''}
+    <div class="fnote">Analisi AI · non è consulenza finanziaria</div></div>`;
+}
+function cell(l,v,cls){return `<div class="cell ${cls||''}"><div class="l">${l}</div><div class="v">${v}</div></div>`;}
+
+// ── Should Buy ──
+let sbH='short';
+$('#sb-tf').addEventListener('click',e=>{const t=e.target.closest('.tf');if(!t)return;sbH=t.dataset.h;$$('#sb-tf .tf').forEach(x=>x.classList.toggle('on',x===t));});
+$('#sb-tk').addEventListener('keydown',e=>{if(e.key==='Enter')runShouldBuy();});
+async function runShouldBuy(){
+  const tk=($('#sb-tk').value||'').trim().toUpperCase();if(!tk){$('#sb-tk').focus();return;}
+  const r=$('#sb-res');r.innerHTML='<div class="lline">Valutazione di '+esc(tk)+'…</div>';
+  const d=await J('/api/stock/'+tk+'/should-buy?horizon='+sbH);
+  if(d.__err||d.error){r.innerHTML=`<div class="lline">${esc((d&&d.error)||'Ticker non trovato')}</div>`;return;}
+  r.innerHTML=shouldHTML(d);
+}
+function shouldHTML(d){
+  const cats=(d.catalysts||[]).map(c=>`<li>${esc(c)}</li>`).join('');
+  return `<div class="res" style="max-width:none">
+    <div class="res-kick">Verdetto · ${d.horizon==='long'?'lungo':'breve'} termine</div>
+    <div class="res-hd"><div><span class="res-tk">${esc(d.ticker)}</span><span class="res-nm">${esc((d.name||'').slice(0,26))}</span></div><span class="res-px">${fx(d.price,d.currency)}</span></div>
+    <div class="verdict ${vcls(d.verdict)}">${vico(d.verdict)} ${esc(d.verdict||'ASPETTA')}<small>Confidenza ${d.confidence??'—'}%</small></div>
+    <div class="cells">
+      ${(d.entry_low!=null&&d.entry_high!=null)?cell("Zona d'ingresso",fx(d.entry_low,d.currency)+' – '+fx(d.entry_high,d.currency),'g'):''}
+      ${d.stop!=null?cell('Stop-loss',fx(d.stop,d.currency),'r'):''}
+      ${d.support!=null?cell('Supporto',fx(d.support,d.currency)):''}
+      ${d.resistance!=null?cell('Resistenza',fx(d.resistance,d.currency)):''}
+    </div>
+    ${d.reasoning?`<div class="prose"><div class="h">Motivo</div>${esc(d.reasoning)}</div>`:''}
+    ${cats?`<div class="prose"><div class="h">Catalizzatori</div><ul style="padding-left:18px">${cats}</ul></div>`:''}
+    <div class="fnote">Analisi AI · non è consulenza finanziaria</div></div>`;
+}
+
+// ── Chart AI ──
+let caiB64=null;
+function caiSet(url){caiB64=url.split(',')[1];$('#pimg').src=url;$('#preview').style.display='block';$('#dropin').style.display='none';$('#caiBtn').disabled=false;}
+$('#drop').onclick=e=>{if(e.target.closest('#preview'))return;$('#file').click();};
+$('#file').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>caiSet(ev.target.result);r.readAsDataURL(f);};
+$('#drop').addEventListener('dragover',e=>{e.preventDefault();$('#drop').classList.add('drag');});
+$('#drop').addEventListener('dragleave',()=>$('#drop').classList.remove('drag'));
+$('#drop').addEventListener('drop',e=>{e.preventDefault();$('#drop').classList.remove('drag');const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/')){const r=new FileReader();r.onload=ev=>caiSet(ev.target.result);r.readAsDataURL(f);}});
+window.addEventListener('paste',e=>{if($('section[data-view=chartai]').hidden)return;for(const it of (e.clipboardData||{}).items||[]){if(it.type&&it.type.startsWith('image/')){const f=it.getAsFile();const r=new FileReader();r.onload=ev=>caiSet(ev.target.result);r.readAsDataURL(f);break;}}});
+$('#caiBtn').onclick=async()=>{
+  if(!caiB64)return;const btn=$('#caiBtn');btn.disabled=true;const res=$('#cai-res');
+  res.innerHTML='<div class="lline">L\'AI legge pattern, livelli e candele…</div>';
+  const d=await J('/api/chart-pro',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_b64:caiB64})});
+  btn.disabled=false;
+  if(d.__err||d.error){res.innerHTML=`<div class="lline">${esc((d&&d.error)||'Errore')}</div>`;return;}
+  if(d.is_chart===false){res.innerHTML='<div class="lline">Questa immagine non sembra un grafico di prezzo.</div>';return;}
+  const f=v=>v==null||isNaN(+v)?'—':(+v<1?(+v).toFixed(4):(+v).toFixed(2));
+  const tps=(d.take_profits||[]).filter(t=>t&&t.price!=null).map((t,i)=>cell(`TP${i+1}${t.rr?' · '+t.rr:''}`,f(t.price),'g')).join('');
+  const pats=(d.patterns||[]).filter(Boolean).map(p=>`<span class="chip">${esc((''+p).slice(0,32))}</span>`).join('');
+  const sig=(d.signals||[]).filter(Boolean).map(s=>`<li>${esc(s)}</li>`).join('');
+  res.innerHTML=`<div class="res">
+    <div class="res-kick">Piano operativo${d.timeframe?' · '+esc((''+d.timeframe).slice(0,18)):''}</div>
+    <div class="verdict ${vcls(d.verdict)}">${vico(d.verdict)} ${esc(d.verdict||'ASPETTA')}<small>Confidenza ${d.confidence??'—'}%</small></div>
+    <div class="cells">
+      ${(d.entry_low!=null)?cell("Ingresso",f(d.entry_low)+(d.entry_high!=null&&d.entry_high!==d.entry_low?' – '+f(d.entry_high):'')):''}
+      ${d.stop_loss!=null?cell('Stop-loss',f(d.stop_loss),'r'):''}
+      ${tps}
+      ${d.support!=null?cell('Supporto',f(d.support)):''}
+      ${d.resistance!=null?cell('Resistenza',f(d.resistance)):''}
+    </div>
+    ${pats?`<div class="chips"><span style="font-size:.7rem;color:var(--dim)">Pattern:</span>${pats}</div>`:''}
+    ${sig?`<div class="prose"><div class="h">Segnali tecnici</div><ul style="padding-left:18px">${sig}</ul></div>`:''}
+    ${d.thesis?`<div class="prose"><div class="h">Tesi</div>${esc(d.thesis)}</div>`:''}
+    <div class="fnote">Lettura AI del grafico · prezzi stimati dall'asse · non è consulenza finanziaria</div></div>`;
+};
+
+// ── Search ──
+let qt=null;
+$('#q').addEventListener('input',e=>{clearTimeout(qt);const v=e.target.value.trim();if(v.length<1){$('#qdrop').classList.remove('open');return;}qt=setTimeout(()=>doSearch(v),260);});
+$('#q').addEventListener('keydown',e=>{if(e.key==='Enter'){const v=e.target.value.trim().toUpperCase();if(v){$('#qdrop').classList.remove('open');$('#q').value='';openStock(v);}}});
+document.addEventListener('click',e=>{if(!e.target.closest('.search'))$('#qdrop').classList.remove('open');});
+async function doSearch(v){
+  const d=await J('/api/search?q='+encodeURIComponent(v));
+  const arr=Array.isArray(d)?d:(d&&d.results)||[];
+  if(!arr.length){$('#qdrop').classList.remove('open');return;}
+  $('#qdrop').innerHTML=arr.slice(0,7).map(r=>{const t=r.symbol||r.ticker;return `<div class="sd-item" data-tk="${esc(t)}"><span class="sd-tk">${esc(t)}</span><span class="sd-nm">${esc(r.name||r.shortname||'')}</span></div>`;}).join('');
+  $$('#qdrop .sd-item').forEach(el=>el.onclick=()=>{$('#qdrop').classList.remove('open');$('#q').value='';openStock(el.dataset.tk);});
+  $('#qdrop').classList.add('open');
+}
+</script>
+</body>
+</html>

@@ -4609,6 +4609,12 @@ async def root():
     return FileResponse(str(STATIC / "index.html"), headers=_NO_CACHE)
 
 
+@app.get("/v2")
+async def root_v2():
+    """Nuova edizione del sito (stile editoriale). Anteprima su /v2."""
+    return FileResponse(str(STATIC / "v2.html"), headers=_NO_CACHE)
+
+
 @app.get("/landing")
 async def landing():
     return FileResponse(str(STATIC / "landing.html"))
