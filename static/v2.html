@@ -59,12 +59,30 @@ header.top{position:sticky;top:0;z-index:50;background:rgba(10,12,15,.9);backdro
 .tape-item b{color:var(--text);font-weight:500;margin-right:6px}
 
 /* ── Nav ── */
-nav.tabs{position:sticky;top:90px;z-index:30;background:rgba(10,12,15,.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
-.tabs-in{max-width:1200px;margin:0 auto;padding:0 24px;display:flex;gap:4px;overflow-x:auto}
-.tab{font-size:.86rem;font-weight:500;color:var(--dim);padding:14px 14px 12px;position:relative;white-space:nowrap;transition:color .15s}
-.tab:hover{color:var(--text)}
-.tab.active{color:var(--text)}
-.tab.active::after{content:"";position:absolute;left:14px;right:14px;bottom:-1px;height:2px;background:var(--accent);border-radius:2px}
+/* ── Sidebar a sezioni ── */
+.side{position:fixed;top:95px;left:0;bottom:0;width:212px;background:var(--surface);border-right:1px solid var(--border);
+  padding:14px 12px 30px;overflow-y:auto;z-index:30;display:flex;flex-direction:column;gap:2px}
+.side-sec{font-size:.6rem;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);font-weight:600;padding:16px 12px 7px}
+.side-sec:first-child{padding-top:4px}
+.side .tab{display:flex;align-items:center;gap:11px;width:100%;text-align:left;font-size:.85rem;font-weight:500;
+  color:var(--dim);padding:10px 12px;border-radius:8px;position:relative;transition:color .15s,background .15s}
+.side .tab .ti{font-size:.95rem;width:18px;text-align:center;color:var(--faint);transition:color .15s}
+.side .tab:hover{color:var(--text);background:var(--surface-2)}
+.side .tab:hover .ti{color:var(--dim)}
+.side .tab.active{color:var(--text);background:var(--accent-soft)}
+.side .tab.active .ti{color:var(--accent)}
+.side .tab.active::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;background:var(--accent);border-radius:0 3px 3px 0}
+main.wrap{margin:0 0 0 212px;max-width:1080px;padding:0 30px 110px}
+footer.foot{margin-left:212px}
+@media(max-width:820px){
+  .side{position:sticky;top:95px;left:auto;right:auto;bottom:auto;width:auto;flex-direction:row;
+    overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid var(--border);padding:6px 10px;gap:3px}
+  .side-sec{display:none}
+  .side .tab{width:auto;white-space:nowrap;padding:9px 13px}
+  .side .tab.active::before{display:none}
+  main.wrap{margin-left:0;max-width:100%;padding:0 18px 100px}
+  footer.foot{margin-left:0}
+}
 
 /* ── Lead ── */
 .lead{padding:30px 0 16px;display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap}
@@ -221,18 +239,21 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
   </div>
 </header>
 <div class="tape"><div class="tape-track" id="tape"></div></div>
-<nav class="tabs"><div class="tabs-in" id="nav">
-  <button class="tab active" data-v="market">Mercato</button>
-  <button class="tab" data-v="timing">Timing</button>
-  <button class="tab" data-v="topbuy">Miglior acquisto</button>
-  <button class="tab" data-v="shouldbuy">Compro?</button>
-  <button class="tab" data-v="chartai">Grafico AI</button>
-  <button class="tab" data-v="movers">Mercati</button>
-  <button class="tab" data-v="briefing">Briefing</button>
-  <button class="tab" data-v="radar">Radar VIP</button>
-  <button class="tab" data-v="portfolio">Portafoglio</button>
-  <button class="tab" data-v="chat">Chat AI</button>
-</div></nav>
+<aside class="side" id="nav">
+  <div class="side-sec">Principale</div>
+  <button class="tab active" data-v="market"><span class="ti">▣</span>Mercato</button>
+  <button class="tab" data-v="timing"><span class="ti">◴</span>Timing</button>
+  <button class="tab" data-v="portfolio"><span class="ti">▤</span>Portafoglio</button>
+  <div class="side-sec">Decisioni AI</div>
+  <button class="tab" data-v="topbuy"><span class="ti">◆</span>Miglior acquisto</button>
+  <button class="tab" data-v="shouldbuy"><span class="ti">✓</span>Compro?</button>
+  <button class="tab" data-v="chartai"><span class="ti">◳</span>Grafico AI</button>
+  <div class="side-sec">Strumenti</div>
+  <button class="tab" data-v="movers"><span class="ti">⇅</span>Mercati</button>
+  <button class="tab" data-v="briefing"><span class="ti">▦</span>Briefing</button>
+  <button class="tab" data-v="radar"><span class="ti">◎</span>Radar VIP</button>
+  <button class="tab" data-v="chat"><span class="ti">◌</span>Chat AI</button>
+</aside>
 
 <main class="wrap">
 
