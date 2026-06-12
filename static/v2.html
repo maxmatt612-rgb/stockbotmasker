@@ -141,6 +141,26 @@ footer.foot{margin-left:212px}
   font-family:var(--mono);font-size:.92rem;padding:12px 14px;outline:none}
 .inp:focus{border-color:var(--accent)}
 .inp::placeholder{color:var(--faint);font-family:var(--sans)}
+select.inp{cursor:pointer;appearance:none;-webkit-appearance:none;font-family:var(--sans);
+  background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);
+  background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:36px}
+select.inp option{background:var(--surface-2);color:var(--text)}
+.sc-check{display:flex;align-items:center;gap:9px;margin-top:16px;cursor:pointer;font-size:.85rem;color:var(--text)}
+.sc-check input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+/* ── Orari mercati ── */
+.mk-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px}
+.mk-card h3{font-size:1rem;font-weight:600;display:flex;align-items:center;gap:8px}
+.mk-card .mk-tz{font-size:.72rem;color:var(--dim);margin-top:2px}
+.mk-clock{font-family:var(--mono);font-size:1.7rem;font-weight:600;margin:12px 0 4px;letter-spacing:.5px}
+.mk-badge{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:600;padding:4px 10px;border-radius:20px}
+.mk-badge.open{background:rgba(51,194,129,.14);color:#33c281}
+.mk-badge.closed{background:rgba(240,99,90,.12);color:#f0635a}
+.mk-badge .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.mk-badge.open .dot{animation:glow2 1.8s ease-in-out infinite}
+@keyframes glow2{0%,100%{opacity:1}50%{opacity:.35}}
+.mk-next{font-size:.8rem;color:var(--dim);margin-top:12px}
+.mk-next b{color:var(--text);font-family:var(--mono)}
+.mk-hours{font-size:.72rem;color:var(--faint);margin-top:6px;font-family:var(--mono)}
 
 /* ── Result ── */
 .res{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;max-width:660px;
@@ -279,6 +299,8 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
   <button class="tab" data-v="shouldbuy"><span class="ti">✓</span>Compro?</button>
   <button class="tab" data-v="chartai"><span class="ti">◳</span>Grafico AI</button>
   <div class="side-sec">Strumenti</div>
+  <button class="tab" data-v="scanner"><span class="ti">⚲</span>Scanner</button>
+  <button class="tab" data-v="orari"><span class="ti">◷</span>Orari mercati</button>
   <button class="tab" data-v="movers"><span class="ti">⇅</span>Mercati</button>
   <button class="tab" data-v="briefing"><span class="ti">▦</span>Briefing</button>
   <button class="tab" data-v="radar"><span class="ti">◎</span>Radar VIP</button>
@@ -412,6 +434,49 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
     </div>
   </section>
 
+  <section data-view="scanner" hidden>
+    <div class="lead"><div><div class="eyebrow">Scanner personalizzato</div><h2>Filtra il mercato a modo tuo</h2>
+      <p>Imposta i criteri e trova i titoli che rispettano le tue condizioni.</p></div></div>
+    <div class="panel">
+      <div class="flab">Universo</div>
+      <select class="inp" id="sc-univ">
+        <option value="us_large">USA — grandi aziende</option>
+        <option value="us_tech">USA — tecnologici</option>
+        <option value="europa">Europa</option>
+        <option value="asia">Asia</option>
+      </select>
+      <div class="flab" style="margin-top:16px">Direzione</div>
+      <div class="tf-row" id="sc-dir" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="tf on" data-d="all"><b>Tutti</b></div>
+        <div class="tf" data-d="up"><b>In rialzo</b></div>
+        <div class="tf" data-d="down"><b>In calo</b></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
+        <div><div class="flab">Prezzo min</div><input class="inp" id="sc-pmin" type="number" placeholder="0" inputmode="decimal"></div>
+        <div><div class="flab">Prezzo max</div><input class="inp" id="sc-pmax" type="number" placeholder="nessuno" inputmode="decimal"></div>
+        <div><div class="flab">Variazione min %</div><input class="inp" id="sc-cmin" type="number" placeholder="nessuna" inputmode="decimal"></div>
+        <div><div class="flab">Variazione max %</div><input class="inp" id="sc-cmax" type="number" placeholder="nessuna" inputmode="decimal"></div>
+      </div>
+      <div class="flab" style="margin-top:16px">Capitalizzazione</div>
+      <select class="inp" id="sc-mcap">
+        <option value="all">Tutte</option>
+        <option value="mega">Mega (oltre 200 mld)</option>
+        <option value="large">Grande (10–200 mld)</option>
+        <option value="mid">Media (2–10 mld)</option>
+        <option value="small">Piccola (sotto 2 mld)</option>
+      </select>
+      <label class="sc-check"><input type="checkbox" id="sc-vol"> Solo volume insolito (oltre il doppio della media)</label>
+      <button class="btn" style="margin-top:18px;width:100%" onclick="runScanner()">Cerca</button>
+    </div>
+    <div id="sc-res" style="margin-top:18px"></div>
+  </section>
+
+  <section data-view="orari" hidden>
+    <div class="lead"><div><div class="eyebrow">Orari di mercato</div><h2>Mercati nel mondo</h2>
+      <p>Stato in tempo reale delle borse americana, europea e asiatica con il conto alla rovescia.</p></div></div>
+    <div class="grid" id="orari-grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))"></div>
+  </section>
+
 </main>
 
 <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
@@ -473,8 +538,71 @@ $('#nav').addEventListener('click',e=>{const b=e.target.closest('.tab');if(!b)re
     if(v==='briefing')loadBriefing();
     if(v==='radar')loadRadar();
     if(v==='portfolio')pfRender();
+    if(v==='orari')loadOrari();
   }
 });
+
+// ── Scanner personalizzato ──
+let scDir='all';
+document.addEventListener('click',e=>{const t=e.target.closest('#sc-dir .tf');if(!t)return;
+  scDir=t.dataset.d;$$('#sc-dir .tf').forEach(x=>x.classList.toggle('on',x===t));});
+async function runScanner(){
+  const res=$('#sc-res'); res.innerHTML='<div class="lline">Ricerca in corso… (la prima volta può richiedere qualche secondo)</div>';
+  const num=id=>{const v=parseFloat($(id).value);return isNaN(v)?null:v;};
+  const body={
+    universe:$('#sc-univ').value, direction:scDir,
+    min_price:num('#sc-pmin'), max_price:num('#sc-pmax'),
+    min_change:num('#sc-cmin'), max_change:num('#sc-cmax'),
+    mcap:$('#sc-mcap').value, volume_anomalo:$('#sc-vol').checked
+  };
+  const d=await J('/api/screener',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!Array.isArray(d)){res.innerHTML='<div class="lline">Errore nella ricerca.</div>';return;}
+  if(!d.length){res.innerHTML='<div class="empty" style="grid-column:auto"><span class="ic">○</span><h3>Nessun titolo trovato</h3><p>Prova ad allargare i filtri o cambiare universo.</p></div>';return;}
+  res.innerHTML=`<div class="flab" style="margin-bottom:10px">${d.length} titoli trovati</div>
+    <div class="grid">${d.map(x=>{const pos=(x.chg_pct??0)>=0;
+      return `<div class="card" onclick="openStock('${esc(x.ticker)}')" style="cursor:pointer">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <b style="font-size:1rem">${esc(x.ticker)}</b>
+          <span class="${pos?'pos':'neg'}" style="font-family:var(--mono);font-size:.82rem">${fp(x.chg_pct)}</span></div>
+        <div style="font-family:var(--mono);font-size:1.1rem;margin-top:6px">$${(+x.price).toFixed(2)}</div>
+        ${x.mcap?`<div style="font-size:.7rem;color:var(--faint);margin-top:4px">Cap. ${fmtCap(x.mcap)}</div>`:''}
+      </div>`;}).join('')}</div>`;
+}
+function fmtCap(m){if(!m)return '—';if(m>=1e12)return (m/1e12).toFixed(2)+' bln';if(m>=1e9)return (m/1e9).toFixed(1)+' mld';if(m>=1e6)return (m/1e6).toFixed(0)+' mln';return m;}
+
+// ── Orari di mercato ──
+const _MK=[
+  {name:'New York',flag:'🇺🇸',tz:'America/New_York',o:570,c:960,hh:'09:30 – 16:00'},
+  {name:'Europa',flag:'🇪🇺',tz:'Europe/Rome',o:540,c:1050,hh:'09:00 – 17:30'},
+  {name:'Tokyo',flag:'🇯🇵',tz:'Asia/Tokyo',o:540,c:900,hh:'09:00 – 15:00'},
+];
+function _mkStatus(m){
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:m.tz,weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date());
+  const get=t=>parts.find(p=>p.type===t)?.value;
+  let hh=+get('hour'); if(hh===24)hh=0; const mm=+get('minute');
+  const wd={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[get('weekday')];
+  const cur=hh*60+mm, isWk=d=>d>=1&&d<=5;
+  const clock=String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');
+  if(isWk(wd)&&cur>=m.o&&cur<m.c)return {open:true,clock,mins:m.c-cur,label:'Chiude tra'};
+  for(let d=0;d<8;d++){const day=(wd+d)%7;if(!isWk(day))continue;
+    if(d===0){if(cur<m.o)return {open:false,clock,mins:m.o-cur,label:'Apre tra'};continue;}
+    return {open:false,clock,mins:d*1440-cur+m.o,label:'Apre tra'};}
+  return {open:false,clock,mins:0,label:'Apre tra'};
+}
+function _fmtDur(m){const d=Math.floor(m/1440);m%=1440;const h=Math.floor(m/60),mm=m%60;
+  if(d>0)return `${d}g ${h}h`; if(h>0)return `${h}h ${mm}m`; return `${mm}m`;}
+function loadOrari(){
+  const g=$('#orari-grid');if(!g)return;
+  g.innerHTML=_MK.map(m=>{const s=_mkStatus(m);
+    return `<div class="mk-card">
+      <h3>${m.flag} ${m.name}</h3><div class="mk-tz">${m.tz.replace('_',' ')}</div>
+      <div class="mk-clock">${s.clock}</div>
+      <span class="mk-badge ${s.open?'open':'closed'}"><span class="dot"></span>${s.open?'Aperto':'Chiuso'}</span>
+      <div class="mk-next">${s.label} <b>${_fmtDur(s.mins)}</b></div>
+      <div class="mk-hours">Orario: ${m.hh}</div>
+    </div>`;}).join('');
+}
+setInterval(()=>{if(!$('section[data-view="orari"]').hidden)loadOrari();},30000);
 
 // tape (indici: oggetto {KEY:{price,chg,label}} oppure array)
 (async()=>{
@@ -548,7 +676,13 @@ function renderSintesi(){
   $('#dw-body').innerHTML=`
     <div class="chart-card">
       <div class="chart-box" id="dw-chart"><div class="lline" style="padding:34px 0">Caricamento grafico…</div></div>
-      <div class="chart-tf" id="dw-chart-tf">${['1S','1M','3M','1A'].map(t=>`<button class="ctf ${t===chartTF?'on':''}" data-p="${t}" onclick="loadChart('${t}')">${t}</button>`).join('')}</div>
+      <div class="chart-tf" id="dw-chart-tf" style="justify-content:space-between">
+        <span style="display:flex;gap:4px">
+          <button class="ctf ${chartType==='candle'?'on':''}" data-ct="candle" onclick="setChartType('candle')">Candele</button>
+          <button class="ctf ${chartType==='line'?'on':''}" data-ct="line" onclick="setChartType('line')">Linea</button>
+        </span>
+        <span style="display:flex;gap:4px">${['1S','1M','3M','1A'].map(t=>`<button class="ctf ${t===chartTF?'on':''}" data-p="${t}" onclick="loadChart('${t}')">${t}</button>`).join('')}</span>
+      </div>
     </div>
     <div class="stat-grid">
       ${st('Score',d.score_10!=null?(+d.score_10).toFixed(1)+' / 10':'—')}
@@ -572,7 +706,39 @@ function renderSintesi(){
 }
 // ── Grafico prezzi (SVG, nessuna libreria) ──
 const _TF={'1S':['5d','1h'],'1M':['1mo','1d'],'3M':['3mo','1d'],'1A':['1y','1d']};
-let chartTF='1M';
+let chartTF='1M', chartType='candle', _chartRows=null;
+function svgCandles(rows,ccy){
+  rows=(rows||[]).filter(r=>r&&r.open!=null&&r.high!=null&&r.low!=null&&r.close!=null);
+  if(rows.length<2)return '<div class="lline" style="padding:30px 0">Grafico non disponibile</div>';
+  const W=560,H=150,pad=5,n=rows.length;
+  const mn=Math.min(...rows.map(r=>r.low)), mx=Math.max(...rows.map(r=>r.high)), rng=(mx-mn)||1;
+  const Y=v=>pad+(1-(v-mn)/rng)*(H-2*pad);
+  const slot=(W-2*pad)/n, bw=Math.max(1.2,Math.min(slot*0.66,9));
+  let g='';
+  rows.forEach((r,i)=>{
+    const cx=pad+slot*(i+0.5), up=r.close>=r.open, col=up?'#33c281':'#f0635a';
+    const yH=Y(r.high),yL=Y(r.low),yO=Y(r.open),yC=Y(r.close);
+    const top=Math.min(yO,yC),h=Math.max(0.8,Math.abs(yC-yO));
+    g+=`<line x1="${cx.toFixed(1)}" y1="${yH.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${yL.toFixed(1)}" stroke="${col}" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+    g+=`<rect x="${(cx-bw/2).toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${col}" rx=".4"/>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:150px;display:block">${g}</svg>
+  <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:.66rem;color:var(--faint);padding:2px 2px 0">
+    <span>min ${ccySym(ccy)}${mn.toFixed(2)}</span><span>max ${ccySym(ccy)}${mx.toFixed(2)}</span></div>`;
+}
+function renderChart(){
+  const box=$('#dw-chart');if(!box)return;
+  $$('#dw-chart-tf .ctf[data-ct]').forEach(b=>b.classList.toggle('on',b.dataset.ct===chartType));
+  const ccy=(curData&&curData.currency)||'USD';
+  if(!Array.isArray(_chartRows)||_chartRows.length<2){box.innerHTML='<div class="lline" style="padding:30px 0">Grafico non disponibile</div>';return;}
+  box.innerHTML = chartType==='candle' ? svgCandles(_chartRows,ccy)
+    : svgArea(_chartRows.map(x=>x.close).filter(v=>v!=null),ccy);
+}
+function setChartType(t){
+  chartType=t;
+  $$('#dw-chart-tf .ctf[data-ct]').forEach(b=>b.classList.toggle('on',b.dataset.ct===t));
+  renderChart();
+}
 function svgArea(closes,ccy){
   if(!closes||closes.length<2)return '<div class="lline" style="padding:30px 0">Grafico non disponibile</div>';
   const W=560,H=150,pad=5;const mn=Math.min(...closes),mx=Math.max(...closes),rng=(mx-mn)||1,n=closes.length;
@@ -597,9 +763,9 @@ async function loadChart(tf){
   const [p,i]=_TF[tf]||_TF['1M'];
   const d=await J(`/api/stock/${reqTk}/ohlc?period=${p}&interval=${i}`);
   if(curTk!==reqTk)return; // titolo cambiato nel frattempo
-  const box2=$('#dw-chart');if(!box2)return;
-  if(!Array.isArray(d)||d.length<2){box2.innerHTML='<div class="lline" style="padding:30px 0">Grafico non disponibile</div>';return;}
-  box2.innerHTML=svgArea(d.map(x=>x.close).filter(v=>v!=null),(curData&&curData.currency)||'USD');
+  if(!$('#dw-chart'))return;
+  _chartRows=Array.isArray(d)?d:null;
+  renderChart();
 }
 
 const vcls=v=>{const u=(v||'').toUpperCase();return u.includes('NON')?'v-no':(u.includes('COMPRA')||u.includes('BUY')?'v-yes':'v-wait');};
