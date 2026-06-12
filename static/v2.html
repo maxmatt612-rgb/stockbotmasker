@@ -147,20 +147,17 @@ select.inp{cursor:pointer;appearance:none;-webkit-appearance:none;font-family:va
 select.inp option{background:var(--surface-2);color:var(--text)}
 .sc-check{display:flex;align-items:center;gap:9px;margin-top:16px;cursor:pointer;font-size:.85rem;color:var(--text)}
 .sc-check input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
-/* ── Orari mercati ── */
-.mk-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px}
-.mk-card h3{font-size:1rem;font-weight:600;display:flex;align-items:center;gap:8px}
-.mk-card .mk-tz{font-size:.72rem;color:var(--dim);margin-top:2px}
-.mk-clock{font-family:var(--mono);font-size:1.7rem;font-weight:600;margin:12px 0 4px;letter-spacing:.5px}
-.mk-badge{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:600;padding:4px 10px;border-radius:20px}
-.mk-badge.open{background:rgba(51,194,129,.14);color:#33c281}
-.mk-badge.closed{background:rgba(240,99,90,.12);color:#f0635a}
-.mk-badge .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
-.mk-badge.open .dot{animation:glow2 1.8s ease-in-out infinite}
+/* ── Barra orari mercati (sopra la tape) ── */
+.mkbar{display:flex;gap:22px;align-items:center;justify-content:center;flex-wrap:wrap;
+  padding:6px 16px;background:var(--surface);border-bottom:1px solid var(--border);font-size:.72rem}
+.mkbar .mki{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.mkbar .mki .dot{width:7px;height:7px;border-radius:50%;flex:none}
+.mkbar .mki.open .dot{background:#33c281;animation:glow2 1.8s ease-in-out infinite}
+.mkbar .mki.closed .dot{background:#f0635a}
+.mkbar .mki .nm{color:var(--text);font-weight:600}
+.mkbar .mki .st{color:var(--dim)}
+.mkbar .mki .ct{color:var(--faint);font-family:var(--mono)}
 @keyframes glow2{0%,100%{opacity:1}50%{opacity:.35}}
-.mk-next{font-size:.8rem;color:var(--dim);margin-top:12px}
-.mk-next b{color:var(--text);font-family:var(--mono)}
-.mk-hours{font-size:.72rem;color:var(--faint);margin-top:6px;font-family:var(--mono)}
 
 /* ── Result ── */
 .res{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;max-width:660px;
@@ -288,6 +285,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
     </div>
   </div>
 </header>
+<div class="mkbar" id="mkbar"></div>
 <div class="tape"><div class="tape-track" id="tape"></div></div>
 <aside class="side" id="nav">
   <div class="side-sec">Principale</div>
@@ -300,7 +298,6 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
   <button class="tab" data-v="chartai"><span class="ti">◳</span>Grafico AI</button>
   <div class="side-sec">Strumenti</div>
   <button class="tab" data-v="scanner"><span class="ti">⚲</span>Scanner</button>
-  <button class="tab" data-v="orari"><span class="ti">◷</span>Orari mercati</button>
   <button class="tab" data-v="movers"><span class="ti">⇅</span>Mercati</button>
   <button class="tab" data-v="briefing"><span class="ti">▦</span>Briefing</button>
   <button class="tab" data-v="radar"><span class="ti">◎</span>Radar VIP</button>
@@ -471,11 +468,6 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
     <div id="sc-res" style="margin-top:18px"></div>
   </section>
 
-  <section data-view="orari" hidden>
-    <div class="lead"><div><div class="eyebrow">Orari di mercato</div><h2>Mercati nel mondo</h2>
-      <p>Stato in tempo reale delle borse americana, europea e asiatica con il conto alla rovescia.</p></div></div>
-    <div class="grid" id="orari-grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))"></div>
-  </section>
 
 </main>
 
@@ -538,7 +530,6 @@ $('#nav').addEventListener('click',e=>{const b=e.target.closest('.tab');if(!b)re
     if(v==='briefing')loadBriefing();
     if(v==='radar')loadRadar();
     if(v==='portfolio')pfRender();
-    if(v==='orari')loadOrari();
   }
 });
 
@@ -591,18 +582,15 @@ function _mkStatus(m){
 }
 function _fmtDur(m){const d=Math.floor(m/1440);m%=1440;const h=Math.floor(m/60),mm=m%60;
   if(d>0)return `${d}g ${h}h`; if(h>0)return `${h}h ${mm}m`; return `${mm}m`;}
-function loadOrari(){
-  const g=$('#orari-grid');if(!g)return;
-  g.innerHTML=_MK.map(m=>{const s=_mkStatus(m);
-    return `<div class="mk-card">
-      <h3>${m.flag} ${m.name}</h3><div class="mk-tz">${m.tz.replace('_',' ')}</div>
-      <div class="mk-clock">${s.clock}</div>
-      <span class="mk-badge ${s.open?'open':'closed'}"><span class="dot"></span>${s.open?'Aperto':'Chiuso'}</span>
-      <div class="mk-next">${s.label} <b>${_fmtDur(s.mins)}</b></div>
-      <div class="mk-hours">Orario: ${m.hh}</div>
-    </div>`;}).join('');
+function renderMkBar(){
+  const bar=$('#mkbar');if(!bar)return;
+  bar.innerHTML=_MK.map(m=>{const s=_mkStatus(m);
+    return `<span class="mki ${s.open?'open':'closed'}"><span class="dot"></span>`+
+      `<span class="nm">${m.flag} ${m.name}</span> <span class="st">${s.open?'Aperto':'Chiuso'}</span> `+
+      `<span class="ct">· ${s.open?'chiude':'apre'} ${_fmtDur(s.mins)}</span></span>`;}).join('');
 }
-setInterval(()=>{if(!$('section[data-view="orari"]').hidden)loadOrari();},30000);
+renderMkBar();
+setInterval(renderMkBar,30000);
 
 // tape (indici: oggetto {KEY:{price,chg,label}} oppure array)
 (async()=>{
