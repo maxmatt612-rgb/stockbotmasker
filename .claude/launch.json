@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "stock-bot",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "uvicorn", "web_server:app", "--port", "8000", "--reload"],
+      "port": 8000
+    },
+    {
+      "name": "static",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8901", "--directory", "static"],
+      "port": 8901
+    }
+  ]
+}
