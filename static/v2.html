@@ -205,8 +205,14 @@ select.inp option{background:var(--surface-2);color:var(--text)}
 .btn{transition:background .15s,border-color .15s,transform .08s,box-shadow .15s}
 .btn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(76,135,245,.32)}
 .btn:active{transform:translateY(0);box-shadow:none}
-.dw-px-num{display:inline-block}
+.dw-px-num{display:inline-block;border-radius:4px;padding:0 2px}
 .flash{animation:pop .4s ease both}
+/* lampeggio prezzo in tempo reale */
+@keyframes flup{0%{background:rgba(51,194,129,0);color:inherit}22%{background:rgba(51,194,129,.32);color:#5fe0a6}100%{background:rgba(51,194,129,0)}}
+@keyframes fldn{0%{background:rgba(240,99,90,0);color:inherit}22%{background:rgba(240,99,90,.30);color:#ff8a82}100%{background:rgba(240,99,90,0)}}
+.flash-up{animation:flup .9s ease both;border-radius:4px}
+.flash-down{animation:fldn .9s ease both;border-radius:4px}
+.tpx{padding:0 2px;border-radius:3px}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
 
 /* ── Drawer ── */
@@ -592,18 +598,27 @@ function renderMkBar(){
 renderMkBar();
 setInterval(renderMkBar,30000);
 
-// tape (indici: oggetto {KEY:{price,chg,label}} oppure array)
-(async()=>{
+// tape (indici: oggetto {KEY:{price,chg,label}} oppure array) — aggiornamento live + lampeggio
+let _tapePrev={}, _tapeBuilt=false;
+const _tkey=i=>i.label||i.name||i.symbol||'';
+function _tapeHTML(i){const k=esc(_tkey(i)),ch=i.chg??i.change_pct??0,cl=ch>=0?'pos':'neg';
+  return `<span class="tape-item"><b>${k}</b><span class="tpx" data-k="${k}">${(+i.price).toFixed(2)}</span> <span class="tchg ${cl}" data-k="${k}">${fp(ch)}</span></span>`;}
+async function loadTape(){
   const d=await J('/api/market/indices');
   let arr=[];
-  if(Array.isArray(d))arr=d;
-  else if(d&&typeof d==='object'&&!d.__err)arr=Object.values(d);
+  if(Array.isArray(d))arr=d; else if(d&&typeof d==='object'&&!d.__err)arr=Object.values(d);
   arr=arr.filter(i=>i&&i.price!=null);
-  if(!arr.length){$('#tape').innerHTML='<span class="tape-item" style="padding-left:24px;color:var(--faint)">Mercati non disponibili</span>';return;}
-  const html=arr.map(i=>{const ch=i.chg??i.change_pct??0;const cl=ch>=0?'pos':'neg';
-    return `<span class="tape-item"><b>${esc(i.label||i.name||i.symbol)}</b>${(+i.price).toFixed(2)} <span class="${cl}">${fp(ch)}</span></span>`;}).join('');
-  $('#tape').innerHTML=html+html;
-})();
+  if(!arr.length){if(!_tapeBuilt)$('#tape').innerHTML='<span class="tape-item" style="padding-left:24px;color:var(--faint)">Mercati non disponibili</span>';return;}
+  if(!_tapeBuilt){const html=arr.map(_tapeHTML).join('');$('#tape').innerHTML=html+html;_tapeBuilt=true;
+    arr.forEach(i=>_tapePrev[_tkey(i)]=+i.price);return;}
+  arr.forEach(i=>{const key=_tkey(i),nw=+i.price,old=_tapePrev[key],ch=i.chg??i.change_pct??0,cl=ch>=0?'pos':'neg',sel=esc(key);
+    document.querySelectorAll(`.tpx[data-k="${sel}"]`).forEach(el=>{el.textContent=nw.toFixed(2);
+      if(old!=null&&Math.abs(nw-old)>1e-9){const dir=nw>old?'flash-up':'flash-down';el.classList.remove('flash-up','flash-down');void el.offsetWidth;el.classList.add(dir);}});
+    document.querySelectorAll(`.tchg[data-k="${sel}"]`).forEach(el=>{el.textContent=fp(ch);el.className='tchg '+cl;});
+    _tapePrev[key]=nw;});
+}
+loadTape();
+setInterval(loadTape,20000);
 
 // ── Scan ──
 let scanTimer=null;
@@ -633,9 +648,22 @@ function cardHTML(s,rank){
 }
 
 // ── Drawer ──
-let curTk=null, curData=null, dwLoaded={};
+let curTk=null, curData=null, dwLoaded={}, _dwTimer=null, _dwPrice=null;
+async function refreshDwPrice(){
+  const tk=curTk; if(!tk)return;
+  const d=await J('/api/stock/'+tk);
+  if(curTk!==tk||!d||d.__err||d.current_price==null)return;
+  const num=$('#dw-px-num'); if(!num)return;
+  const nw=+d.current_price, old=_dwPrice;
+  num.textContent=fx(nw,d.currency);
+  if(old!=null&&Math.abs(nw-old)>1e-9){const dir=nw>old?'flash-up':'flash-down';
+    num.classList.remove('flash-up','flash-down');void num.offsetWidth;num.classList.add(dir);}
+  const chg=$('#dw-px .pos,#dw-px .neg');
+  if(chg&&d.day_change_pct!=null){chg.textContent=fp(d.day_change_pct);chg.className=(d.day_change_pct>=0?'pos':'neg');chg.style.fontSize='.92rem';}
+  _dwPrice=nw; curData=d;
+}
 async function openStock(tk){
-  curTk=tk; dwLoaded={};
+  curTk=tk; dwLoaded={}; _dwPrice=null; if(_dwTimer)clearInterval(_dwTimer);
   $('#scrim').classList.add('open'); $('#drawer').classList.add('open');
   $('#dw-tk').textContent=tk; $('#dw-nm').textContent='Caricamento…'; $('#dw-px').textContent='…';
   $$('.dw-tab').forEach((t,i)=>t.classList.toggle('on',i===0)); $('#dw-tabs').dataset.cur='sintesi';
@@ -645,9 +673,11 @@ async function openStock(tk){
   $('#dw-nm').textContent=curData.name||tk;
   $('#dw-px').innerHTML=`<span class="dw-px-num" id="dw-px-num">${fx(curData.current_price,curData.currency)}</span> <span class="${(curData.day_change_pct??0)>=0?'pos':'neg'}" style="font-size:.92rem">${fp(curData.day_change_pct)}</span>`;
   countUp($('#dw-px-num'),curData.current_price,curData.currency);
+  _dwPrice=curData.current_price!=null?+curData.current_price:null;
+  _dwTimer=setInterval(refreshDwPrice,15000);
   if($('#dw-tabs').dataset.cur==='sintesi')renderSintesi();
 }
-function closeDrawer(){$('#scrim').classList.remove('open');$('#drawer').classList.remove('open');}
+function closeDrawer(){$('#scrim').classList.remove('open');$('#drawer').classList.remove('open');if(_dwTimer){clearInterval(_dwTimer);_dwTimer=null;}}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
 $('#dw-tabs').addEventListener('click',e=>{const b=e.target.closest('.dw-tab');if(!b)return;
   $$('.dw-tab').forEach(x=>x.classList.toggle('on',x===b));setDwTab(b.dataset.t);});
