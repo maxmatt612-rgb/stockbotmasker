@@ -2510,7 +2510,7 @@ async def api_forecast(ticker: str):
 
 @app.get("/api/market/indices")
 async def api_indices():
-    """S&P500, NASDAQ, DOW, VIX, DAX, FTSE MIB, Nikkei, Hang Seng, BTC, Gold, Oil — cache 60s."""
+    """S&P500, NASDAQ, FTSE MIB, BTC, Gold, Oil — cache 60s."""
     key = "market:indices"
     if (c := _cached(key, 60)) is not None:
         return c
@@ -2521,16 +2521,8 @@ async def api_indices():
             # USA
             "SP500":  ("^GSPC",   "S&P 500"),
             "NASDAQ": ("^IXIC",   "NASDAQ"),
-            "DOW":    ("^DJI",    "DOW"),
-            "VIX":    ("^VIX",    "VIX"),
             # Europa
-            "DAX":    ("^GDAXI",  "DAX"),
             "MIB":    ("FTSEMIB.MI", "FTSE MIB"),
-            "CAC":    ("^FCHI",   "CAC 40"),
-            # Asia
-            "NIKKEI": ("^N225",   "Nikkei 225"),
-            "HSI":    ("^HSI",    "Hang Seng"),
-            "STI":    ("^STI",    "Singapore"),
             # Commodities / Crypto
             "BTC":    ("BTC-USD", "Bitcoin"),
             "GOLD":   ("GC=F",    "Oro"),
