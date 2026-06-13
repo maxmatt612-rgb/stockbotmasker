@@ -36,6 +36,9 @@ header.top{position:sticky;top:0;z-index:50;background:rgba(10,12,15,.9);backdro
 .brand .nm{font-weight:600;font-size:1.06rem;letter-spacing:-.01em}
 .brand .nm span{color:var(--faint);font-weight:400}
 .search{position:relative;margin-left:auto;width:280px;max-width:42vw}
+.langtog{flex:none;font-family:var(--mono);font-size:.74rem;font-weight:600;letter-spacing:.04em;color:var(--dim);
+  background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;transition:.15s}
+.langtog:hover{color:var(--text);border-color:var(--accent);background:var(--surface-3)}
 .search input{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);
   font-family:var(--sans);font-size:.85rem;padding:9px 12px 9px 34px;outline:none;transition:border-color .15s,background .15s}
 .search input:focus{border-color:var(--accent);background:var(--surface-3)}
@@ -289,6 +292,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
       <input id="q" placeholder="Cerca un titolo (AAPL, ENI.MI…)" autocomplete="off" spellcheck="false">
       <div class="search-drop" id="qdrop"></div>
     </div>
+    <button id="langtog" class="langtog" onclick="toggleLang()" title="Lingua / Language">EN</button>
   </div>
 </header>
 <div class="mkbar" id="mkbar"></div>
@@ -507,8 +511,128 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const ccySym=c=>c==='EUR'?'€':c==='GBP'?'£':c==='CHF'?'CHF ':'$';
 const fx=(v,c)=>v==null||isNaN(+v)?'—':ccySym(c)+(+v<1?(+v).toFixed(4):(+v).toFixed(2));
 const fp=v=>v==null||isNaN(+v)?'—':(+v>=0?'+':'')+(+v).toFixed(2)+'%';
-async function J(u,o){try{const r=await fetch(u,o);return await r.json();}catch(e){return{__err:1};}}
+const LANG = localStorage.getItem('masker_lang')==='en' ? 'en' : 'it';
+async function J(u,o){try{ if(LANG==='en'&&u.indexOf('/api/')===0){u+=(u.indexOf('?')>=0?'&':'?')+'lang=en';} const r=await fetch(u,o);return await r.json();}catch(e){return{__err:1};}}
 const esc=s=>(''+(s??'')).replace(/[<>]/g,'');
+
+// ── i18n IT/EN: traduce l'interfaccia fissa; i testi AI arrivano gia' in inglese dal backend (lang=en) ──
+function toggleLang(){ localStorage.setItem('masker_lang', LANG==='en'?'it':'en'); location.reload(); }
+const I18N_EXACT={
+"Principale":"Main","Mercato":"Market","Portafoglio":"Portfolio","Decisioni AI":"AI Decisions",
+"Miglior acquisto":"Best buy","Compro?":"Buy it?","Grafico AI":"AI Chart","Strumenti":"Tools","Mercati":"Markets",
+"Radar VIP":"VIP Radar","Chat AI":"AI Chat",
+"Scanner di mercato":"Market scanner","Le migliori opportunità del momento":"The best opportunities right now",
+"Scansione AI dell'intero mercato con punteggio di qualità, rischio e momentum. Parte quando lo chiedi tu.":"AI scan of the whole market with quality, risk and momentum scores. It starts when you ask.",
+"Analizza ora":"Analyze now","Analisi a richiesta":"On-demand analysis",
+"Il listino non si aggiorna automaticamente. Avvia la scansione per vedere i titoli migliori adesso.":"The list doesn't update automatically. Start the scan to see the best stocks now.",
+"Decisione AI":"AI Decision","Il miglior acquisto adesso":"The best buy right now",
+"L'AI scandaglia il mercato e indica la singola opportunità migliore per il tuo orizzonte.":"The AI scans the market and shows the single best opportunity for your horizon.",
+"Orizzonte d'investimento":"Investment horizon","Breve termine":"Short term","Lungo termine":"Long term",
+"3–6 mesi":"3–6 months","12–24 mesi":"12–24 months","Ottieni il consiglio":"Get the recommendation",
+"Verdetto":"Verdict","Compro o no?":"Buy or not?",
+"Giudizio basato sui dati con zona d'ingresso, stop-loss e catalizzatori.":"Data-based judgment with entry zone, stop-loss and catalysts.",
+"Orizzonte":"Horizon","Analizza":"Analyze",
+"Visione AI":"AI Vision","Analisi del grafico":"Chart analysis",
+"Carica lo screenshot di un grafico: l'AI riconosce pattern e livelli e indica entry, stop-loss e take-profit.":"Upload a chart screenshot: the AI recognizes patterns and levels and gives entry, stop-loss and take-profit.",
+"Clicca, trascina o incolla (Ctrl+V) uno screenshot":"Click, drag or paste (Ctrl+V) a screenshot",
+"PNG / JPG — un grafico con l'asse dei prezzi visibile":"PNG / JPG — a chart with the price axis visible",
+"Analizza il grafico":"Analyze the chart",
+"Quando entrare":"When to enter",
+"L'AI analizza i tecnici e indica quando conviene entrare long e quando short.":"The AI analyzes the technicals and shows when to go long and when to go short.",
+"Analizza il timing":"Analyze the timing",
+"Movimenti di giornata":"Today's moves","Chi sale e chi scende":"Who's up and who's down",
+"I titoli che si muovono di più oggi, per area geografica.":"The stocks moving the most today, by region.",
+"Il punto sui mercati":"Market overview","Sintesi AI della giornata: indici, temi e cosa guardare.":"AI summary of the day: indices, themes and what to watch.",
+"Dichiarazioni di figure pubbliche":"Statements from public figures",
+"Menzioni di titoli da parte di figure influenti, con orario e impatto. Fonte: news finanziarie.":"Stock mentions by influential figures, with time and impact. Source: financial news.",
+"Le tue posizioni":"Your positions",
+"Aggiungi le tue azioni: prezzo, P&L e una valutazione AI. Si salva nel browser.":"Add your stocks: price, P&L and an AI evaluation. Saved in your browser.",
+"Valuta con AI":"Evaluate with AI","+ Aggiungi":"+ Add",
+"Assistente AI":"AI Assistant","Chiedi all'AI":"Ask the AI",
+"Domande su titoli, settori o strategie. L'AI conosce i dati di mercato.":"Questions about stocks, sectors or strategies. The AI knows the market data.",
+"Invia":"Send",
+"Scanner personalizzato":"Custom scanner","Filtra il mercato a modo tuo":"Filter the market your way",
+"Imposta i criteri e trova i titoli che rispettano le tue condizioni.":"Set the criteria and find stocks that match your conditions.",
+"Universo":"Universe","USA — grandi aziende":"US — large caps","USA — tecnologici":"US — tech","Europa":"Europe","Asia":"Asia",
+"Direzione":"Direction","Tutti":"All","In rialzo":"Up","In calo":"Down",
+"Prezzo min":"Min price","Prezzo max":"Max price","Variazione min %":"Min change %","Variazione max %":"Max change %",
+"Capitalizzazione":"Market cap","Tutte":"All","Mega (oltre 200 mld)":"Mega (over 200B)","Grande (10–200 mld)":"Large (10–200B)",
+"Media (2–10 mld)":"Mid (2–10B)","Piccola (sotto 2 mld)":"Small (under 2B)",
+"Solo volume insolito (oltre il doppio della media)":"Only unusual volume (over double the average)","Cerca":"Search",
+"Sintesi":"Summary","Analisi AI":"AI Analysis","Consenso":"Consensus","Dibattito":"Debate",
+"Dati: Yahoo Finance · Intelligenza: Groq (Llama · GPT-OSS · Qwen)":"Data: Yahoo Finance · Intelligence: Groq (Llama · GPT-OSS · Qwen)",
+"Solo a scopo informativo. Non è consulenza finanziaria.":"For informational purposes only. Not financial advice.",
+"Oro":"Gold","Petrolio":"Oil","Mercati non disponibili":"Markets unavailable","Aperto":"Open","Chiuso":"Closed",
+"Rischio":"Risk","Volatilità":"Volatility","Settimana":"Week","Mese":"Month","52w min":"52w low","52w max":"52w high","Settore":"Sector",
+"Strumenti AI":"AI Tools","Analisi completa":"Full analysis","1 modello forte (GPT-OSS 120B) + tutti i dati":"1 strong model (GPT-OSS 120B) + all the data",
+"Consenso 3 AI":"3-AI consensus","Llama · GPT-OSS · Qwen votano":"Llama · GPT-OSS · Qwen vote",
+"Dibattito Toro vs Orso":"Bull vs Bear debate","Due tesi e un giudice decidono":"Two theses and a judge decide",
+"Caricamento…":"Loading…","Caricamento dati…":"Loading data…","Caricamento grafico…":"Loading chart…","Caricamento briefing…":"Loading briefing…",
+"Scansione in corso…":"Scanning…","Grafico non disponibile":"Chart not available",
+"Analisi approfondita in corso…":"In-depth analysis in progress…","Analisi non disponibile.":"Analysis not available.",
+"3 modelli (Meta · OpenAI · Alibaba) stanno valutando…":"3 models (Meta · OpenAI · Alibaba) are evaluating…","Consenso non disponibile.":"Consensus not available.",
+"Toro e Orso discutono… poi il giudice decide.":"Bull and Bear debate… then the judge decides.","Dibattito non disponibile.":"Debate not available.",
+"Verdetto in corso…":"Verdict in progress…","Non disponibile.":"Not available.","Errore di rete.":"Network error.","Errore nella ricerca.":"Search error.",
+"Dati non disponibili.":"Data not available.","Nessun dato.":"No data.","Briefing non disponibile.":"Briefing not available.",
+"Questa immagine non sembra un grafico di prezzo.":"This image doesn't look like a price chart.",
+"Ricerca in corso… (la prima volta può richiedere qualche secondo)":"Searching… (the first time may take a few seconds)",
+"Analisi in corso":"Analysis in progress","Scansione del mercato in corso (~1-2 min). I titoli compariranno qui.":"Scanning the market (~1-2 min). Stocks will appear here.",
+"Nessun titolo trovato":"No stocks found","Prova ad allargare i filtri o cambiare universo.":"Try widening the filters or changing the universe.",
+"Nessuna dichiarazione recente":"No recent statements","Il radar raccoglie menzioni di titoli da figure pubbliche. Riprova più tardi.":"The radar collects stock mentions from public figures. Try again later.",
+"Portafoglio vuoto":"Empty portfolio","Aggiungi le tue posizioni qui sopra.":"Add your positions above.",
+"Investito":"Invested","Valore attuale":"Current value","P&L totale":"Total P&L","Posizioni":"Positions",
+"Valutazione AI del portafoglio…":"AI portfolio evaluation…","Valutazione AI":"AI evaluation","Panoramica":"Overview","Consigli":"Advice",
+"Cos'è":"What it is","Perché":"Why","Rischi":"Risks","Situazione":"Situation","Perché questo":"Why this one","Perché long":"Why long","Perché short":"Why short",
+"Motivo":"Reason","Catalizzatori":"Catalysts","Decisione del giudice":"Judge's decision","Segnali tecnici":"Technical signals","Tesi":"Thesis","Indici":"Indices",
+"Ingresso":"Entry","Obiettivo":"Target","Supporto":"Support","Resistenza":"Resistance","Zona d'ingresso":"Entry zone","Entrare LONG":"Enter LONG","Entrare SHORT":"Enter SHORT",
+"Consenso · 3 modelli":"Consensus · 3 models","Miglior acquisto · lungo termine":"Best buy · long term","Miglior acquisto · breve termine":"Best buy · short term",
+"Verdetto · lungo termine":"Verdict · long term","Verdetto · breve termine":"Verdict · short term",
+"Alternative:":"Alternatives:","Concorrenti:":"Competitors:","Pattern:":"Pattern:","Apri dettaglio completo →":"Open full detail →",
+"apertura":"opening","corpo":"body","chiusura":"closing","conclusione":"conclusion","sintesi":"summary",
+"sta scrivendo…":"typing…","Errore: nessuna risposta.":"Error: no response.","Oggi":"Today"
+};
+const I18N_PHRASES=[
+["NON COMPRARE","DO NOT BUY"],["NON COMPRA","DO NOT BUY"],["non comprare","don't buy"],["COMPRARE","BUY"],["COMPRA","BUY"],
+["ASPETTARE","WAIT"],["ASPETTA","WAIT"],["VENDI","SELL"],
+["Giudice · confidenza","Judge · confidence"],["Confidenza","Confidence"],
+["Toro · compra","Bull · buy"],["Orso · non comprare","Bear · don't buy"],["Toro","Bull"],["Orso","Bear"],["compra","buy"],
+["breve termine","short term"],["lungo termine","long term"],
+["Piano operativo","Trading plan"],["Valutazione AI","AI evaluation"],["Miglior acquisto","Best buy"],
+["non è consulenza finanziaria","not financial advice"],["su dati reali","on real data"],["con ragionamento","with reasoning"],
+["Lettura AI del grafico","AI chart reading"],["prezzi stimati dall'asse","prices estimated from the axis"],
+["agenti AI","AI agents"],["ispirato a","inspired by"],["Sintesi AI","AI summary"],["dati Yahoo Finance","Yahoo Finance data"],
+["il timing è una stima","timing is an estimate"],["Analisi tecnica","Technical analysis"],["Analisi AI","AI analysis"],["Analisi","Analysis"],
+["Migliori","Best"],["Peggiori","Worst"],
+["apertura","opening"],["chiusura","closing"],["chiude","closes"],["apre","opens"],
+["Valutazione di ","Evaluating "],["Analisi del timing di ","Timing analysis of "],
+["titoli trovati","stocks found"],["n/d","n/a"]
+];
+function _trText(v){
+  const k=v.trim(); if(!k) return v;
+  const ex=I18N_EXACT[k]; if(ex!=null) return v.replace(k,ex);
+  let out=v;
+  for(let p=0;p<I18N_PHRASES.length;p++){const it=I18N_PHRASES[p][0]; if(out.indexOf(it)>=0) out=out.split(it).join(I18N_PHRASES[p][1]);}
+  return out;
+}
+function _trEl(el){
+  if(el.nodeType===3){const nv=_trText(el.nodeValue); if(nv!==el.nodeValue)el.nodeValue=nv; return;}
+  if(el.nodeType!==1) return;
+  if(el.id==='langtog') return;
+  const wk=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,null);
+  const arr=[];let n;while(n=wk.nextNode())arr.push(n);
+  arr.forEach(t=>{const nv=_trText(t.nodeValue); if(nv!==t.nodeValue)t.nodeValue=nv;});
+  const ph=el.querySelectorAll?el.querySelectorAll('[placeholder]'):[];
+  ph.forEach(i=>{let pv=i.getAttribute('placeholder')||''; const k=pv.trim();
+    if(I18N_EXACT[k]!=null)pv=pv.replace(k,I18N_EXACT[k]); else{for(const a of I18N_PHRASES){if(pv.indexOf(a[0])>=0)pv=pv.split(a[0]).join(a[1]);}}
+    i.setAttribute('placeholder',pv);});
+}
+function i18nInit(){
+  const b=document.getElementById('langtog'); if(b)b.textContent=LANG==='en'?'IT':'EN';
+  if(LANG!=='en')return;
+  document.documentElement.lang='en';
+  _trEl(document.body);
+  new MutationObserver(ms=>{ms.forEach(m=>m.addedNodes.forEach(nd=>{try{_trEl(nd);}catch(_){}}));}).observe(document.body,{childList:true,subtree:true});
+}
 function countUp(el,to,ccy,dur=650){
   if(!el||to==null||isNaN(+to))return; to=+to;
   const done=()=>{el.textContent=fx(to,ccy);};
@@ -1084,6 +1208,8 @@ async function chatSend(){
   log.insertAdjacentHTML('beforeend',chatMsg('assistant',reply));
   log.scrollTop=log.scrollHeight;
 }
+
+i18nInit();
 </script>
 </body>
 </html>
