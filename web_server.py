@@ -147,10 +147,12 @@ if groq_client is not None:
             if _lang() == "en":
                 msgs = kwargs.get("messages")
                 if isinstance(msgs, list) and msgs:
-                    directive = ("\n\nIMPORTANT: Write all explanatory / free-form text in fluent, natural ENGLISH "
-                                 "(not Italian). BUT keep any fixed verdict keywords, field labels or structured "
-                                 "tokens required by the format above EXACTLY as written in the instructions "
-                                 "(e.g. COMPRA, ASPETTA, NON COMPRARE, VERDETTO, LONG, SHORT) — do not translate those tokens.")
+                    directive = ("\n\nCRITICAL LANGUAGE OVERRIDE: Ignore any earlier instruction to write in Italian. "
+                                 "Write ALL explanatory / free-form / prose text in fluent, natural ENGLISH (never Italian). "
+                                 "BUT keep any fixed verdict keywords, section labels or structured tokens required by the "
+                                 "format above EXACTLY as written in the instructions — do NOT translate those tokens "
+                                 "(e.g. COMPRA, ASPETTA, NON COMPRARE, VENDI, VERDETTO, ACCUMULA, MANTIENI, EVITA, LONG, SHORT, "
+                                 "TITOLO, APERTURA, MACRO, CRYPTO, COMMODITIES, OUTLOOK, MOOD, BULL, BEAR, NEUTRO).")
                     injected = False
                     for msg in msgs:
                         if isinstance(msg, dict) and msg.get("role") == "system":
@@ -4516,23 +4518,41 @@ async def api_briefing():
     import datetime
     today = datetime.date.today().strftime("%d %B %Y")
 
-    prompt = (
-        f"Dati di mercato di oggi {today}:\n{market_str}\n\n"
-        "Scrivi un briefing di mercato professionale in italiano. Formato ESATTO:\n"
-        "TITOLO: [titolo breve e incisivo del giorno]\n"
-        "APERTURA: [2-3 frasi sul sentiment generale dei mercati]\n"
-        "MACRO: [1-2 frasi su trend macroeconomici rilevanti dal contesto]\n"
-        "CRYPTO: [1-2 frasi su BTC e crypto]\n"
-        "COMMODITIES: [1-2 frasi su oro e petrolio]\n"
-        "OUTLOOK: [1-2 frasi di outlook per le prossime ore]\n"
-        "MOOD: BULL oppure BEAR oppure NEUTRO\n"
-    )
+    if _lang() == "en":
+        sys_msg = ("You are a senior market analyst writing daily briefings for investors. "
+                   "Professional but direct tone. Write in fluent English.")
+        prompt = (
+            f"Today's market data {today}:\n{market_str}\n\n"
+            "Write a professional market briefing in ENGLISH. Use this EXACT format and keep the "
+            "uppercase labels EXACTLY as written below (do NOT translate the labels themselves):\n"
+            "TITOLO: [short, punchy headline for the day]\n"
+            "APERTURA: [2-3 sentences on the overall market sentiment]\n"
+            "MACRO: [1-2 sentences on relevant macroeconomic trends]\n"
+            "CRYPTO: [1-2 sentences on BTC and crypto]\n"
+            "COMMODITIES: [1-2 sentences on gold and oil]\n"
+            "OUTLOOK: [1-2 sentences of outlook for the next hours]\n"
+            "MOOD: BULL or BEAR or NEUTRO\n"
+        )
+    else:
+        sys_msg = ("Sei un analista di mercato senior che scrive briefing quotidiani per investitori italiani. "
+                   "Tono professionale ma diretto. Scrivi in italiano.")
+        prompt = (
+            f"Dati di mercato di oggi {today}:\n{market_str}\n\n"
+            "Scrivi un briefing di mercato professionale in italiano. Formato ESATTO:\n"
+            "TITOLO: [titolo breve e incisivo del giorno]\n"
+            "APERTURA: [2-3 frasi sul sentiment generale dei mercati]\n"
+            "MACRO: [1-2 frasi su trend macroeconomici rilevanti dal contesto]\n"
+            "CRYPTO: [1-2 frasi su BTC e crypto]\n"
+            "COMMODITIES: [1-2 frasi su oro e petrolio]\n"
+            "OUTLOOK: [1-2 frasi di outlook per le prossime ore]\n"
+            "MOOD: BULL oppure BEAR oppure NEUTRO\n"
+        )
     try:
         resp = await groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             max_tokens=500,
             messages=[
-                {"role": "system", "content": "Sei un analista di mercato senior che scrive briefing quotidiani per investitori italiani. Tono professionale ma diretto. Scrivi in italiano."},
+                {"role": "system", "content": sys_msg},
                 {"role": "user", "content": prompt},
             ],
         )
