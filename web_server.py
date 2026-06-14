@@ -1519,7 +1519,12 @@ async def api_best_buy(horizon: str = "short"):
 
     cands = [dict(s) for s in pool]
     if horizon == "long":
+        # lungo termine: trend solido + bassa volatilità
         q = [s for s in cands if s.get("uptrend") and (s.get("volatility", 100) or 100) < 70]
+        cands = q or cands
+    else:
+        # breve termine (3-6 mesi): privilegia titoli in trend rialzista (no scatti isolati)
+        q = [s for s in cands if s.get("uptrend")]
         cands = q or cands
     cands.sort(key=lambda s: (s.get("score", 0) or 0), reverse=True)
     pick = cands[0]
@@ -1529,14 +1534,14 @@ async def api_best_buy(horizon: str = "short"):
     reasoning = ""
     if groq_client:
         try:
-            oriz = "breve termine (3-6 mesi)" if horizon == "short" else "lungo termine (12-24 mesi)"
+            oriz = "3-6 mesi" if horizon == "short" else "12-24 mesi"
             prompt = (
-                f"Tra i titoli analizzati oggi, il migliore per {oriz} è {pick['ticker']} "
+                f"Tra i titoli analizzati oggi, il migliore per un orizzonte di {oriz} è {pick['ticker']} "
                 f"(prezzo ${pick.get('current_price',0):.2f}, score {pick.get('score_10','?')}/10, "
                 f"RSI {pick.get('rsi',50):.0f}, trend {'rialzista' if pick.get('uptrend') else 'misto'}, "
                 f"mese {(pick.get('month_return') or 0):+.0f}%).\n"
-                "Spiega in 2-3 frasi PERCHÉ è la migliore opportunità di acquisto adesso per questo orizzonte. "
-                "Italiano, diretto, concreto. Niente disclaimer."
+                f"Spiega in 2-3 frasi PERCHÉ ha il miglior potenziale di crescita nei prossimi {oriz} "
+                "(non solo nei prossimi giorni). Italiano, diretto, concreto. Niente disclaimer."
             )
             r = await groq_client.chat.completions.create(
                 model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="low",
@@ -1574,18 +1579,24 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
         return JSONResponse({"error": "Ticker non trovato"}, status_code=404)
     data = _clean(data)
 
-    # Zona d'ingresso + stop da supporto/resistenza
+    # Storico sull'ORIZZONTE: supporto/resistenza + trend e posizione nel range
     def _levels():
         import yfinance as yf
         try:
-            h = yf.Ticker(t).history(period="3mo")
+            per = "6mo" if horizon == "short" else "2y"
+            h = yf.Ticker(t).history(period=per)
             if h.empty:
-                return None, None
+                return None, None, None, None
             recent = h.tail(40)
-            return float(recent["Low"].min()), float(recent["High"].max())
+            sup = float(recent["Low"].min()); res = float(recent["High"].max())
+            closes = h["Close"].dropna()
+            hor_ret = (float(closes.iloc[-1]) / float(closes.iloc[0]) - 1) * 100 if len(closes) > 1 else None
+            lo = float(closes.min()); hi = float(closes.max())
+            pos = (float(closes.iloc[-1]) - lo) / (hi - lo) * 100 if hi > lo else None
+            return sup, res, hor_ret, pos
         except Exception:
-            return None, None
-    support, resistance = await asyncio.to_thread(_levels)
+            return None, None, None, None
+    support, resistance, hor_ret, pos_range = await asyncio.to_thread(_levels)
     cur = data.get("current_price", 0) or 0
     ccy = data.get("currency", "USD")
     sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
@@ -1604,21 +1615,32 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
     verdict, conf, reasoning = "ASPETTA", 60, ""
     if groq_client:
         try:
-            oriz = "breve termine (3-6 mesi)" if horizon == "short" else "lungo termine (12-24 mesi)"
+            oriz = "3-6 mesi" if horizon == "short" else "12-24 mesi"
+            win = "6 mesi" if horizon == "short" else "2 anni"
+            extra = ""
+            if hor_ret is not None:
+                extra += f"Rendimento ultimi {win}: {hor_ret:+.0f}%. "
+            if pos_range is not None:
+                extra += f"Posizione nel range {win}: {pos_range:.0f}% (0=minimo, 100=massimo). "
             prompt = (
-                f"Devo comprare {t} ({data.get('name',t)}) per {oriz}?\n"
+                f"Valuta se comprare {t} ({data.get('name',t)}) con un orizzonte di {oriz}. "
+                f"Giudica il POTENZIALE di crescita su {oriz}, NON i prossimi giorni.\n"
                 f"Prezzo {sym}{cur:.2f}, RSI {data.get('rsi',50):.0f}, rischio {data.get('risk_level','N/D')}, "
-                f"settimana {(data.get('week_return') or 0):+.1f}%, mese {(data.get('month_return') or 0):+.1f}%, "
+                f"mese {(data.get('month_return') or 0):+.1f}%, "
                 f"supporto {sym}{(support or 0):.2f}, resistenza {sym}{(resistance or 0):.2f}, "
                 f"sentiment {data.get('news_sentiment_label','N/D')}, earnings {data.get('next_earnings_str','N/D')}.\n"
+                f"{extra}\n"
+                "SII DECISO. Se il quadro favorisce un rialzo nell'orizzonte indicato → VERDETTO COMPRA. "
+                "Se è chiaramente sfavorevole → NON COMPRARE. Usa ASPETTA SOLO se i dati sono davvero in equilibrio, "
+                "NON come scappatoia prudente.\n"
                 "Rispondi SOLO in questo formato:\n"
                 "VERDETTO: COMPRA oppure ASPETTA oppure NON COMPRARE\n"
                 "CONFIDENZA: [50-95]\n"
-                "MOTIVO: [2 frasi concrete sul perché]\n"
+                "MOTIVO: [2 frasi concrete riferite all'orizzonte indicato]\n"
             )
             r = await groq_client.chat.completions.create(
-                model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="low",
-                messages=[{"role": "system", "content": "Trader che dà verdetti netti compra/aspetta/non comprare. Italiano, diretto."},
+                model="openai/gpt-oss-120b", max_tokens=1400, reasoning_effort="medium",
+                messages=[{"role": "system", "content": "Sei un trader deciso: dai verdetti netti (COMPRA/ASPETTA/NON COMPRARE) sull'orizzonte richiesto, valutando il potenziale di crescita su quell'arco temporale. Non rispondere ASPETTA per eccesso di prudenza: scegli una direzione quando i dati la suggeriscono. Italiano, diretto."},
                           {"role": "user", "content": prompt}])
             txt = r.choices[0].message.content.strip()
             for line in txt.split("\n"):
