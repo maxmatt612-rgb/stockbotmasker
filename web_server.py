@@ -1915,7 +1915,7 @@ async def api_deep_report(ticker: str):
     Cache 4h. Generato dall'AI sui dati reali del titolo."""
     t = ticker.upper()
     key = f"deepreport:{t}:{_lang()}"
-    if (c := _cached(key, 14400)) is not None:
+    if (c := _cached(key, 0)) is not None:  # analisi sempre fresca (no cache)
         return c
     if not groq_client:
         return JSONResponse({"error": "AI non disponibile"}, status_code=503)
