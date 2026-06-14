@@ -1020,22 +1020,21 @@ async function loadChart(tf){
 const vcls=v=>{const u=(v||'').toUpperCase();return u.includes('NON')?'v-no':(u.includes('COMPRA')||u.includes('BUY')?'v-yes':'v-wait');};
 const vico=v=>{const c=vcls(v);return c==='v-yes'?'▲':c==='v-no'?'▼':'■';};
 
-function aiToolsHTML(){return `<div class="flab">Strumenti AI</div>
+function aiToolsHTML(){return `<div class="flab" style="margin-top:20px">Strumenti AI</div>
     <button class="aibtn" onclick="goTab('ai')"><span class="bdg">AI</span><span><span class="t">Analisi completa</span><div class="s">1 modello forte (GPT-OSS 120B) + tutti i dati</div></span><span class="ar">↻</span></button>
     <button class="aibtn" onclick="goTab('consenso')"><span class="bdg">×3</span><span><span class="t">Consenso 3 AI</span><div class="s">Llama · GPT-OSS · Qwen votano</div></span><span class="ar">→</span></button>
-    <button class="aibtn" onclick="goTab('dibattito')"><span class="bdg">⚖</span><span><span class="t">Dibattito Toro vs Orso</span><div class="s">Due tesi e un giudice decidono</div></span><span class="ar">→</span></button>
-    <div style="height:14px"></div>`;}
+    <button class="aibtn" onclick="goTab('dibattito')"><span class="bdg">⚖</span><span><span class="t">Dibattito Toro vs Orso</span><div class="s">Due tesi e un giudice decidono</div></span><span class="ar">→</span></button>`;}
 async function loadDeep(){
-  const b=$('#dw-body');b.innerHTML=aiToolsHTML()+'<div class="lline">Analisi approfondita in corso…</div>';
-  const d=await J('/api/stock/'+curTk+'/deep');if(d.__err||d.error){b.innerHTML=aiToolsHTML()+'<div class="lline">Analisi non disponibile.</div>';return;}
-  b.innerHTML=aiToolsHTML()+`<div class="res" style="max-width:none">
+  const b=$('#dw-body');b.innerHTML='<div class="lline">Analisi approfondita in corso…</div>';
+  const d=await J('/api/stock/'+curTk+'/deep');if(d.__err||d.error){b.innerHTML='<div class="lline">Analisi non disponibile.</div>'+aiToolsHTML();return;}
+  b.innerHTML=`<div class="res" style="max-width:none">
     <div class="verdict ${vcls(d.verdetto)}">${vico(d.verdetto)} ${esc(d.verdetto||'ASPETTA')}<small>Confidenza ${d.confidenza??'—'}%</small></div>
     <div class="prose"><div class="h">Cos'è</div>${esc(d.descrizione)}</div>
     <div class="prose"><div class="h">Perché</div>${esc(d.perche)}</div>
     <div class="prose"><div class="h">Rischi</div>${esc(d.rischi)}</div>
     ${d.notizie?`<div class="prose"><div class="h">Situazione</div>${esc(d.notizie)}</div>`:''}
     ${(d.concorrenti_tickers||[]).length?`<div class="chips"><span style="font-size:.7rem;color:var(--dim)">Concorrenti:</span>${d.concorrenti_tickers.map(c=>`<span class="chip" onclick="openStock('${c}')">${esc(c)}</span>`).join('')}</div>`:''}
-    <div class="fnote">GPT-OSS 120B con ragionamento · su dati reali · non è consulenza finanziaria</div></div>`;
+    <div class="fnote">GPT-OSS 120B con ragionamento · su dati reali · non è consulenza finanziaria</div></div>`+aiToolsHTML();
 }
 async function loadCons(){
   const b=$('#dw-body');b.innerHTML='<div class="lline">3 modelli (Meta · OpenAI · Alibaba) stanno valutando…</div>';
