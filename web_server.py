@@ -2330,7 +2330,10 @@ async def api_deep_analysis(ticker: str):
         f"- Prossimi earnings: {data.get('next_earnings_str', 'N/D')} | Sentiment news: {data.get('news_sentiment_label', 'N/D')}\n"
         f"- Notizie recenti:\n{news_str}\n\n"
         "Ragiona sui dati (trend tecnico + momentum + fondamentali + rischio), poi rispondi SOLO in questo "
-        "formato ESATTO, in ITALIANO, concreto e SPECIFICO (cita i numeri reali sopra):\n"
+        "formato ESATTO, in ITALIANO, concreto e SPECIFICO (cita i numeri reali sopra).\n"
+        "SUL VERDETTO SII DECISO: se il quadro complessivo è favorevole all'acquisto (potenziale di crescita) "
+        "→ COMPRA; se è chiaramente negativo → VENDI. Usa ASPETTA SOLO se i dati sono davvero contrastanti, "
+        "MAI come risposta prudente di default. Privilegia una direzione chiara.\n"
         "DESCRIZIONE: [cosa fa l'azienda in 1-2 frasi]\n"
         "VERDETTO: COMPRA oppure VENDI oppure ASPETTA\n"
         "CONFIDENZA: [numero intero 50-95]\n"
@@ -2345,7 +2348,7 @@ async def api_deep_analysis(ticker: str):
             max_tokens=1800,
             reasoning_effort="medium",
             messages=[
-                {"role": "system", "content": "Sei un analista finanziario senior di Wall Street: esamini TUTTI i dati tecnici e fondamentali forniti e dai un verdetto netto, motivato e specifico, in italiano. Conosci bene i concorrenti delle aziende quotate. Niente giri di parole."},
+                {"role": "system", "content": "Sei un analista finanziario senior di Wall Street: esamini TUTTI i dati tecnici e fondamentali forniti e dai un verdetto NETTO e deciso (preferisci COMPRA o VENDI; ASPETTA solo se davvero contrastante), motivato e specifico, in italiano. Conosci bene i concorrenti delle aziende quotate. Niente giri di parole, niente prudenza eccessiva."},
                 {"role": "user", "content": prompt},
             ],
         )
