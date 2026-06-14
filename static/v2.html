@@ -780,15 +780,16 @@ function renderMkBar(){
 renderMkBar();
 setInterval(renderMkBar,30000);
 
-// tape (indici: oggetto {KEY:{price,chg,label}} oppure array) — aggiornamento live + lampeggio
+// tape (indici: oggetto {KEY:{price,chg,label}} oppure array) — aggiornamento live + lampeggio + click
 let _tapePrev={}, _tapeBuilt=false;
+const _TAPE_TK={SP500:'^GSPC',NASDAQ:'^IXIC',BTC:'BTC-USD',GOLD:'GC=F',OIL:'CL=F'};
 const _tkey=i=>i.label||i.name||i.symbol||'';
-function _tapeHTML(i){const k=esc(_tkey(i)),ch=i.chg??i.change_pct??0,cl=ch>=0?'pos':'neg';
-  return `<span class="tape-item"><b>${k}</b><span class="tpx" data-k="${k}">${(+i.price).toFixed(2)}</span> <span class="tchg ${cl}" data-k="${k}">${fp(ch)}</span></span>`;}
+function _tapeHTML(i){const k=esc(_tkey(i)),ch=i.chg??i.change_pct??0,cl=ch>=0?'pos':'neg',tk=i._tk||'';
+  return `<span class="tape-item"${tk?` style="cursor:pointer" onclick="openStock('${esc(tk)}')"`:''}><b>${k}</b><span class="tpx" data-k="${k}">${(+i.price).toFixed(2)}</span> <span class="tchg ${cl}" data-k="${k}">${fp(ch)}</span></span>`;}
 async function loadTape(){
   const d=await J('/api/market/indices');
   let arr=[];
-  if(Array.isArray(d))arr=d; else if(d&&typeof d==='object'&&!d.__err)arr=Object.values(d);
+  if(Array.isArray(d))arr=d; else if(d&&typeof d==='object'&&!d.__err)arr=Object.entries(d).map(([k,v])=>({...v,_tk:_TAPE_TK[k]||''}));
   arr=arr.filter(i=>i&&i.price!=null);
   if(!arr.length){if(!_tapeBuilt)$('#tape').innerHTML='<span class="tape-item" style="padding-left:24px;color:var(--faint)">Mercati non disponibili</span>';return;}
   if(!_tapeBuilt){const html=arr.map(_tapeHTML).join('');$('#tape').innerHTML=html+html;_tapeBuilt=true;
@@ -902,11 +903,7 @@ function renderSintesi(){
       ${st('Beta',d.beta!=null?(+d.beta).toFixed(2):'—')}
       ${st('Settore',d.sector||'—')}
       ${st('Earnings',d.next_earnings_str||'—')}
-    </div>
-    <div class="flab">Strumenti AI</div>
-    <button class="aibtn" onclick="goTab('ai')"><span class="bdg">AI</span><span><span class="t">Analisi completa</span><div class="s">1 modello forte (GPT-OSS 120B) + tutti i dati</div></span><span class="ar">→</span></button>
-    <button class="aibtn" onclick="goTab('consenso')"><span class="bdg">×3</span><span><span class="t">Consenso 3 AI</span><div class="s">Llama · GPT-OSS · Qwen votano</div></span><span class="ar">→</span></button>
-    <button class="aibtn" onclick="goTab('dibattito')"><span class="bdg">⚖</span><span><span class="t">Dibattito Toro vs Orso</span><div class="s">Due tesi e un giudice decidono</div></span><span class="ar">→</span></button>`;
+    </div>`;
   loadChart(chartTF);
 }
 // ── Grafico prezzi (SVG, nessuna libreria) ──
@@ -1023,10 +1020,15 @@ async function loadChart(tf){
 const vcls=v=>{const u=(v||'').toUpperCase();return u.includes('NON')?'v-no':(u.includes('COMPRA')||u.includes('BUY')?'v-yes':'v-wait');};
 const vico=v=>{const c=vcls(v);return c==='v-yes'?'▲':c==='v-no'?'▼':'■';};
 
+function aiToolsHTML(){return `<div class="flab">Strumenti AI</div>
+    <button class="aibtn" onclick="goTab('ai')"><span class="bdg">AI</span><span><span class="t">Analisi completa</span><div class="s">1 modello forte (GPT-OSS 120B) + tutti i dati</div></span><span class="ar">↻</span></button>
+    <button class="aibtn" onclick="goTab('consenso')"><span class="bdg">×3</span><span><span class="t">Consenso 3 AI</span><div class="s">Llama · GPT-OSS · Qwen votano</div></span><span class="ar">→</span></button>
+    <button class="aibtn" onclick="goTab('dibattito')"><span class="bdg">⚖</span><span><span class="t">Dibattito Toro vs Orso</span><div class="s">Due tesi e un giudice decidono</div></span><span class="ar">→</span></button>
+    <div style="height:14px"></div>`;}
 async function loadDeep(){
-  const b=$('#dw-body');b.innerHTML='<div class="lline">Analisi approfondita in corso…</div>';
-  const d=await J('/api/stock/'+curTk+'/deep');if(d.__err||d.error){b.innerHTML='<div class="lline">Analisi non disponibile.</div>';return;}
-  b.innerHTML=`<div class="res" style="max-width:none">
+  const b=$('#dw-body');b.innerHTML=aiToolsHTML()+'<div class="lline">Analisi approfondita in corso…</div>';
+  const d=await J('/api/stock/'+curTk+'/deep');if(d.__err||d.error){b.innerHTML=aiToolsHTML()+'<div class="lline">Analisi non disponibile.</div>';return;}
+  b.innerHTML=aiToolsHTML()+`<div class="res" style="max-width:none">
     <div class="verdict ${vcls(d.verdetto)}">${vico(d.verdetto)} ${esc(d.verdetto||'ASPETTA')}<small>Confidenza ${d.confidenza??'—'}%</small></div>
     <div class="prose"><div class="h">Cos'è</div>${esc(d.descrizione)}</div>
     <div class="prose"><div class="h">Perché</div>${esc(d.perche)}</div>
