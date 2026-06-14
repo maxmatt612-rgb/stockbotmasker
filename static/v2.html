@@ -284,6 +284,19 @@ select.inp option{background:var(--surface-2);color:var(--text)}
 .ind-chip{font-family:var(--mono);font-size:.72rem;color:var(--dim);padding:4px 10px;border-radius:6px;border:1px solid transparent;cursor:pointer;transition:.15s}
 .ind-chip:hover{color:var(--text);background:var(--surface-2)}
 .ind-chip.on{color:var(--accent);background:var(--accent-soft);border-color:rgba(76,135,245,.3)}
+/* Dashboard home */
+.dash-head{margin-bottom:18px}
+.dash-head h2{font-size:1.6rem;font-weight:700;margin-top:2px}
+.dash-head p{color:var(--dim);font-size:.86rem;margin-top:4px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.kpi{background:var(--surface);padding:15px 17px;animation:fadeUp .5s cubic-bezier(.2,.85,.3,1) both}
+.kpi .l{font-size:.7rem;color:var(--dim);font-weight:600;letter-spacing:.02em}
+.kpi .v{font-family:var(--mono);font-size:1.45rem;font-weight:600;margin:7px 0 3px;letter-spacing:-.01em}
+.kpi .b{font-size:.76rem;font-weight:600;font-family:var(--mono)}
+.card2{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:15px 18px 12px}
+.dash-chart-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.dash-chart-hd .dmi{display:flex;gap:6px;align-items:baseline}
+.dmi-px{font-family:var(--mono);font-size:1.05rem;font-weight:600}
 
 .drop{border:1px dashed var(--border-2);border-radius:9px;background:var(--surface-2);cursor:pointer;transition:.15s;overflow:hidden}
 .drop:hover,.drop.drag{border-color:var(--accent);background:var(--surface-3)}
@@ -339,7 +352,20 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
 <main class="wrap">
 
   <section data-view="market">
-    <div class="lead">
+    <div class="dash-head">
+      <div class="eyebrow">Panoramica</div>
+      <h2 id="dash-greet">Buongiorno</h2>
+      <p id="dash-sub">Ecco come si muovono i mercati in questo momento.</p>
+    </div>
+    <div class="kpi-grid" id="kpi-grid"><div class="lline" style="padding:30px 0">Caricamento mercati…</div></div>
+    <div class="card2" style="margin-top:16px">
+      <div class="dash-chart-hd">
+        <div class="flab" style="margin:0">Andamento · <span id="dmi-name">S&amp;P 500</span></div>
+        <div class="chart-tf" id="dash-tf" style="margin:0"></div>
+      </div>
+      <div id="dash-chart-box"><div class="lline" style="padding:34px 0">Caricamento grafico…</div></div>
+    </div>
+    <div class="lead" style="margin-top:24px">
       <div>
         <div class="eyebrow">Scanner di mercato</div>
         <h2>Le migliori opportunità del momento</h2>
@@ -660,7 +686,9 @@ const I18N_EXACT={
 "Periodo":"Period","1 anno":"1 year","2 anni":"2 years","5 anni":"5 years","Esegui backtest":"Run backtest","Backtest in corso…":"Backtest in progress…",
 "Dati storici insufficienti per questo ticker.":"Not enough historical data for this ticker.","Compra e tieni":"Buy & hold","Operazioni":"Trades","Max perdita":"Max loss","Vincitore":"Winner",
 "Medie SMA":"SMA","Caricamento andamento…":"Loading trend…","Valore del portafoglio · ultimi 6 mesi":"Portfolio value · last 6 months",
-"Simulazione su prezzi storici reali · esclude commissioni e dividendi · i risultati passati non garantiscono quelli futuri":"Simulation on real historical prices · excludes fees and dividends · past results don't guarantee future ones"
+"Simulazione su prezzi storici reali · esclude commissioni e dividendi · i risultati passati non garantiscono quelli futuri":"Simulation on real historical prices · excludes fees and dividends · past results don't guarantee future ones",
+"Buongiorno":"Good morning","Buon pomeriggio":"Good afternoon","Buonasera":"Good evening",
+"Ecco come si muovono i mercati in questo momento.":"Here's how the markets are moving right now.","Caricamento mercati…":"Loading markets…"
 };
 const I18N_PHRASES=[
 ["NON COMPRARE","DO NOT BUY"],["NON COMPRA","DO NOT BUY"],["non comprare","don't buy"],["COMPRARE","BUY"],["COMPRA","BUY"],
@@ -678,6 +706,7 @@ const I18N_PHRASES=[
 ["apertura","opening"],["chiusura","closing"],["chiude","closes"],["apre","opens"],
 ["Valutazione di ","Evaluating "],["Analisi del timing di ","Timing analysis of "],
 ["Incrocio medie 50/200","MA cross 50/200"],["1 anno","1 year"],["2 anni","2 years"],["5 anni","5 years"],
+["Andamento","Trend"],
 ["titoli trovati","stocks found"],["n/d","n/a"]
 ];
 function _trText(v){
@@ -1395,15 +1424,16 @@ async function runBacktest(){
 }
 
 // ── Grafico andamento portafoglio ──
-function pfAreaSVG(vals){
-  const W=560,H=140,pad=6,n=vals.length,mn=Math.min(...vals),mx=Math.max(...vals),rng=(mx-mn)||1;
+function pfAreaSVG(vals,gid,h){
+  gid=gid||'pfg';h=h||140;
+  const W=560,H=h,pad=6,n=vals.length,mn=Math.min(...vals),mx=Math.max(...vals),rng=(mx-mn)||1;
   const X=i=>pad+(i/(n-1))*(W-2*pad),Y=v=>pad+(1-(v-mn)/rng)*(H-2*pad);
   const pts=vals.map((v,i)=>X(i).toFixed(1)+','+Y(v).toFixed(1)).join(' ');
   const up=vals[n-1]>=vals[0],col=up?'#33c281':'#f0635a';
-  return `<div class="chart-card"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:140px;display:block">
-    <defs><linearGradient id="pfg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".22"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
-    <polygon points="${X(0).toFixed(1)},${H} ${pts} ${X(n-1).toFixed(1)},${H}" fill="url(#pfg)"/>
-    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg></div>`;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px;display:block">
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".22"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    <polygon points="${X(0).toFixed(1)},${H} ${pts} ${X(n-1).toFixed(1)},${H}" fill="url(#${gid})"/>
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
 }
 async function pfChartRender(positions){
   const box=$('#pf-chart');if(!box)return;
@@ -1416,8 +1446,40 @@ async function pfChartRender(positions){
   if(dates.length<2){box.innerHTML='';return;}
   const maps=series.map(rows=>{const m={};(rows||[]).forEach(r=>m[r.time]=r.close);return m;});
   const vals=dates.map(dt=>positions.reduce((s,p,i)=>s+(maps[i][dt]||0)*p.qty,0));
-  box.innerHTML=`<div class="flab" style="margin-bottom:8px">Valore del portafoglio · ultimi 6 mesi</div>`+pfAreaSVG(vals);
+  box.innerHTML=`<div class="flab" style="margin-bottom:8px">Valore del portafoglio · ultimi 6 mesi</div><div class="chart-card">`+pfAreaSVG(vals,'pfg')+`</div>`;
 }
+
+// ── Dashboard home (panoramica mercati) ──
+const _DMI={SP500:['^GSPC','S&P 500'],NASDAQ:['^IXIC','NASDAQ'],BTC:['BTC-USD','Bitcoin'],GOLD:['GC=F','Oro'],OIL:['CL=F','Petrolio']};
+let dashTF='3M',dashSym='^GSPC',dashName='S&P 500';
+async function loadDashboard(){
+  const h=new Date().getHours();
+  $('#dash-greet').textContent=h<12?'Buongiorno':h<18?'Buon pomeriggio':'Buonasera';
+  const d=await J('/api/market/indices'),kg=$('#kpi-grid');
+  if(d&&typeof d==='object'&&!d.__err){
+    kg.innerHTML=Object.keys(d).map((k,i)=>{const x=d[k];if(!x)return '';const pos=(x.chg??0)>=0,m=_DMI[k];
+      return `<div class="kpi" style="animation-delay:${(i*0.04).toFixed(2)}s;${m?'cursor:pointer':''}" ${m?`onclick="setDashChart('${k}')"`:''}>
+        <div class="l">${esc(x.label||k)}</div><div class="v">${(+x.price).toFixed(2)}</div>
+        <div class="b ${pos?'pos':'neg'}">${fp(x.chg)}</div></div>`;}).join('');
+  } else kg.innerHTML='<div class="lline" style="padding:24px 0">Mercati non disponibili</div>';
+  $('#dash-tf').innerHTML=['1M','3M','1A'].map(t=>`<button class="ctf ${t===dashTF?'on':''}" data-p="${t}" onclick="setDashTF('${t}')">${t}</button>`).join('');
+  loadDashChart();
+}
+function setDashChart(key){const m=_DMI[key];if(!m)return;dashSym=m[0];dashName=m[1];const el=$('#dmi-name');if(el)el.textContent=m[1];loadDashChart();}
+function setDashTF(t){dashTF=t;$$('#dash-tf .ctf').forEach(b=>b.classList.toggle('on',b.dataset.p===t));loadDashChart();}
+async function loadDashChart(){
+  const box=$('#dash-chart-box');if(!box)return;
+  const sym=dashSym;
+  box.innerHTML='<div class="lline" style="padding:34px 0">Caricamento grafico…</div>';
+  const per={'1M':['1mo','1d'],'3M':['3mo','1d'],'1A':['1y','1d']}[dashTF]||['3mo','1d'];
+  const rows=await J(`/api/stock/${encodeURIComponent(sym)}/ohlc?period=${per[0]}&interval=${per[1]}`);
+  if(dashSym!==sym)return;
+  const b2=$('#dash-chart-box');if(!b2)return;
+  if(!Array.isArray(rows)||rows.length<2){b2.innerHTML='<div class="lline" style="padding:30px 0">Grafico non disponibile</div>';return;}
+  const closes=rows.map(r=>r.close).filter(v=>v!=null);
+  b2.innerHTML=pfAreaSVG(closes,'dfg',170);
+}
+loadDashboard();
 
 i18nInit();
 </script>
