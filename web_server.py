@@ -1505,60 +1505,114 @@ async def api_longterm(ticker: str):
     return data
 
 
+_BESTBUY_UNIVERSE = [
+    "AAPL","MSFT","NVDA","GOOGL","AMZN","META","TSLA","AVGO","AMD","NFLX",
+    "CRM","ORCL","ADBE","QCOM","JPM","V","MA","COST","WMT","HD",
+    "PG","KO","PEP","UNH","LLY","ABBV","XOM","CVX","CAT","GE",
+    "BA","DIS","NKE","MCD","INTC","MU","PLTR","UBER","SHOP","NOW",
+]
+
+
 @app.get("/api/best-buy")
 async def api_best_buy(horizon: str = "short"):
-    """Top Buy: l'AI trova il MIGLIOR acquisto adesso tra i titoli analizzati,
-    in base all'orizzonte (short = momentum/tecnico, long = trend solido+qualità)."""
+    """Miglior acquisto: ricerca LIVE su un universo di titoli, con criteri diversi per
+    orizzonte (breve = momentum 3-6 mesi; lungo = crescita costante 12-24 mesi). Sempre fresca."""
     horizon = "long" if horizon == "long" else "short"
     key = f"bestbuy:{horizon}:{_lang()}"
-    if (c := _cached(key, 1200)) is not None:
+    if (c := _cached(key, 0)) is not None:  # ricerca sempre nuova
         return c
-    pool = ((_cache.get("scan:full") or {}).get("data")) or _morning_data or ((_cache.get("scan:10") or {}).get("data")) or []
-    if not pool:
-        return JSONResponse({"error": "Scansione non ancora pronta — riprova tra poco"}, status_code=202)
 
-    cands = [dict(s) for s in pool]
-    if horizon == "long":
-        # lungo termine: trend solido + bassa volatilità
-        q = [s for s in cands if s.get("uptrend") and (s.get("volatility", 100) or 100) < 70]
-        cands = q or cands
+    period = "6mo" if horizon == "short" else "2y"
+
+    def _scan():
+        import yfinance as yf, pandas as pd, numpy as np
+        try:
+            raw = yf.download(_BESTBUY_UNIVERSE, period=period, interval="1d",
+                              auto_adjust=True, progress=False)
+        except Exception:
+            return []
+        close = raw["Close"] if isinstance(raw.columns, pd.MultiIndex) else None
+        if close is None:
+            return []
+        out = []
+        for t in _BESTBUY_UNIVERSE:
+            if t not in close.columns:
+                continue
+            s = close[t].dropna()
+            if len(s) < 60:
+                continue
+            cur = float(s.iloc[-1]); first = float(s.iloc[0])
+            if first <= 0:
+                continue
+            win_ret = (cur / first - 1) * 100
+            sma50 = float(s.tail(50).mean())
+            mret = (cur / float(s.iloc[-22]) - 1) * 100 if len(s) >= 22 else 0.0
+            rets = s.pct_change().dropna()
+            vol = float(rets.std() * np.sqrt(252) * 100) if len(rets) > 5 else 50.0
+            diff = s.diff().dropna()
+            ru = diff.clip(lower=0).tail(14).mean()
+            rd = (-diff.clip(upper=0)).tail(14).mean()
+            rsi = 100 - 100 / (1 + (ru / rd)) if rd and rd > 0 else 100.0
+            out.append({
+                "ticker": t, "price": round(cur, 2), "win_ret": win_ret, "month_ret": mret,
+                "vol": vol, "rsi": rsi, "sup": float(s.tail(40).min()), "res": float(s.tail(60).max()),
+                "uptrend": cur > sma50,
+            })
+        return out
+
+    cands = await asyncio.to_thread(_scan)
+    cands = [c for c in cands if c["uptrend"] and c["win_ret"] > 0]
+    if not cands:
+        return JSONResponse({"error": "Nessun candidato adatto trovato adesso — riprova"}, status_code=404)
+
+    if horizon == "short":
+        # 3-6 mesi: momentum solido ma non ipercomprato
+        pool2 = [c for c in cands if c["rsi"] < 80] or cands
+        pool2.sort(key=lambda c: c["win_ret"] * 0.5 + c["month_ret"] * 0.5, reverse=True)
+        stop_pct, target_pct = 0.92, 1.18   # -8% / +18%
     else:
-        # breve termine (3-6 mesi): privilegia titoli in trend rialzista (no scatti isolati)
-        q = [s for s in cands if s.get("uptrend")]
-        cands = q or cands
-    cands.sort(key=lambda s: (s.get("score", 0) or 0), reverse=True)
-    pick = cands[0]
-    runners = [{"ticker": s["ticker"], "score_10": s.get("score_10")} for s in cands[1:4]]
+        # 12-24 mesi: crescita COSTANTE → escludi i titoli troppo volatili, premia rendimento/volatilità
+        pool2 = [c for c in cands if c["vol"] < 45] or cands
+        pool2.sort(key=lambda c: c["win_ret"] / max(c["vol"], 1), reverse=True)
+        stop_pct, target_pct = 0.85, 1.40   # -15% / +40%
 
-    ts = pick.get("trade_setup") or {}
+    pick = pool2[0]
+    runners = [{"ticker": c["ticker"], "score_10": None} for c in pool2[1:4]]
+    cur = pick["price"]
+    entry = round(cur, 2)
+    stop = round(cur * stop_pct, 2)
+    target = round(cur * target_pct, 2)
+    score10 = max(1.0, min(10.0, 5 + pick["win_ret"] / 12 - max(0.0, pick["vol"] - 35) / 20))
+
     reasoning = ""
     if groq_client:
         try:
             oriz = "3-6 mesi" if horizon == "short" else "12-24 mesi"
+            win = "6 mesi" if horizon == "short" else "2 anni"
             prompt = (
-                f"Tra i titoli analizzati oggi, il migliore per un orizzonte di {oriz} è {pick['ticker']} "
-                f"(prezzo ${pick.get('current_price',0):.2f}, score {pick.get('score_10','?')}/10, "
-                f"RSI {pick.get('rsi',50):.0f}, trend {'rialzista' if pick.get('uptrend') else 'misto'}, "
-                f"mese {(pick.get('month_return') or 0):+.0f}%).\n"
-                f"Spiega in 2-3 frasi PERCHÉ ha il miglior potenziale di crescita nei prossimi {oriz} "
-                "(non solo nei prossimi giorni). Italiano, diretto, concreto. Niente disclaimer."
+                f"Il miglior titolo da comprare ORA per un orizzonte di {oriz} è {pick['ticker']} "
+                f"(prezzo ${cur:.2f}, rendimento ultimi {win} {pick['win_ret']:+.0f}%, "
+                f"ultimo mese {pick['month_ret']:+.0f}%, RSI {pick['rsi']:.0f}, in trend rialzista sopra la media a 50 giorni).\n"
+                f"Spiega in 2-3 frasi PERCHÉ ha il miglior potenziale di crescita nei prossimi {oriz}. "
+                "Italiano, diretto, concreto. Niente disclaimer."
             )
             r = await groq_client.chat.completions.create(
                 model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="low",
-                messages=[{"role": "system", "content": "Analista che indica la migliore opportunità d'acquisto. Conciso, italiano."},
+                messages=[{"role": "system", "content": "Analista che indica la migliore opportunità d'acquisto sull'orizzonte richiesto. Conciso, italiano."},
                           {"role": "user", "content": prompt}])
             reasoning = r.choices[0].message.content.strip()
         except Exception:
             pass
 
     result = {
-        "horizon": horizon, "ticker": pick["ticker"], "name": pick.get("name", pick["ticker"]),
-        "price": pick.get("current_price"), "currency": pick.get("currency", "USD"),
-        "score_10": pick.get("score_10"), "rsi": pick.get("rsi"),
-        "month_return": pick.get("month_return"), "week_return": pick.get("week_return"),
-        "uptrend": pick.get("uptrend"), "risk_level": pick.get("risk_level"),
-        "entry": ts.get("entry"), "stop": ts.get("stop"), "target": ts.get("target"),
-        "stop_pct": ts.get("stop_pct"), "target_pct": ts.get("target_pct"), "rr": ts.get("rr"),
+        "horizon": horizon, "ticker": pick["ticker"], "name": pick["ticker"],
+        "price": cur, "currency": "USD",
+        "score_10": round(score10, 1), "rsi": round(pick["rsi"]),
+        "month_return": round(pick["month_ret"]), "week_return": None,
+        "uptrend": True, "risk_level": None,
+        "entry": entry, "stop": stop, "target": target,
+        "stop_pct": round((stop / cur - 1) * 100, 1), "target_pct": round((target / cur - 1) * 100, 1),
+        "rr": round((target - cur) / max(cur - stop, 0.01), 1),
         "reasoning": reasoning, "runners_up": runners,
     }
     result = _clean(result)
