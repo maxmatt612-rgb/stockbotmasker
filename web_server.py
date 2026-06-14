@@ -1567,7 +1567,7 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
     t = ticker.upper()
     horizon = "long" if horizon == "long" else "short"
     key = f"shouldbuy:{t}:{horizon}:{_lang()}"
-    if (c := _cached(key, 1200)) is not None:
+    if (c := _cached(key, 0)) is not None:  # analisi sempre fresca (no cache)
         return c
     data = await asyncio.to_thread(get_enriched_analysis, t)
     if not data:
@@ -1684,7 +1684,7 @@ async def api_consensus(ticker: str):
         return JSONResponse({"error": "AI non configurata"}, status_code=503)
     t = ticker.upper()
     key = f"consensus:{t}:{_lang()}"
-    if (c := _cached(key, 1200)) is not None:
+    if (c := _cached(key, 0)) is not None:  # analisi sempre fresca (no cache)
         return c
     data = await asyncio.to_thread(get_enriched_analysis, t)
     if not data:
@@ -1764,7 +1764,7 @@ async def api_debate(ticker: str):
         return JSONResponse({"error": "AI non configurata"}, status_code=503)
     t = ticker.upper()
     key = f"debate:{t}:{_lang()}"
-    if (c := _cached(key, 1800)) is not None:
+    if (c := _cached(key, 0)) is not None:  # analisi sempre fresca (no cache)
         return c
     data = await asyncio.to_thread(get_enriched_analysis, t)
     if not data:
@@ -2143,7 +2143,7 @@ async def api_timing(ticker: str):
     long e quando short (entra ora / aspetta pullback / aspetta conferma). Cache 30 min."""
     t = ticker.upper()
     key = f"timing:{t}:{_lang()}"
-    if (c := _cached(key, 1800)) is not None:
+    if (c := _cached(key, 0)) is not None:  # analisi sempre fresca (no cache)
         return c
 
     data = await asyncio.to_thread(get_enriched_analysis, t)
@@ -2245,7 +2245,7 @@ async def api_deep_analysis(ticker: str):
     concorrenti (con ticker cliccabili) e notizie. Cache 1h."""
     t = ticker.upper()
     key = f"deep:{t}:{_lang()}"
-    if (c := _cached(key, 3600)) is not None:
+    if (c := _cached(key, 0)) is not None:  # analisi sempre fresca (no cache)
         return c
     if not groq_client:
         return JSONResponse({"error": "AI non disponibile"}, status_code=503)
@@ -4383,7 +4383,7 @@ async def api_compare(body: CompareBody):
     if not t1 or not t2 or t1 == t2:
         return JSONResponse({"error": "Servono due ticker diversi"}, status_code=400)
     key = f"compare:{t1}:{t2}:{_lang()}"
-    if (c := _cached(key, 1800)) is not None:
+    if (c := _cached(key, 0)) is not None:  # analisi sempre fresca (no cache)
         return c
 
     if not groq_client:
