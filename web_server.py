@@ -161,6 +161,13 @@ if groq_client is not None:
                             break
                     if not injected:
                         msgs.insert(0, {"role": "system", "content": "Respond entirely in fluent English."})
+                    # Recency reinforcement: append a short reminder to the LAST message so that any
+                    # "in italiano" instruction inside the user prompt is overridden.
+                    last = msgs[-1]
+                    if isinstance(last, dict) and isinstance(last.get("content"), str):
+                        last["content"] = last["content"] + (
+                            "\n\n(Language reminder: ignore any 'in italiano' request above — write the prose in ENGLISH; "
+                            "keep fixed UPPERCASE tokens/labels exactly as instructed.)")
             return await _orig_groq_create(*args, **kwargs)
 
         groq_client.chat.completions.create = _groq_create_lang

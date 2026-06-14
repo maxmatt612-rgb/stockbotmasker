@@ -264,6 +264,26 @@ select.inp option{background:var(--surface-2);color:var(--text)}
 .modrow .nm{font-weight:600;font-size:.84rem}
 .modrow .vd{float:right;font-family:var(--mono);font-weight:600;font-size:.8rem}
 .modrow .rs{clear:both;font-size:.75rem;color:var(--dim);margin-top:3px;line-height:1.45}
+/* Confronto */
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.cmp-col{background:var(--surface);padding:14px 15px}
+.cmp-col.win{background:var(--accent-soft);border-bottom:2px solid var(--accent)}
+.cmp-col h4{font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:6px}
+.cmp-col .cmp-nm{font-size:.72rem;color:var(--dim);margin:2px 0 10px}
+.cmp-col .cmp-pro{font-size:.8rem;line-height:1.45;color:var(--pos);margin-bottom:7px}
+.cmp-col .cmp-con{font-size:.8rem;line-height:1.45;color:var(--neg)}
+.cmp-col .crown{font-size:.7rem;color:var(--accent);font-weight:600}
+/* Backtest / indicatori */
+.bt-stat{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-top:14px}
+.bt-stat .c{background:var(--surface);padding:13px 14px;text-align:center}
+.bt-stat .c .l{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.bt-stat .c .v{font-family:var(--mono);font-size:1.15rem;font-weight:600;margin-top:4px}
+.bt-leg{display:flex;gap:16px;justify-content:center;font-size:.72rem;color:var(--dim);margin-top:8px}
+.bt-leg span{display:inline-flex;align-items:center;gap:6px}
+.bt-leg i{width:14px;height:3px;border-radius:2px;display:inline-block}
+.ind-chip{font-family:var(--mono);font-size:.72rem;color:var(--dim);padding:4px 10px;border-radius:6px;border:1px solid transparent;cursor:pointer;transition:.15s}
+.ind-chip:hover{color:var(--text);background:var(--surface-2)}
+.ind-chip.on{color:var(--accent);background:var(--accent-soft);border-color:rgba(76,135,245,.3)}
 
 .drop{border:1px dashed var(--border-2);border-radius:9px;background:var(--surface-2);cursor:pointer;transition:.15s;overflow:hidden}
 .drop:hover,.drop.drag{border-color:var(--accent);background:var(--surface-3)}
@@ -305,9 +325,11 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
   <div class="side-sec">Decisioni AI</div>
   <button class="tab" data-v="topbuy"><span class="ti">◆</span>Miglior acquisto</button>
   <button class="tab" data-v="shouldbuy"><span class="ti">✓</span>Compro?</button>
+  <button class="tab" data-v="compare"><span class="ti">⇄</span>Confronto</button>
   <button class="tab" data-v="chartai"><span class="ti">◳</span>Grafico AI</button>
   <div class="side-sec">Strumenti</div>
   <button class="tab" data-v="scanner"><span class="ti">⚲</span>Scanner</button>
+  <button class="tab" data-v="backtest"><span class="ti">↻</span>Backtest</button>
   <button class="tab" data-v="movers"><span class="ti">⇅</span>Mercati</button>
   <button class="tab" data-v="briefing"><span class="ti">▦</span>Briefing</button>
   <button class="tab" data-v="radar"><span class="ti">◎</span>Radar VIP</button>
@@ -424,6 +446,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
         <button class="btn" onclick="pfAdd()">+ Aggiungi</button>
       </div>
     </div>
+    <div id="pf-chart" style="margin-top:18px"></div>
     <div id="pf-sum" style="margin-top:18px"></div>
     <div id="pf-grid" class="grid"></div>
     <div id="pf-ai" style="margin-top:18px"></div>
@@ -476,6 +499,42 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
       <button class="btn" style="margin-top:18px;width:100%" onclick="runScanner()">Cerca</button>
     </div>
     <div id="sc-res" style="margin-top:18px"></div>
+  </section>
+
+  <section data-view="compare" hidden>
+    <div class="lead"><div><div class="eyebrow">Confronto AI</div><h2>Quale azione è meglio?</h2>
+      <p>Metti due titoli a confronto: l'AI analizza i fondamentali e indica il vincitore.</p></div></div>
+    <div class="panel">
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center">
+        <input class="inp" id="cmp-a" placeholder="Es. AAPL" autocapitalize="characters" spellcheck="false">
+        <span style="color:var(--dim);font-weight:600">vs</span>
+        <input class="inp" id="cmp-b" placeholder="Es. MSFT" autocapitalize="characters" spellcheck="false">
+      </div>
+      <button class="btn" style="margin-top:16px;width:100%" onclick="runCompare()">Confronta</button>
+    </div>
+    <div id="cmp-res" style="margin-top:18px"></div>
+  </section>
+
+  <section data-view="backtest" hidden>
+    <div class="lead"><div><div class="eyebrow">Backtest</div><h2>Quanto avrebbe reso una strategia</h2>
+      <p>Simula una strategia su dati storici reali e confrontala con il semplice "compra e tieni".</p></div></div>
+    <div class="panel">
+      <div class="flab">Ticker</div>
+      <input class="inp" id="bt-tk" placeholder="Es. NVDA" autocapitalize="characters" spellcheck="false">
+      <div class="flab" style="margin-top:16px">Strategia</div>
+      <select class="inp" id="bt-strat">
+        <option value="sma">Incrocio medie (SMA 50/200)</option>
+        <option value="rsi">RSI (compra sotto 30, vendi sopra 70)</option>
+      </select>
+      <div class="flab" style="margin-top:16px">Periodo</div>
+      <div class="tf-row" id="bt-per" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="tf on" data-p="1y"><b>1 anno</b></div>
+        <div class="tf" data-p="2y"><b>2 anni</b></div>
+        <div class="tf" data-p="5y"><b>5 anni</b></div>
+      </div>
+      <button class="btn" style="margin-top:18px;width:100%" onclick="runBacktest()">Esegui backtest</button>
+    </div>
+    <div id="bt-res" style="margin-top:18px"></div>
   </section>
 
 
@@ -591,7 +650,17 @@ const I18N_EXACT={
 "apertura":"opening","corpo":"body","chiusura":"closing","conclusione":"conclusion","sintesi":"summary",
 "sta scrivendo…":"typing…","Errore: nessuna risposta.":"Error: no response.","Oggi":"Today",
 "Cerca un titolo (AAPL, ENI.MI…)":"Search a stock (AAPL, ENI.MI…)","Es. TSLA":"e.g. TSLA","Es. NVDA":"e.g. NVDA",
-"Prezzo acquisto":"Buy price","Quantità":"Quantity","Scrivi una domanda…":"Type a question…","nessuno":"none","nessuna":"none"
+"Prezzo acquisto":"Buy price","Quantità":"Quantity","Scrivi una domanda…":"Type a question…","nessuno":"none","nessuna":"none",
+"Confronto":"Compare","Confronto AI":"AI Comparison","Quale azione è meglio?":"Which stock is better?",
+"Metti due titoli a confronto: l'AI analizza i fondamentali e indica il vincitore.":"Compare two stocks: the AI analyzes the fundamentals and picks the winner.",
+"Confronta":"Compare","Confronto AI in corso…":"AI comparison in progress…","Inserisci due ticker diversi.":"Enter two different tickers.","Confronto non disponibile":"Comparison not available",
+"Quanto avrebbe reso una strategia":"How a strategy would have performed",
+"Simula una strategia su dati storici reali e confrontala con il semplice \"compra e tieni\".":"Simulate a strategy on real historical data and compare it to simple buy & hold.",
+"Strategia":"Strategy","Incrocio medie (SMA 50/200)":"Moving-average cross (SMA 50/200)","RSI (compra sotto 30, vendi sopra 70)":"RSI (buy below 30, sell above 70)",
+"Periodo":"Period","1 anno":"1 year","2 anni":"2 years","5 anni":"5 years","Esegui backtest":"Run backtest","Backtest in corso…":"Backtest in progress…",
+"Dati storici insufficienti per questo ticker.":"Not enough historical data for this ticker.","Compra e tieni":"Buy & hold","Operazioni":"Trades","Max perdita":"Max loss","Vincitore":"Winner",
+"Medie SMA":"SMA","Caricamento andamento…":"Loading trend…","Valore del portafoglio · ultimi 6 mesi":"Portfolio value · last 6 months",
+"Simulazione su prezzi storici reali · esclude commissioni e dividendi · i risultati passati non garantiscono quelli futuri":"Simulation on real historical prices · excludes fees and dividends · past results don't guarantee future ones"
 };
 const I18N_PHRASES=[
 ["NON COMPRARE","DO NOT BUY"],["NON COMPRA","DO NOT BUY"],["non comprare","don't buy"],["COMPRARE","BUY"],["COMPRA","BUY"],
@@ -608,6 +677,7 @@ const I18N_PHRASES=[
 ["Migliori","Best"],["Peggiori","Worst"],
 ["apertura","opening"],["chiusura","closing"],["chiude","closes"],["apre","opens"],
 ["Valutazione di ","Evaluating "],["Analisi del timing di ","Timing analysis of "],
+["Incrocio medie 50/200","MA cross 50/200"],["1 anno","1 year"],["2 anni","2 years"],["5 anni","5 years"],
 ["titoli trovati","stocks found"],["n/d","n/a"]
 ];
 function _trText(v){
@@ -828,6 +898,10 @@ function renderSintesi(){
         </span>
         <span style="display:flex;gap:4px">${['1S','1M','3M','1A'].map(t=>`<button class="ctf ${t===chartTF?'on':''}" data-p="${t}" onclick="loadChart('${t}')">${t}</button>`).join('')}</span>
       </div>
+      <div class="chart-tf" id="dw-chart-ind" style="justify-content:flex-start;margin-top:4px">
+        <span class="ind-chip ${_ind.sma?'on':''}" data-ind="sma" onclick="toggleInd('sma')">Medie SMA</span>
+        <span class="ind-chip ${_ind.rsi?'on':''}" data-ind="rsi" onclick="toggleInd('rsi')">RSI</span>
+      </div>
     </div>
     <div class="stat-grid">
       ${st('Score',d.score_10!=null?(+d.score_10).toFixed(1)+' / 10':'—')}
@@ -871,13 +945,60 @@ function svgCandles(rows,ccy){
   <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:.66rem;color:var(--faint);padding:2px 2px 0">
     <span>min ${ccySym(ccy)}${mn.toFixed(2)}</span><span>max ${ccySym(ccy)}${mx.toFixed(2)}</span></div>`;
 }
+// indicatori tecnici (SMA, RSI)
+let _ind={sma:false,rsi:false};
+function smaArr(vals,n){const out=Array(vals.length).fill(null);let s=0;for(let i=0;i<vals.length;i++){s+=vals[i];if(i>=n)s-=vals[i-n];if(i>=n-1)out[i]=s/n;}return out;}
+function rsiArr(vals,p){p=p||14;const out=Array(vals.length).fill(null);if(vals.length<=p)return out;let g=0,l=0;
+  for(let i=1;i<=p;i++){const d=vals[i]-vals[i-1];if(d>=0)g+=d;else l-=d;}g/=p;l/=p;out[p]=100-100/(1+(l===0?100:g/l));
+  for(let i=p+1;i<vals.length;i++){const d=vals[i]-vals[i-1],up=d>0?d:0,dn=d<0?-d:0;g=(g*(p-1)+up)/p;l=(l*(p-1)+dn)/p;out[i]=100-100/(1+(l===0?100:g/l));}return out;}
+function toggleInd(k){_ind[k]=!_ind[k];renderChart();}
+function buildChart(rows,ccy){
+  rows=(rows||[]).filter(r=>r&&r.close!=null);
+  if(rows.length<2)return '<div class="lline" style="padding:30px 0">Grafico non disponibile</div>';
+  const closes=rows.map(r=>r.close),W=560,Hp=150,pad=5,n=rows.length;
+  let lo,hi;
+  if(chartType==='candle'){lo=Math.min(...rows.map(r=>r.low!=null?r.low:r.close));hi=Math.max(...rows.map(r=>r.high!=null?r.high:r.close));}
+  else{lo=Math.min(...closes);hi=Math.max(...closes);}
+  let s20=null,s50=null;
+  if(_ind.sma){s20=smaArr(closes,20);s50=smaArr(closes,50);[s20,s50].forEach(a=>a.forEach(v=>{if(v!=null){if(v<lo)lo=v;if(v>hi)hi=v;}}));}
+  const rng=(hi-lo)||1, X=i=>pad+(i/(n-1))*(W-2*pad), Y=v=>pad+(1-(v-lo)/rng)*(Hp-2*pad);
+  let body='';
+  if(chartType==='candle'){
+    const slot=(W-2*pad)/n,bw=Math.max(1.2,Math.min(slot*0.66,9));
+    rows.forEach((r,i)=>{const cx=pad+slot*(i+0.5),up=r.close>=r.open,col=up?'#33c281':'#f0635a';
+      const yH=Y(r.high),yL=Y(r.low),yO=Y(r.open),yC=Y(r.close),top=Math.min(yO,yC),h=Math.max(0.8,Math.abs(yC-yO));
+      body+=`<line x1="${cx.toFixed(1)}" y1="${yH.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${yL.toFixed(1)}" stroke="${col}" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+      body+=`<rect x="${(cx-bw/2).toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${col}" rx=".4"/>`;});
+  }else{
+    const up=closes[n-1]>=closes[0],col=up?'#33c281':'#f0635a';
+    const pts=closes.map((v,i)=>X(i).toFixed(1)+','+Y(v).toFixed(1)).join(' ');
+    body=`<defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".22"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+      <polygon points="${X(0).toFixed(1)},${Hp} ${pts} ${X(n-1).toFixed(1)},${Hp}" fill="url(#cg)"/>
+      <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+  }
+  const smaLine=(arr,col)=>{const pts=arr.map((v,i)=>v==null?null:X(i).toFixed(1)+','+Y(v).toFixed(1)).filter(Boolean).join(' ');return pts?`<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.3" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`:'';};
+  let overlay=_ind.sma?(smaLine(s20,'#5ac8fa')+smaLine(s50,'#ffb454')):'';
+  let out=`<svg viewBox="0 0 ${W} ${Hp}" preserveAspectRatio="none" style="width:100%;height:150px;display:block">${body}${overlay}</svg>
+  <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:.66rem;color:var(--faint);padding:2px 2px 0">
+    <span>min ${ccySym(ccy)}${lo.toFixed(2)}</span>${_ind.sma?'<span style="color:#5ac8fa">SMA20</span><span style="color:#ffb454">SMA50</span>':''}<span>max ${ccySym(ccy)}${hi.toFixed(2)}</span></div>`;
+  if(_ind.rsi){
+    const rs=rsiArr(closes,14),Hr=54,Yr=v=>4+(1-v/100)*(Hr-8);
+    const pts=rs.map((v,i)=>v==null?null:X(i).toFixed(1)+','+Yr(v).toFixed(1)).filter(Boolean).join(' ');
+    out+=`<div style="font-size:.6rem;color:var(--faint);font-family:var(--mono);margin-top:6px">RSI (14)</div>
+    <svg viewBox="0 0 ${W} ${Hr}" preserveAspectRatio="none" style="width:100%;height:54px;display:block">
+      <line x1="0" y1="${Yr(70).toFixed(1)}" x2="${W}" y2="${Yr(70).toFixed(1)}" stroke="#f0635a" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" opacity=".5"/>
+      <line x1="0" y1="${Yr(30).toFixed(1)}" x2="${W}" y2="${Yr(30).toFixed(1)}" stroke="#33c281" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" opacity=".5"/>
+      <polyline points="${pts}" fill="none" stroke="#a78bfa" stroke-width="1.4" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+  }
+  return out;
+}
 function renderChart(){
   const box=$('#dw-chart');if(!box)return;
   $$('#dw-chart-tf .ctf[data-ct]').forEach(b=>b.classList.toggle('on',b.dataset.ct===chartType));
+  $$('#dw-chart-ind .ind-chip').forEach(b=>b.classList.toggle('on',!!_ind[b.dataset.ind]));
   const ccy=(curData&&curData.currency)||'USD';
   if(!Array.isArray(_chartRows)||_chartRows.length<2){box.innerHTML='<div class="lline" style="padding:30px 0">Grafico non disponibile</div>';return;}
-  box.innerHTML = chartType==='candle' ? svgCandles(_chartRows,ccy)
-    : svgArea(_chartRows.map(x=>x.close).filter(v=>v!=null),ccy);
+  box.innerHTML=buildChart(_chartRows,ccy);
 }
 function setChartType(t){
   chartType=t;
@@ -1150,7 +1271,7 @@ function pfAdd(){
 function pfDel(i){const a=pf();a.splice(i,1);pfSave(a);pfRender();}
 async function pfRender(){
   const a=pf(),g=$('#pf-grid'),sum=$('#pf-sum');$('#pf-ai').innerHTML='';
-  if(!a.length){sum.innerHTML='';g.innerHTML='<div class="empty"><span class="ic">○</span><h3>Portafoglio vuoto</h3><p>Aggiungi le tue posizioni qui sopra.</p></div>';return;}
+  if(!a.length){sum.innerHTML='';$('#pf-chart').innerHTML='';g.innerHTML='<div class="empty"><span class="ic">○</span><h3>Portafoglio vuoto</h3><p>Aggiungi le tue posizioni qui sopra.</p></div>';return;}
   g.innerHTML=Array(a.length).fill('<div class="skel"></div>').join('');
   const q=await J('/api/batch_quotes?tickers='+a.map(p=>p.ticker).join(','));
   let inv=0,val=0;
@@ -1172,6 +1293,7 @@ async function pfRender(){
     <div class="cell ${totPl>=0?'g':'r'}"><div class="l">P&L totale</div><div class="v">${totPl>=0?'+':''}${totPl.toFixed(2)} (${fp(totPlp)})</div></div>
     ${cell('Posizioni',a.length)}</div>`;
   g.innerHTML=cards;
+  pfChartRender(a);
 }
 async function pfEval(){
   const a=pf();if(!a.length){alert('Aggiungi prima delle posizioni.');return;}
@@ -1210,6 +1332,91 @@ async function chatSend(){
   chatHist.push({role:'assistant',content:reply});
   log.insertAdjacentHTML('beforeend',chatMsg('assistant',reply));
   log.scrollTop=log.scrollHeight;
+}
+
+// ── Confronto ──
+$('#cmp-a').addEventListener('keydown',e=>{if(e.key==='Enter')runCompare();});
+$('#cmp-b').addEventListener('keydown',e=>{if(e.key==='Enter')runCompare();});
+async function runCompare(){
+  const a=($('#cmp-a').value||'').trim().toUpperCase(),b=($('#cmp-b').value||'').trim().toUpperCase(),r=$('#cmp-res');
+  if(!a||!b||a===b){r.innerHTML='<div class="lline">Inserisci due ticker diversi.</div>';return;}
+  r.innerHTML='<div class="lline">Confronto AI in corso…</div>';
+  const d=await J('/api/compare',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker1:a,ticker2:b})});
+  if(d.__err||d.error){r.innerHTML=`<div class="lline">${esc((d&&d.error)||'Confronto non disponibile')}</div>`;return;}
+  const win=(d.vincitore||'').toUpperCase();
+  const col=(tk,nm,pro,con)=>`<div class="cmp-col ${win===(tk||'').toUpperCase()?'win':''}"><h4>${esc(tk)} ${win===(tk||'').toUpperCase()?'🏆':''}</h4><div class="cmp-nm">${esc((nm||'').slice(0,30))}</div>
+    <div class="cmp-pro">✓ ${esc(pro||'—')}</div><div class="cmp-con">✗ ${esc(con||'—')}</div></div>`;
+  r.innerHTML=`<div class="res" style="max-width:none">
+    <div class="cmp-grid">${col(d.ticker1,d.name1,d.pro1,d.contro1)}${col(d.ticker2,d.name2,d.pro2,d.contro2)}</div>
+    <div class="verdict v-yes" style="margin-top:14px">🏆 ${esc(d.vincitore)}<small>Confidenza ${d.confidenza??'—'}%</small></div>
+    ${d.motivo?`<div class="prose"><div class="h">Perché</div>${esc(d.motivo)}</div>`:''}
+    <div class="chips"><button class="chip" onclick="openStock('${esc(d.ticker1)}')">${esc(d.ticker1)} →</button><button class="chip" onclick="openStock('${esc(d.ticker2)}')">${esc(d.ticker2)} →</button></div>
+    <div class="fnote">Analisi AI · non è consulenza finanziaria</div></div>`;
+}
+
+// ── Backtest ──
+let btPer='1y';
+$('#bt-per').addEventListener('click',e=>{const t=e.target.closest('.tf');if(!t)return;btPer=t.dataset.p;$$('#bt-per .tf').forEach(x=>x.classList.toggle('on',x===t));});
+$('#bt-tk').addEventListener('keydown',e=>{if(e.key==='Enter')runBacktest();});
+function btEquitySVG(a,b){
+  const W=560,H=160,pad=6,n=a.length,all=a.concat(b),mn=Math.min(...all),mx=Math.max(...all),rng=(mx-mn)||1;
+  const X=i=>pad+(i/(n-1))*(W-2*pad),Y=v=>pad+(1-(v-mn)/rng)*(H-2*pad);
+  const line=(arr,col,w)=>`<polyline points="${arr.map((v,i)=>X(i).toFixed(1)+','+Y(v).toFixed(1)).join(' ')}" fill="none" stroke="${col}" stroke-width="${w}" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
+  return `<div class="chart-card"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:160px;display:block">${line(b,'#6b7280',1.2)}${line(a,'#4c87f5',1.8)}</svg></div>`;
+}
+async function runBacktest(){
+  const tk=($('#bt-tk').value||'').trim().toUpperCase(),r=$('#bt-res');
+  if(!tk){$('#bt-tk').focus();return;}
+  r.innerHTML='<div class="lline">Backtest in corso…</div>';
+  const rows=await J(`/api/stock/${tk}/ohlc?period=${btPer}&interval=1d`);
+  if(!Array.isArray(rows)||rows.length<60){r.innerHTML='<div class="lline">Dati storici insufficienti per questo ticker.</div>';return;}
+  const closes=rows.map(x=>x.close),strat=$('#bt-strat').value,inMkt=Array(closes.length).fill(0);
+  if(strat==='sma'){const f=smaArr(closes,50),s=smaArr(closes,200);for(let i=0;i<closes.length;i++)inMkt[i]=(f[i]!=null&&s[i]!=null&&f[i]>s[i])?1:0;}
+  else{const rs=rsiArr(closes,14);let pos=0;for(let i=0;i<closes.length;i++){if(rs[i]!=null){if(rs[i]<30)pos=1;else if(rs[i]>70)pos=0;}inMkt[i]=pos;}}
+  let eqS=[100],eqB=[100],trades=0,prev=0;
+  for(let i=1;i<closes.length;i++){const ret=closes[i]/closes[i-1]-1;eqB.push(eqB[i-1]*(1+ret));const sig=inMkt[i-1];eqS.push(eqS[i-1]*(1+(sig?ret:0)));if(sig!==prev){trades++;prev=sig;}}
+  const retS=eqS[eqS.length-1]-100,retB=eqB[eqB.length-1]-100;
+  let peak=eqS[0],dd=0;eqS.forEach(v=>{if(v>peak)peak=v;const x=(v-peak)/peak*100;if(x<dd)dd=x;});
+  const pl=btPer==='1y'?'1 anno':btPer==='2y'?'2 anni':'5 anni';
+  r.innerHTML=`<div class="res" style="max-width:none">
+    <div class="res-kick">${esc(tk)} · ${strat==='sma'?'Incrocio medie 50/200':'RSI 14'} · ${pl}</div>
+    ${btEquitySVG(eqS,eqB)}
+    <div class="bt-leg"><span><i style="background:#4c87f5"></i>Strategia</span><span><i style="background:#6b7280"></i>Compra e tieni</span></div>
+    <div class="bt-stat">
+      <div class="c"><div class="l">Strategia</div><div class="v ${retS>=0?'pos':'neg'}">${retS>=0?'+':''}${retS.toFixed(1)}%</div></div>
+      <div class="c"><div class="l">Compra e tieni</div><div class="v ${retB>=0?'pos':'neg'}">${retB>=0?'+':''}${retB.toFixed(1)}%</div></div>
+      <div class="c"><div class="l">Operazioni</div><div class="v">${trades}</div></div>
+    </div>
+    <div class="bt-stat" style="grid-template-columns:1fr 1fr">
+      <div class="c"><div class="l">Max perdita</div><div class="v neg">${dd.toFixed(1)}%</div></div>
+      <div class="c"><div class="l">Vincitore</div><div class="v ${retS>=retB?'pos':'neg'}">${retS>=retB?'Strategia':'Compra e tieni'}</div></div>
+    </div>
+    <div class="fnote">Simulazione su prezzi storici reali · esclude commissioni e dividendi · i risultati passati non garantiscono quelli futuri</div></div>`;
+}
+
+// ── Grafico andamento portafoglio ──
+function pfAreaSVG(vals){
+  const W=560,H=140,pad=6,n=vals.length,mn=Math.min(...vals),mx=Math.max(...vals),rng=(mx-mn)||1;
+  const X=i=>pad+(i/(n-1))*(W-2*pad),Y=v=>pad+(1-(v-mn)/rng)*(H-2*pad);
+  const pts=vals.map((v,i)=>X(i).toFixed(1)+','+Y(v).toFixed(1)).join(' ');
+  const up=vals[n-1]>=vals[0],col=up?'#33c281':'#f0635a';
+  return `<div class="chart-card"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:140px;display:block">
+    <defs><linearGradient id="pfg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".22"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    <polygon points="${X(0).toFixed(1)},${H} ${pts} ${X(n-1).toFixed(1)},${H}" fill="url(#pfg)"/>
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg></div>`;
+}
+async function pfChartRender(positions){
+  const box=$('#pf-chart');if(!box)return;
+  if(!positions.length){box.innerHTML='';return;}
+  box.innerHTML='<div class="lline" style="padding:20px 0">Caricamento andamento…</div>';
+  const series=await Promise.all(positions.map(p=>J(`/api/stock/${p.ticker}/ohlc?period=6mo&interval=1d`)));
+  let common=null;
+  series.forEach(rows=>{if(!Array.isArray(rows))return;const set=new Set(rows.map(r=>r.time));common=common?new Set([...common].filter(x=>set.has(x))):set;});
+  const dates=[...(common||[])].sort();
+  if(dates.length<2){box.innerHTML='';return;}
+  const maps=series.map(rows=>{const m={};(rows||[]).forEach(r=>m[r.time]=r.close);return m;});
+  const vals=dates.map(dt=>positions.reduce((s,p,i)=>s+(maps[i][dt]||0)*p.qty,0));
+  box.innerHTML=`<div class="flab" style="margin-bottom:8px">Valore del portafoglio · ultimi 6 mesi</div>`+pfAreaSVG(vals);
 }
 
 i18nInit();
