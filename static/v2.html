@@ -908,11 +908,12 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
 $('#dw-tabs').addEventListener('click',e=>{const b=e.target.closest('.dw-tab');if(!b)return;
   $$('.dw-tab').forEach(x=>x.classList.toggle('on',x===b));setDwTab(b.dataset.t);});
 function setDwTab(t){$('#dw-tabs').dataset.cur=t;
+  // ogni click rilancia l'analisi in tempo reale (nessuna cache lato pagina)
   if(t==='sintesi')return renderSintesi();
-  if(t==='ai'){if(dwLoaded.ai)return;dwLoaded.ai=1;loadDeep();}
-  if(t==='consenso'){if(dwLoaded.cons)return;dwLoaded.cons=1;loadCons();}
-  if(t==='dibattito'){if(dwLoaded.deb)return;dwLoaded.deb=1;loadDebate();}
-  if(t==='compro'){if(dwLoaded.cmp)return;dwLoaded.cmp=1;loadCompro();}
+  if(t==='ai')loadDeep();
+  if(t==='consenso')loadCons();
+  if(t==='dibattito')loadDebate();
+  if(t==='compro')loadCompro();
 }
 function goTab(t){const b=$$('.dw-tab').find(x=>x.dataset.t===t);if(b){$$('.dw-tab').forEach(x=>x.classList.toggle('on',x===b));setDwTab(t);}}
 function renderSintesi(){
