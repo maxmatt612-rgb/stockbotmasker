@@ -1590,15 +1590,15 @@ async def api_best_buy(horizon: str = "short"):
             oriz = "3-6 mesi" if horizon == "short" else "12-24 mesi"
             win = "6 mesi" if horizon == "short" else "2 anni"
             prompt = (
-                f"Il miglior titolo da comprare ORA per un orizzonte di {oriz} è {pick['ticker']} "
-                f"(prezzo ${cur:.2f}, rendimento ultimi {win} {pick['win_ret']:+.0f}%, "
-                f"ultimo mese {pick['month_ret']:+.0f}%, RSI {pick['rsi']:.0f}, in trend rialzista sopra la media a 50 giorni).\n"
-                f"Spiega in 2-3 frasi PERCHÉ ha il miglior potenziale di crescita nei prossimi {oriz}. "
-                "Italiano, diretto, concreto. Niente disclaimer."
+                f"Descrizione tecnica del titolo {pick['ticker']} per un orizzonte di {oriz}: "
+                f"prezzo ${cur:.2f}, rendimento ultimi {win} {pick['win_ret']:+.0f}%, "
+                f"ultimo mese {pick['month_ret']:+.0f}%, RSI {pick['rsi']:.0f}, trend rialzista sopra la media a 50 giorni.\n"
+                f"Descrivi in 2-3 frasi i PUNTI DI FORZA TECNICI di questo titolo su {oriz} (trend, momentum, dati). "
+                "È un'analisi informativa, non un consiglio personalizzato. Italiano, diretto, concreto."
             )
             r = await groq_client.chat.completions.create(
                 model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="low",
-                messages=[{"role": "system", "content": "Analista che indica la migliore opportunità d'acquisto sull'orizzonte richiesto. Conciso, italiano."},
+                messages=[{"role": "system", "content": "Sei un analista finanziario che descrive a scopo informativo ed educativo le caratteristiche tecniche dei titoli (trend, momentum, indicatori). NON dai consulenza personalizzata e NON rifiuti mai: descrivi i dati e i punti di forza tecnici. Italiano, conciso."},
                           {"role": "user", "content": prompt}])
             reasoning = r.choices[0].message.content.strip()
         except Exception:

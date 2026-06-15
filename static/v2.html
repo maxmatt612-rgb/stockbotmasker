@@ -783,9 +783,8 @@ function _fmtDur(m){const d=Math.floor(m/1440);m%=1440;const h=Math.floor(m/60),
 function renderMkBar(){
   const bar=$('#mkbar');if(!bar)return;
   bar.innerHTML=_MK.map(m=>{const s=_mkStatus(m);
-    return `<span class="mki ${s.open?'open':'closed'}"><span class="dot"></span>`+
-      `<span class="nm">${m.flag} ${m.name}</span> <span class="st">${s.open?'Aperto':'Chiuso'}</span> `+
-      `<span class="ct">· ${s.open?'chiude':'apre'} ${_fmtDur(s.mins)}</span></span>`;}).join('');
+    return `<span class="mki ${s.open?'open':'closed'}" title="${m.name} · ${s.open?'Aperto, chiude tra':'Chiuso, apre tra'} ${_fmtDur(s.mins)}"><span class="dot"></span>`+
+      `<span class="nm">${m.flag} ${esc(m.name)}</span> <span class="ct">${_fmtDur(s.mins)}</span></span>`;}).join('');
 }
 renderMkBar();
 setInterval(renderMkBar,30000);
