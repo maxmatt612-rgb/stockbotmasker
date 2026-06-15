@@ -32,10 +32,10 @@ button{font-family:inherit;cursor:pointer;color:inherit;background:none;border:n
 header.top{position:sticky;top:0;z-index:50;background:rgba(10,12,15,.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
 .top-in{max-width:1200px;margin:0 auto;padding:0 24px;height:60px;display:flex;align-items:center;gap:22px}
 .brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.brand .mk{width:30px;height:30px;border-radius:8px;display:block}
+.brand .mk{width:44px;height:44px;border-radius:10px;display:block}
 .brand .nm{font-weight:600;font-size:1.06rem;letter-spacing:-.01em}
 .brand .nm span{color:var(--faint);font-weight:400}
-.search{position:relative;margin-left:auto;width:280px;max-width:42vw}
+.search{position:relative;width:280px;max-width:42vw;flex-shrink:0}
 .langtog{flex:none;font-family:var(--mono);font-size:.74rem;font-weight:600;letter-spacing:.04em;color:var(--dim);
   background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;transition:.15s}
 .langtog:hover{color:var(--text);border-color:var(--accent);background:var(--surface-3)}
@@ -151,8 +151,7 @@ select.inp option{background:var(--surface-2);color:var(--text)}
 .sc-check{display:flex;align-items:center;gap:9px;margin-top:16px;cursor:pointer;font-size:.85rem;color:var(--text)}
 .sc-check input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
 /* ── Barra orari mercati (sopra la tape) ── */
-.mkbar{display:flex;gap:22px;align-items:center;justify-content:center;flex-wrap:wrap;
-  padding:6px 16px;background:var(--surface);border-bottom:1px solid var(--border);font-size:.72rem}
+.mkbar{flex:1;min-width:0;display:flex;gap:20px;align-items:center;justify-content:center;font-size:.72rem;overflow:hidden}
 .mkbar .mki{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .mkbar .mki .dot{width:7px;height:7px;border-radius:50%;flex:none}
 .mkbar .mki.open .dot{background:#33c281;animation:glow2 1.8s ease-in-out infinite}
@@ -191,8 +190,6 @@ select.inp option{background:var(--surface-2);color:var(--text)}
 @keyframes fadeUp{from{opacity:0;transform:translateY(13px)}to{opacity:1;transform:none}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes pop{0%{opacity:0;transform:scale(.94)}60%{transform:scale(1.015)}100%{opacity:1;transform:scale(1)}}
-@keyframes glow{0%,100%{box-shadow:0 2px 10px rgba(76,135,245,.30)}50%{box-shadow:0 2px 18px rgba(76,135,245,.55)}}
-.brand .mk{animation:glow 3.4s ease-in-out infinite}
 .lead{animation:fadeUp .55s cubic-bezier(.2,.85,.3,1) both}
 .panel{animation:fadeUp .5s cubic-bezier(.2,.85,.3,1) both .05s}
 .grid .card{animation:fadeUp .5s cubic-bezier(.2,.85,.3,1) both}
@@ -318,6 +315,7 @@ select.inp option{background:var(--surface-2);color:var(--text)}
 
 footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-size:.68rem;line-height:1.7;border-top:1px solid var(--border);margin-top:24px}
 
+@media(max-width:920px){ .mkbar{display:none} }
 @media(max-width:680px){
   .lead h2{font-size:1.25rem}
   .cells,.stat-grid,.deb{grid-template-columns:1fr}
@@ -332,6 +330,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
 <header class="top">
   <div class="top-in">
     <div class="brand"><img class="mk" src="/icon.svg" alt="Masker"><div class="nm">Masker <span>· Intelligence</span></div></div>
+    <div class="mkbar" id="mkbar"></div>
     <div class="search">
       <span class="si">⌕</span>
       <input id="q" placeholder="Cerca un titolo (AAPL, ENI.MI…)" autocomplete="off" spellcheck="false">
@@ -340,7 +339,6 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
     <button id="langtog" class="langtog" onclick="toggleLang()" title="Lingua / Language">EN</button>
   </div>
 </header>
-<div class="mkbar" id="mkbar"></div>
 <div class="tape"><div class="tape-track" id="tape"></div></div>
 <aside class="side" id="nav">
   <div class="side-sec">Principale</div>
