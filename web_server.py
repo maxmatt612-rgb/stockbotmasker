@@ -1505,6 +1505,52 @@ async def api_longterm(ticker: str):
     return data
 
 
+@app.get("/api/stock/{ticker}/peers")
+async def api_peers(ticker: str):
+    """Concorrenti quotati del titolo (ticker cliccabili). Cache 24h (i concorrenti sono stabili)."""
+    t = ticker.upper()
+    key = f"peers:{t}"
+    if (c := _cached(key, 86400)) is not None:
+        return c
+    if not groq_client:
+        return {"ticker": t, "peers": []}
+
+    def _info():
+        import yfinance as yf
+        try:
+            info = yf.Ticker(t).info or {}
+            return (info.get("shortName") or info.get("longName") or t,
+                    info.get("sector", ""), info.get("industry", ""))
+        except Exception:
+            return t, "", ""
+
+    name, sector, industry = await asyncio.to_thread(_info)
+    peers = []
+    try:
+        prompt = (
+            f"Elenca da 4 a 6 principali aziende CONCORRENTI quotate in borsa di {name} "
+            f"(settore {sector or 'N/D'}, industria {industry or 'N/D'}). "
+            "Rispondi SOLO con i loro ticker di borsa in MAIUSCOLO separati da virgola, nient'altro. "
+            f"NON includere {t}."
+        )
+        r = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile", max_tokens=120,
+            messages=[{"role": "system", "content": "Esperto di mercati azionari: conosci i ticker di borsa delle aziende e i loro concorrenti diretti. Rispondi solo con ticker."},
+                      {"role": "user", "content": prompt}])
+        import re
+        seen = []
+        for tok in re.split(r"[,\s]+", r.choices[0].message.content.strip()):
+            tok = tok.strip().upper().strip(".")
+            if tok and tok != t and re.fullmatch(r"[A-Z]{1,6}(\.[A-Z]{1,3})?", tok) and tok not in seen:
+                seen.append(tok)
+        peers = seen[:6]
+    except Exception:
+        pass
+    out = {"ticker": t, "peers": peers}
+    _store(key, out)
+    return out
+
+
 _BESTBUY_UNIVERSE = [
     "AAPL","MSFT","NVDA","GOOGL","AMZN","META","TSLA","AVGO","AMD","NFLX",
     "CRM","ORCL","ADBE","QCOM","JPM","V","MA","COST","WMT","HD",
