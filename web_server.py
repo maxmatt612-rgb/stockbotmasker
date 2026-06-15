@@ -4083,18 +4083,64 @@ async def api_targets(ticker: str):
 
     def _get():
         import yfinance as yf
-        info = yf.Ticker(t).info or {}
-        return {
+        tk = yf.Ticker(t)
+        info = tk.info or {}
+
+        def _f(x):
+            try:
+                return round(float(x), 4) if x is not None else None
+            except Exception:
+                return None
+
+        out = {
+            "price":        _f(info.get("currentPrice") or info.get("regularMarketPrice")),
+            "currency":     info.get("currency", "USD"),
             "targetMean":   info.get("targetMeanPrice"),
             "targetHigh":   info.get("targetHighPrice"),
             "targetLow":    info.get("targetLowPrice"),
             "recommendation": info.get("recommendationKey", ""),
             "numAnalysts":  info.get("numberOfAnalystOpinions"),
             "shortFloat":   info.get("shortPercentOfFloat"),
-            "shortRatio":   info.get("shortRatio"),
             "sector":       info.get("sector", ""),
             "industry":     info.get("industry", ""),
+            "estimates":    [],   # previsioni per anno
+            "growth5y":     None,
         }
+
+        # Stime EPS / crescita per anno (quest'anno, prossimo anno)
+        labels = {"0y": "Quest'anno", "+1y": "Prossimo anno", "+2y": "Tra 2 anni"}
+        rows = {}
+        try:
+            ee = tk.earnings_estimate
+            if ee is not None and not ee.empty:
+                for p in ["0y", "+1y", "+2y"]:
+                    if p in ee.index:
+                        r = ee.loc[p]
+                        rows[p] = {"period": labels.get(p, p),
+                                   "eps": _f(r.get("avg")),
+                                   "eps_growth": _f(r.get("growth")),
+                                   "rev_growth": None}
+        except Exception:
+            pass
+        try:
+            re_ = tk.revenue_estimate
+            if re_ is not None and not re_.empty:
+                for p in list(rows.keys()):
+                    if p in re_.index:
+                        rows[p]["rev_growth"] = _f(re_.loc[p].get("growth"))
+        except Exception:
+            pass
+        out["estimates"] = [rows[p] for p in ["0y", "+1y", "+2y"] if p in rows]
+
+        # Crescita stimata a lungo termine (+5y annua)
+        try:
+            ge = tk.growth_estimates
+            if ge is not None and not ge.empty and "+5y" in ge.index:
+                col = "stockTrend" if "stockTrend" in ge.columns else ge.columns[0]
+                out["growth5y"] = _f(ge.loc["+5y"][col])
+        except Exception:
+            pass
+        return out
 
     data = await asyncio.to_thread(_get)
     _store(key, data)

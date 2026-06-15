@@ -294,6 +294,20 @@ select.inp option{background:var(--surface-2);color:var(--text)}
 .dash-chart-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .dash-chart-hd .dmi{display:flex;gap:6px;align-items:baseline}
 .dmi-px{font-family:var(--mono);font-size:1.05rem;font-weight:600}
+/* Previsioni analisti */
+.fc-tgt{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.fc-tgt .l{font-size:.64rem;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.fc-tgt .v{font-family:var(--mono);font-size:1.4rem;font-weight:600;margin-top:3px}
+.fc-bar{position:relative;height:14px;margin:20px 0 7px}
+.fc-track{position:absolute;left:0;right:0;top:5px;height:4px;border-radius:3px;background:linear-gradient(90deg,#f0635a,#e0a23c,#33c281)}
+.fc-cur{position:absolute;top:0;width:3px;height:14px;background:var(--text);border-radius:2px;transform:translateX(-50%)}
+.fc-mean{position:absolute;top:-2px;width:11px;height:18px;border:2px solid var(--accent);border-radius:3px;transform:translateX(-50%);background:var(--surface)}
+.fc-bl{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.66rem;color:var(--faint)}
+.fc-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.fc-yr{background:var(--surface);padding:11px 13px}
+.fc-yl{font-size:.7rem;color:var(--dim);font-weight:600}
+.fc-yv{font-family:var(--mono);font-size:1.05rem;font-weight:600;margin:5px 0 3px}
+.fc-yg{font-size:.74rem;color:var(--dim)}
 /* Radar VIP */
 .rad-list{display:flex;flex-direction:column;gap:12px;max-width:760px}
 .rad-card{position:relative}
@@ -655,7 +669,9 @@ const I18N_EXACT={
 "Medie SMA":"SMA","Caricamento andamento…":"Loading trend…","Valore del portafoglio · ultimi 6 mesi":"Portfolio value · last 6 months",
 "Simulazione su prezzi storici reali · esclude commissioni e dividendi · i risultati passati non garantiscono quelli futuri":"Simulation on real historical prices · excludes fees and dividends · past results don't guarantee future ones",
 "Buongiorno":"Good morning","Buon pomeriggio":"Good afternoon","Buonasera":"Good evening",
-"Ecco come si muovono i mercati in questo momento.":"Here's how the markets are moving right now.","Caricamento mercati…":"Loading markets…"
+"Ecco come si muovono i mercati in questo momento.":"Here's how the markets are moving right now.","Caricamento mercati…":"Loading markets…",
+"Giudizio":"Rating","Comprare":"Buy","Comprare (forte)":"Strong buy","Mantenere":"Hold","Vendere":"Sell","Vendere (forte)":"Strong sell","Sottopesare":"Underweight","Sovrappesare":"Overweight",
+"Quest'anno":"This year","Prossimo anno":"Next year","Tra 2 anni":"In 2 years","Stime tra gli anni":"Year-by-year estimates","Target medio (12 mesi)":"Average target (12 months)","Concorrenti:":"Competitors:"
 };
 const I18N_PHRASES=[
 ["NON COMPRARE","DO NOT BUY"],["NON COMPRA","DO NOT BUY"],["non comprare","don't buy"],["COMPRARE","BUY"],["COMPRA","BUY"],
@@ -674,6 +690,8 @@ const I18N_PHRASES=[
 ["Valutazione di ","Evaluating "],["Analisi del timing di ","Timing analysis of "],
 ["Incrocio medie 50/200","MA cross 50/200"],["1 anno","1 year"],["2 anni","2 years"],["5 anni","5 years"],
 ["Andamento","Trend"],
+["Previsioni analisti","Analyst forecasts"],["analisti","analysts"],["Crescita stimata a lungo termine","Estimated long-term growth"],["all'anno","per year"],
+["Fonte: consenso analisti","Source: analyst consensus"],["utili","earnings"],["ricavi","revenue"],
 ["titoli trovati","stocks found"],["n/d","n/a"]
 ];
 function _trText(v){
@@ -912,8 +930,47 @@ function renderSintesi(){
       ${st('Beta',d.beta!=null?(+d.beta).toFixed(2):'—')}
       ${st('Settore',d.sector||'—')}
       ${st('Earnings',d.next_earnings_str||'—')}
-    </div>`;
+    </div>
+    <div id="dw-forecast" style="margin-top:18px"></div>`;
   loadChart(chartTF);
+  loadForecast(curTk);
+}
+// previsioni analisti + target tra gli anni
+const fpc=v=>v==null||isNaN(+v)?'—':((+v)>=0?'+':'')+((+v)*100).toFixed(1)+'%';
+const _REC={buy:'Comprare',strong_buy:'Comprare (forte)',hold:'Mantenere',sell:'Vendere',strong_sell:'Vendere (forte)',underperform:'Sottopesare',outperform:'Sovrappesare',none:'—'};
+function targetBarHTML(cur,lo,mean,hi,ccy){
+  const min=Math.min(lo,cur)*0.97,max=Math.max(hi,cur)*1.03,rng=(max-min)||1,pos=v=>Math.max(0,Math.min(100,(v-min)/rng*100)).toFixed(1);
+  return `<div class="fc-bar"><div class="fc-track"></div>
+    <div class="fc-cur" style="left:${pos(cur)}%" title="Prezzo attuale ${ccySym(ccy)}${cur.toFixed(2)}"></div>
+    <div class="fc-mean" style="left:${pos(mean)}%" title="Target medio ${ccySym(ccy)}${mean.toFixed(2)}"></div></div>
+    <div class="fc-bl"><span>min ${ccySym(ccy)}${(+lo).toFixed(0)}</span><span style="color:var(--accent)">▮ target ${ccySym(ccy)}${(+mean).toFixed(0)}</span><span>max ${ccySym(ccy)}${(+hi).toFixed(0)}</span></div>`;
+}
+async function loadForecast(tk){
+  const box=$('#dw-forecast');if(!box)return;
+  const d=await J('/api/stock/'+tk+'/targets');
+  if(curTk!==tk){return;}
+  const b2=$('#dw-forecast');if(!b2)return;
+  const ests=(d&&d.estimates)||[];
+  if(d.__err||(!d.targetMean&&!ests.length)){b2.innerHTML='';return;}
+  const ccy=d.currency||(curData&&curData.currency)||'USD';
+  const cur=(curData&&curData.current_price)||d.price||0;
+  const up=(d.targetMean&&cur)?((d.targetMean/cur-1)*100):null;
+  const rec=_REC[(d.recommendation||'none').toLowerCase()]||esc(d.recommendation||'—');
+  const est=ests.map(e=>`<div class="fc-yr">
+      <div class="fc-yl">${esc(e.period)}</div>
+      <div class="fc-yv">EPS ${e.eps!=null?ccySym(ccy)+(+e.eps).toFixed(2):'—'}</div>
+      <div class="fc-yg">${e.eps_growth!=null?`utili <b class="${e.eps_growth>=0?'pos':'neg'}">${fpc(e.eps_growth)}</b>`:''}${e.rev_growth!=null?` · ricavi <b class="${e.rev_growth>=0?'pos':'neg'}">${fpc(e.rev_growth)}</b>`:''}</div>
+    </div>`).join('');
+  b2.innerHTML=`<div class="card2">
+    <div class="flab" style="margin:0 0 12px">Previsioni analisti${d.numAnalysts?' · '+d.numAnalysts+' analisti':''}</div>
+    ${d.targetMean?`<div class="fc-tgt">
+      <div><div class="l">Target medio (12 mesi)</div><div class="v">${ccySym(ccy)}${(+d.targetMean).toFixed(2)} ${up!=null?`<span class="${up>=0?'pos':'neg'}" style="font-size:.82rem">${up>=0?'+':''}${up.toFixed(1)}%</span>`:''}</div></div>
+      <div style="text-align:right"><div class="l">Giudizio</div><div class="v" style="font-size:1.05rem">${rec}</div></div></div>
+      ${(d.targetLow&&d.targetHigh)?targetBarHTML(cur,d.targetLow,d.targetMean,d.targetHigh,ccy):''}`:''}
+    ${est?`<div class="flab" style="margin:18px 0 10px">Stime tra gli anni</div><div class="fc-grid">${est}</div>`:''}
+    ${d.growth5y!=null?`<div style="font-size:.74rem;color:var(--dim);margin-top:10px">Crescita stimata a lungo termine: <b class="${d.growth5y>=0?'pos':'neg'}">${fpc(d.growth5y)} all'anno</b></div>`:''}
+    <div class="fnote" style="padding:10px 0 0">Fonte: consenso analisti · Yahoo Finance · non è consulenza finanziaria</div>
+  </div>`;
 }
 // ── Grafico prezzi (SVG, nessuna libreria) ──
 const _TF={'1S':['5d','1h'],'1M':['1mo','1d'],'3M':['3mo','1d'],'1A':['1y','1d']};
