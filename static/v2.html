@@ -1029,6 +1029,11 @@ async function loadChart(tf){
 const vcls=v=>{const u=(v||'').toUpperCase();return u.includes('NON')?'v-no':(u.includes('COMPRA')||u.includes('BUY')?'v-yes':'v-wait');};
 const vico=v=>{const c=vcls(v);return c==='v-yes'?'▲':c==='v-no'?'▼':'■';};
 
+// concorrenti su ogni analisi (cliccabili)
+window._peers=window._peers||{};
+async function getPeers(tk){if(!tk)return [];if(_peers[tk])return _peers[tk];const d=await J('/api/stock/'+tk+'/peers');const a=(d&&d.peers)||[];_peers[tk]=a;return a;}
+function peersChipsHTML(arr){if(!arr||!arr.length)return '';return `<div class="chips peers-row" style="margin-top:14px"><span style="font-size:.7rem;color:var(--dim)">Concorrenti:</span>${arr.map(c=>`<span class="chip" onclick="openStock('${esc(c)}')">${esc(c)}</span>`).join('')}</div>`;}
+async function injectPeers(sel,tk,guard){const a=await getPeers(tk);if(!a.length)return;if(guard&&!guard())return;const box=$(sel);if(!box||box.querySelector('.peers-row'))return;box.insertAdjacentHTML('beforeend',peersChipsHTML(a));}
 function aiToolsHTML(){return `<div class="flab" style="margin-top:20px">Strumenti AI</div>
     <button class="aibtn" onclick="goTab('ai')"><span class="bdg">AI</span><span><span class="t">Analisi completa</span><div class="s">1 modello forte (GPT-OSS 120B) + tutti i dati</div></span><span class="ar">↻</span></button>
     <button class="aibtn" onclick="goTab('consenso')"><span class="bdg">×3</span><span><span class="t">Consenso 3 AI</span><div class="s">Llama · GPT-OSS · Qwen votano</div></span><span class="ar">→</span></button>
@@ -1070,6 +1075,7 @@ async function loadCons(){
     <div class="verdict ${vcls(d.consensus)}">${vico(d.consensus)} ${d.agree}/${d.total||3} · ${esc(d.consensus||'ASPETTA')}</div>
     <div class="prose">${rows}</div>
     <div class="fnote">Llama 3.3 (Meta) · GPT-OSS 120B (OpenAI) · Qwen3 (Alibaba) · via Groq</div></div>`;
+  injectPeers('#dw-body',curTk,()=>$('#dw-tabs').dataset.cur==='consenso');
 }
 async function loadDebate(){
   const b=$('#dw-body');b.innerHTML='<div class="lline">Toro e Orso discutono… poi il giudice decide.</div>';
@@ -1083,11 +1089,13 @@ async function loadDebate(){
     <div class="verdict ${vcls(d.verdict)}" style="border-top:1px solid var(--border)">${vico(d.verdict)} ${esc(d.verdict||'ASPETTA')}<small>Giudice · confidenza ${d.confidence??'—'}%</small></div>
     ${d.synthesis?`<div class="prose"><div class="h">Decisione del giudice</div>${esc(d.synthesis)}</div>`:''}
     <div class="fnote">3 agenti AI (GPT-OSS 120B) · ispirato a TradingAgents</div></div>`;
+  injectPeers('#dw-body',curTk,()=>$('#dw-tabs').dataset.cur==='dibattito');
 }
 async function loadCompro(){
   const b=$('#dw-body');b.innerHTML='<div class="lline">Verdetto in corso…</div>';
   const d=await J('/api/stock/'+curTk+'/should-buy?horizon=short');if(d.__err||d.error){b.innerHTML='<div class="lline">Non disponibile.</div>';return;}
   b.innerHTML=shouldHTML(d);
+  injectPeers('#dw-body',curTk,()=>$('#dw-tabs').dataset.cur==='compro');
 }
 
 // ── Top Buy ──
@@ -1111,6 +1119,7 @@ async function runTopBuy(){
     ${d.reasoning?`<div class="prose"><div class="h">Perché questo</div>${esc(d.reasoning)}</div>`:''}
     ${up?`<div class="chips"><span style="font-size:.7rem;color:var(--dim)">Alternative:</span>${up}</div>`:''}
     <div class="fnote">Analisi AI · non è consulenza finanziaria</div></div>`;
+  if(d.ticker)injectPeers('#tb-res',d.ticker);
 }
 function cell(l,v,cls){return `<div class="cell ${cls||''}"><div class="l">${l}</div><div class="v">${v}</div></div>`;}
 
@@ -1124,6 +1133,7 @@ async function runShouldBuy(){
   const d=await J('/api/stock/'+tk+'/should-buy?horizon='+sbH);
   if(d.__err||d.error){r.innerHTML=`<div class="lline">${esc((d&&d.error)||'Ticker non trovato')}</div>`;return;}
   r.innerHTML=shouldHTML(d);
+  injectPeers('#sb-res',tk);
 }
 function shouldHTML(d){
   const cats=(d.catalysts||[]).map(c=>`<li>${esc(c)}</li>`).join('');
@@ -1216,6 +1226,7 @@ async function runTiming(){
     </div>
     <div class="chips"><button class="chip" onclick="openStock('${esc(d.ticker)}')">Apri dettaglio completo →</button></div>
     <div class="fnote">${d.ai?'Analisi AI':'Analisi tecnica'} · il timing è una stima · non è consulenza finanziaria</div></div>`;
+  injectPeers('#tm-res',tk);
 }
 
 // ── Briefing ──
