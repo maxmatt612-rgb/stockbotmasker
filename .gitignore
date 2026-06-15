@@ -2,3 +2,6 @@
 user_data.json
 __pycache__/
 *.pyc
+
+.claude/skills/
+last_scan.json
