@@ -1739,7 +1739,7 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
                 "MOTIVO: [2 frasi concrete riferite all'orizzonte indicato]\n"
             )
             r = await groq_client.chat.completions.create(
-                model="openai/gpt-oss-120b", max_tokens=1400, reasoning_effort="medium",
+                model="openai/gpt-oss-120b", max_tokens=1400, reasoning_effort="low",
                 messages=[{"role": "system", "content": "Sei un trader deciso: dai verdetti netti (COMPRA/ASPETTA/NON COMPRARE) sull'orizzonte richiesto, valutando il potenziale di crescita su quell'arco temporale. Non rispondere ASPETTA per eccesso di prudenza: scegli una direzione quando i dati la suggeriscono. Italiano, diretto."},
                           {"role": "user", "content": prompt}])
             txt = r.choices[0].message.content.strip()
@@ -1761,10 +1761,16 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
         except Exception:
             pass
 
+    # Take-profit (obiettivo): resistenza se sensata, altrimenti +% in base all'orizzonte
+    tp_pct = 1.15 if horizon == "short" else 1.35
+    target = round(max(resistance or 0, cur * tp_pct), 2) if cur else None
+    target_pct = round((target / cur - 1) * 100, 1) if (target and cur) else None
+
     result = {
         "ticker": t, "name": data.get("name", t), "currency": ccy, "price": cur, "horizon": horizon,
         "verdict": verdict, "confidence": conf, "reasoning": reasoning,
         "entry_low": entry_low, "entry_high": entry_high, "stop": stop,
+        "target": target, "target_pct": target_pct,
         "support": round(support, 2) if support else None, "resistance": round(resistance, 2) if resistance else None,
         "rsi": round(data.get("rsi", 50) or 50), "risk_level": data.get("risk_level"),
         "catalysts": catalysts,
@@ -1926,7 +1932,7 @@ async def api_debate(ticker: str):
     winner, verdict, conf, synth = "PAREGGIO", "ASPETTA", 65, ""
     try:
         r = await groq_client.chat.completions.create(
-            model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="medium",
+            model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="low",
             messages=[{"role": "system", "content": "Sei il trader capo: equilibrato, deciso, in italiano."},
                       {"role": "user", "content": judge_pr}])
         for line in r.choices[0].message.content.split("\n"):
@@ -2446,7 +2452,7 @@ async def api_deep_analysis(ticker: str):
         resp = await groq_client.chat.completions.create(
             model="openai/gpt-oss-120b",
             max_tokens=1800,
-            reasoning_effort="medium",
+            reasoning_effort="low",
             messages=[
                 {"role": "system", "content": "Sei un analista finanziario senior di Wall Street: esamini TUTTI i dati tecnici e fondamentali forniti e dai un verdetto NETTO e deciso (preferisci COMPRA o VENDI; ASPETTA solo se davvero contrastante), motivato e specifico, in italiano. Conosci bene i concorrenti delle aziende quotate. Niente giri di parole, niente prudenza eccessiva."},
                 {"role": "user", "content": prompt},
