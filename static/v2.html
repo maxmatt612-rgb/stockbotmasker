@@ -308,6 +308,7 @@ select.inp option{background:var(--surface-2);color:var(--text)}
 .fc-yl{font-size:.7rem;color:var(--dim);font-weight:600}
 .fc-yv{font-family:var(--mono);font-size:1.05rem;font-weight:600;margin:5px 0 3px}
 .fc-yg{font-size:.74rem;color:var(--dim)}
+.ai-tag{display:inline-block;font-size:.58rem;font-weight:700;letter-spacing:.06em;color:var(--accent);background:var(--accent-soft);border:1px solid rgba(76,135,245,.3);border-radius:5px;padding:2px 6px;vertical-align:middle;margin-left:6px}
 /* Radar VIP */
 .rad-list{display:flex;flex-direction:column;gap:12px;max-width:760px}
 .rad-card{position:relative}
@@ -1085,6 +1086,7 @@ async function loadChart(tf){
 
 const vcls=v=>{const u=(v||'').toUpperCase();return u.includes('NON')?'v-no':(u.includes('COMPRA')||u.includes('BUY')?'v-yes':'v-wait');};
 const vico=v=>{const c=vcls(v);return c==='v-yes'?'▲':c==='v-no'?'▼':'■';};
+const aiTag='<span class="ai-tag">✦ AI</span>';
 
 // concorrenti su ogni analisi (cliccabili)
 window._peers=window._peers||{};
@@ -1113,6 +1115,7 @@ async function loadDeep(){
   const b=$('#dw-body');b.innerHTML='<div class="lline">Analisi approfondita in corso…</div>';
   const d=await J('/api/stock/'+curTk+'/deep');if(d.__err||d.error){b.innerHTML='<div class="lline">Analisi non disponibile.</div>'+aiToolsHTML();return;}
   b.innerHTML=`<div class="res" style="max-width:none">
+    <div class="res-kick">Analisi completa ${aiTag}</div>
     <div class="verdict ${vcls(d.verdetto)}">${vico(d.verdetto)} ${esc(d.verdetto||'ASPETTA')}<small>Confidenza ${d.confidenza??'—'}%</small></div>
     <div class="prose"><div class="h">Cos'è</div>${esc(d.descrizione)}</div>
     <div class="prose"><div class="h">Perché</div>${esc(d.perche)}</div>
@@ -1128,7 +1131,7 @@ async function loadCons(){
     `<div class="modrow"><span class="nm">${esc(m.name)}</span><span class="vd ${vcls(m.verdict)==='v-yes'?'pos':vcls(m.verdict)==='v-no'?'neg':''}">${vico(m.verdict)} ${esc(m.verdict)}</span>${m.reason?`<div class="rs">${esc(m.reason)}</div>`:''}</div>`
     :`<div class="modrow"><span class="nm">${esc(m.name)}</span><span class="vd" style="color:var(--faint)">— n/d</span></div>`).join('');
   b.innerHTML=`<div class="res" style="max-width:none">
-    <div class="res-kick">Consenso · 3 modelli</div>
+    <div class="res-kick">Consenso · 3 modelli ${aiTag}</div>
     <div class="verdict ${vcls(d.consensus)}">${vico(d.consensus)} ${d.agree}/${d.total||3} · ${esc(d.consensus||'ASPETTA')}</div>
     <div class="prose">${rows}</div>
     <div class="fnote">Llama 3.3 (Meta) · GPT-OSS 120B (OpenAI) · Qwen3 (Alibaba) · via Groq</div></div>`;
@@ -1165,7 +1168,7 @@ async function runTopBuy(){
   if(d.error){r.innerHTML=`<div class="lline">${esc(d.error)}</div>`;return;}
   const up=(d.runners_up||[]).map(s=>`<span class="chip" onclick="openStock('${s.ticker}')">${esc(s.ticker)}${s.score_10!=null?' '+(+s.score_10).toFixed(1):''}</span>`).join('');
   r.innerHTML=`<div class="res">
-    <div class="res-kick">Miglior acquisto · ${tbH==='long'?'lungo':'breve'} termine</div>
+    <div class="res-kick">Miglior acquisto · ${tbH==='long'?'lungo':'breve'} termine ${aiTag}</div>
     <div class="res-hd"><div><span class="res-tk">${esc(d.ticker)}</span><span class="res-nm">${esc((d.name||'').slice(0,26))}</span></div><span class="res-px">${fx(d.price,d.currency)}</span></div>
     <div class="cells">
       ${d.score_10!=null?cell('Score',(+d.score_10).toFixed(1)+' / 10'):''}
@@ -1195,11 +1198,12 @@ async function runShouldBuy(){
 function shouldHTML(d){
   const cats=(d.catalysts||[]).map(c=>`<li>${esc(c)}</li>`).join('');
   return `<div class="res" style="max-width:none">
-    <div class="res-kick">Verdetto · ${d.horizon==='long'?'lungo':'breve'} termine</div>
+    <div class="res-kick">Verdetto · ${d.horizon==='long'?'lungo':'breve'} termine ${aiTag}</div>
     <div class="res-hd"><div><span class="res-tk">${esc(d.ticker)}</span><span class="res-nm">${esc((d.name||'').slice(0,26))}</span></div><span class="res-px">${fx(d.price,d.currency)}</span></div>
     <div class="verdict ${vcls(d.verdict)}">${vico(d.verdict)} ${esc(d.verdict||'ASPETTA')}<small>Confidenza ${d.confidence??'—'}%</small></div>
     <div class="cells">
       ${(d.entry_low!=null&&d.entry_high!=null)?cell("Zona d'ingresso",fx(d.entry_low,d.currency)+' – '+fx(d.entry_high,d.currency),'g'):''}
+      ${d.target!=null?cell('Take profit',fx(d.target,d.currency)+(d.target_pct!=null?` (${d.target_pct>=0?'+':''}${d.target_pct}%)`:''),'g'):''}
       ${d.stop!=null?cell('Stop-loss',fx(d.stop,d.currency),'r'):''}
       ${d.support!=null?cell('Supporto',fx(d.support,d.currency)):''}
       ${d.resistance!=null?cell('Resistenza',fx(d.resistance,d.currency)):''}
