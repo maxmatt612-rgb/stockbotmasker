@@ -12,7 +12,7 @@ cd /d "%~dp0"
 
 set "PY=C:\Users\Mattia\AppData\Local\Programs\Python\Python312\python.exe"
 set "PORT=8000"
-set "URL=http://localhost:%PORT%/v2"
+set "URL=http://localhost:%PORT%/"
 
 REM --- Le chiavi API: python-dotenv cerca un file ".env", ma qui si chiama ".env.txt".
 REM     Se manca ".env" lo creo copiando ".env.txt" (cosi' GROQ/Telegram funzionano in locale).
