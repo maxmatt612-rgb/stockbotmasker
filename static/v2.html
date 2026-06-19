@@ -462,6 +462,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
   <button class="tab" data-v="chartai"><span class="ti">◳</span>Grafico AI</button>
   <div class="side-sec">Strumenti</div>
   <button class="tab" data-v="scanner"><span class="ti">⚲</span>Scanner</button>
+  <button class="tab" data-v="track"><span class="ti">🎯</span>Track record</button>
   <button class="tab" data-v="briefing"><span class="ti">▦</span>Briefing</button>
   <button class="tab" data-v="radar"><span class="ti">◎</span>Radar VIP</button>
 </aside>
@@ -523,6 +524,12 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
       </div>
     </div>
     <div id="wl-list" style="margin-top:18px"></div>
+  </section>
+
+  <section data-view="track" hidden>
+    <div class="lead"><div><div class="eyebrow">Track record</div><h2>Quanto ci azzecca il bot</h2>
+      <p>Accuratezza reale dei segnali e backtest del portafoglio simulato. Si basa sulle giornate di mercato già chiuse.</p></div></div>
+    <div id="track-page"><div class="lline" style="padding:24px 0">Caricamento track record…</div></div>
   </section>
 
   <section data-view="topbuy" hidden>
@@ -827,7 +834,15 @@ const I18N_EXACT={
 "Solo a scopo informativo. Non è consulenza finanziaria. Investire comporta il rischio di perdere il capitale.":"For informational purposes only. Not financial advice. Investing carries the risk of losing your capital.",
 "Notizie del giorno":"Today's news","Cosa muove i mercati":"What's moving the markets",
 "Le ultime notizie dai principali titoli e indici. Tocca \"Spiega\" per il riassunto AI.":"The latest news from major stocks and indices. Tap \"Explain\" for the AI summary.",
-"Caricamento notizie…":"Loading news…","Nessuna notizia":"No news","Riprova tra poco.":"Try again shortly.","✨ Spiega":"✨ Explain"
+"Caricamento notizie…":"Loading news…","Nessuna notizia":"No news","Riprova tra poco.":"Try again shortly.","✨ Spiega":"✨ Explain",
+"Quanto ci azzecca il bot":"How accurate the bot is",
+"Accuratezza reale dei segnali e backtest del portafoglio simulato. Si basa sulle giornate di mercato già chiuse.":"Real signal accuracy and a simulated-portfolio backtest. Based on market days already closed.",
+"Caricamento track record…":"Loading track record…","Ancora nessun dato":"No data yet",
+"Il track record si popola quando il bot chiude la prima giornata di mercato (analisi del mattino confrontata con la chiusura). Torna tra un giorno o due.":"The track record fills in once the bot closes its first market day (morning analysis compared to the close). Come back in a day or two.",
+"Accuratezza dei segnali":"Signal accuracy","Backtest portafoglio (Score ≥8, equal-weight)":"Portfolio backtest (Score ≥8, equal-weight)",
+"Precisione del bot":"Bot accuracy",
+"In attesa della prima giornata di mercato chiusa · apri il Track record →":"Waiting for the first closed market day · open Track record →",
+"Simulazione su prezzi storici reali · esclude commissioni e dividendi · i risultati passati non garantiscono quelli futuri.":"Simulation on real historical prices · excludes fees and dividends · past results don't guarantee future ones."
 };
 const I18N_PHRASES=[
 ["NON COMPRARE","DO NOT BUY"],["NON COMPRA","DO NOT BUY"],["non comprare","don't buy"],["COMPRARE","BUY"],["COMPRA","BUY"],
@@ -853,7 +868,11 @@ const I18N_PHRASES=[
 ["Calcolatore di posizione · R/R 1:","Position calculator · R/R 1:"],
 ["Capitale totale","Total capital"],
 ["Copia setup","Copy setup"],
-["Dati ~15 min","Data ~15 min"]
+["Dati ~15 min","Data ~15 min"],
+["segnali chiusi · apri il Track record →","closed signals · open Track record →"],
+["previsioni corrette","correct predictions"],
+["giornate","days"],
+["segnali","signals"]
 ];
 function _trText(v){
   const k=v.trim(); if(!k) return v;
@@ -905,6 +924,7 @@ $('#nav').addEventListener('click',e=>{const b=e.target.closest('.tab');if(!b)re
   $$('.tab').forEach(x=>x.classList.toggle('active',x===b));
   const v=b.dataset.v;$$('section[data-view]').forEach(s=>s.hidden=s.dataset.view!==v);
   if(v==='watchlist')wlRender();
+  if(v==='track')loadTrackPage();
   if(!_loaded[v]){_loaded[v]=true;
     if(v==='briefing')loadBriefing();
     if(v==='radar')loadRadar();
@@ -1688,14 +1708,68 @@ if(lsGet('discOk',0))dismissDisc();
 async function renderTrack(){
   const box=$('#track-record');if(!box)return;
   const d=await J('/api/accuracy');
-  if(!d||d.__err||!d.total){box.innerHTML='';return;}
+  if(!d||d.__err||!d.total){
+    // Nessuno storico ancora: mostra comunque il riquadro con un messaggio d'attesa.
+    box.innerHTML=`<div class="trk" style="cursor:pointer" onclick="goView('track')">
+      <div class="trk-main"><span class="trk-pct" style="color:var(--faint)">—</span>
+        <span><span class="trk-lab">Precisione del bot</span><div class="trk-sub">In attesa della prima giornata di mercato chiusa · apri il Track record →</div></span></div>
+    </div>`;
+    return;
+  }
   const bk=d.by_score||{};
   const b=(k,o)=>o&&o.total?`<span class="b">${esc(o.label)}: <b>${o.pct}%</b></span>`:'';
-  box.innerHTML=`<div class="trk">
+  box.innerHTML=`<div class="trk" style="cursor:pointer" onclick="goView('track')">
     <div class="trk-main"><span class="trk-pct">${d.accuracy_pct}%</span>
-      <span><span class="trk-lab">Previsioni corrette</span><div class="trk-sub">${d.correct}/${d.total} segnali chiusi · track record verificabile</div></span></div>
+      <span><span class="trk-lab">Previsioni corrette</span><div class="trk-sub">${d.correct}/${d.total} segnali chiusi · apri il Track record →</div></span></div>
     <div class="trk-bk">${b('high',bk.high)}${b('mid',bk.mid)}${b('low',bk.low)}</div>
   </div>`;
+}
+// Cambia vista come un click sulla sidebar (riusato da link interni).
+function goView(v){const t=$$('.tab').find(x=>x.dataset.v===v);if(t)t.click();}
+
+// ── Pagina Track record: accuratezza segnali + backtest portafoglio ──
+async function loadTrackPage(){
+  const box=$('#track-page');if(!box)return;
+  box.innerHTML='<div class="lline" style="padding:24px 0">Caricamento track record…</div>';
+  const [acc,bt]=await Promise.all([J('/api/accuracy'),J('/api/backtest')]);
+  const hasAcc=acc&&!acc.__err&&acc.total;
+  const hasBt=bt&&!bt.__err&&bt.total;
+  if(!hasAcc&&!hasBt){
+    box.innerHTML='<div class="empty"><span class="ic">🎯</span><h3>Ancora nessun dato</h3><p>Il track record si popola quando il bot chiude la prima giornata di mercato (analisi del mattino confrontata con la chiusura). Torna tra un giorno o due.</p></div>';
+    return;
+  }
+  let html='';
+  if(hasAcc){
+    const bk=acc.by_score||{};
+    const col=(o)=>o&&o.total?`<div class="c"><div class="l">${esc(o.label)}</div><div class="v">${o.pct}%</div><div style="font-size:.6rem;color:var(--faint)">${o.correct}/${o.total}</div></div>`:'<div class="c"><div class="l">—</div><div class="v">—</div></div>';
+    html+=`<div class="setup-card">
+      <div class="flab" style="margin:0">Accuratezza dei segnali</div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-top:8px">
+        <span class="trk-pct">${acc.accuracy_pct}%</span>
+        <span class="trk-sub">${acc.correct}/${acc.total} previsioni corrette</span></div>
+      <div class="setup-row" style="grid-template-columns:repeat(3,1fr)">${col(bk.high)}${col(bk.mid)}${col(bk.low)}</div>
+    </div>`;
+  }
+  if(hasBt){
+    const curve=(bt.portfolio||[]).map(p=>p.value);
+    const ret=bt.portfolio_return_pct;
+    const bk=bt.by_score||{};
+    const row=(o)=>o&&o.total?`<div class="wl-row" style="cursor:default">
+        <span class="tk" style="min-width:92px">${esc(o.label)}</span>
+        <span style="flex:1;font-size:.78rem;color:var(--dim)">Win ${o.win_rate}% · ${o.total} segnali</span>
+        <span class="px ${o.avg_return>=0?'pos':'neg'}">${o.avg_return>=0?'+':''}${o.avg_return}%</span>
+      </div>`:'';
+    html+=`<div class="setup-card" style="margin-top:18px">
+      <div class="flab" style="margin:0">Backtest portafoglio (Score ≥8, equal-weight)</div>
+      <div style="display:flex;align-items:baseline;gap:12px;margin-top:8px;flex-wrap:wrap">
+        <span class="trk-pct" style="color:var(${ret>=0?'--pos':'--neg'})">${ret>=0?'+':''}${ret}%</span>
+        <span class="trk-sub">$10.000 → ${fx(bt.portfolio_final,'USD')} · ${bt.days} giornate</span></div>
+      ${curve.length>1?pfAreaSVG(curve,'btcurve',150):''}
+      <div style="margin-top:14px">${row(bk.high)}${row(bk.mid)}${row(bk.low)}</div>
+    </div>`;
+  }
+  html+=`<p style="font-size:.7rem;color:var(--faint);margin-top:14px">Simulazione su prezzi storici reali · esclude commissioni e dividendi · i risultati passati non garantiscono quelli futuri.</p>`;
+  box.innerHTML=html;
 }
 renderTrack();
 
