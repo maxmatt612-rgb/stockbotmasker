@@ -1753,8 +1753,9 @@ async function annotateEarnings(tickers,scope){
 let _newsData=[];
 async function loadMarketNews(){
   const box=$('#news-feed');if(!box)return;
-  const d=await J('/api/market-news');
-  if(!Array.isArray(d)||!d.length){box.innerHTML='<div class="empty"><span class="ic">📰</span><h3>Nessuna notizia</h3><p>Riprova tra poco.</p></div>';return;}
+  const all=await J('/api/market-news');
+  if(!Array.isArray(all)||!all.length){box.innerHTML='<div class="empty"><span class="ic">📰</span><h3>Nessuna notizia</h3><p>Riprova tra poco.</p></div>';return;}
+  const d=all.slice(0,3); // in home solo le 3 più importanti (più recenti dai titoli principali)
   _newsData=d;
   box.innerHTML='<div class="news-feed">'+d.map((n,i)=>{
     const when=newsAge(n.time);
