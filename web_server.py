@@ -4771,6 +4771,66 @@ async def api_briefing():
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+# ─── Notizie del giorno (feed di mercato) ─────────────────────────────────────
+
+# Basket di titoli/indici ad alto profilo da cui aggregare le headline di mercato.
+_NEWS_BASKET = ["AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "GOOGL", "META",
+                "JPM", "XOM", "SPY", "QQQ", "BTC-USD"]
+
+
+@app.get("/api/market-news")
+async def api_market_news():
+    """Aggrega le ultime notizie di mercato da un basket di titoli ad alto profilo.
+    Stale-while-revalidate: cache 15 min."""
+    key = "market-news"
+    if (c := _cached(key, 900)) is not None:
+        return c
+
+    def _get():
+        import yfinance as yf
+        from concurrent.futures import ThreadPoolExecutor
+
+        def _fetch(tk):
+            try:
+                return tk, (yf.Ticker(tk).news or [])
+            except Exception:
+                return tk, []
+
+        seen = set()
+        out = []
+        try:
+            with ThreadPoolExecutor(max_workers=8) as ex:
+                for tk, news in ex.map(_fetch, _NEWS_BASKET):
+                    for n in (news or [])[:6]:
+                        cnt = n.get("content") if isinstance(n.get("content"), dict) else None
+                        if not isinstance(cnt, dict):
+                            cnt = n if isinstance(n, dict) else {}
+                        title = (cnt.get("title") or n.get("title") or "").strip()
+                        if not title or title.lower() in seen:
+                            continue
+                        seen.add(title.lower())
+                        link = ""
+                        for k in ("canonicalUrl", "clickThroughUrl"):
+                            v = cnt.get(k)
+                            if isinstance(v, dict):
+                                link = v.get("url", ""); break
+                        if not link:
+                            link = n.get("link", "")
+                        pub = (cnt.get("provider") or {}).get("displayName") or n.get("publisher", "")
+                        ts = cnt.get("pubDate") or n.get("providerPublishTime") or ""
+                        out.append({"title": title[:200], "link": link, "publisher": pub,
+                                    "time": ts, "ticker": tk})
+        except Exception as e:
+            print(f"[market-news] {e}")
+        # Ordina per data (le stringhe ISO si ordinano cronologicamente); i timestamp numerici a parte
+        out.sort(key=lambda x: str(x.get("time") or ""), reverse=True)
+        return out[:10]
+
+    data = await asyncio.to_thread(_get)
+    _store(key, data)
+    return data
+
+
 # ─── Manifest / SW (PWA) ──────────────────────────────────────────────────────
 
 @app.get("/manifest.json")

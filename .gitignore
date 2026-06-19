@@ -1,7 +1,11 @@
 .env
+.env.txt
 user_data.json
+web_users.json
+analysis_history.json
 __pycache__/
 *.pyc
+*.log
 
 .claude/skills/
 last_scan.json
