@@ -64,6 +64,12 @@ async def _startup_load_cache():
     else:
         print("[startup] Analisi on-demand: nessuno scan automatico, in attesa di richiesta.")
 
+    # Avvia lo scheduler giornaliero: 07:35 salva lo snapshot, 22:05 lo chiude.
+    # Cosí lo storico (accuracy/backtest/track record) si accumula da solo,
+    # basta tenere il server acceso sul PC. Nessun bot Telegram necessario.
+    asyncio.create_task(_pdf_scheduler())
+    print("[startup] Scheduler storico avviato (07:35 salva, 22:05 chiude — lun-ven).")
+
 
 async def _warm_influence():
     """Pre-riscalda la cache del Radar VIP ~40s dopo l'avvio (così il primo click è istantaneo)."""
@@ -719,8 +725,79 @@ def _build_evening_pdf(stocks: list, title: str, subtitle: str) -> bytes:
     return bytes(pdf.output())
 
 
+def _save_history_snapshot_web(stocks: list):
+    """Salva lo snapshot mattutino nello storico (alimenta accuracy/backtest/track record).
+    Girato dal sito stesso: non serve il bot Telegram."""
+    if not stocks:
+        return
+    date_iso = datetime.now().strftime("%Y-%m-%d")
+    try:
+        history = json.loads(HISTORY_FILE.read_text(encoding="utf-8")) if HISTORY_FILE.exists() else {}
+    except Exception:
+        history = {}
+    if history.get(date_iso, {}).get("closed"):
+        return  # giornata già chiusa, non sovrascrivere
+    history[date_iso] = {
+        "date": date_iso,
+        "generated_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "closed": False,
+        "stocks": [
+            {
+                "ticker": d["ticker"],
+                "name": d.get("name", d["ticker"]),
+                "price_at_analysis": round(float(d.get("current_price") or 0), 4),
+                "score_10": float(d.get("score_10", 5.0)),
+                "risk_level": d.get("risk_level", "Medio"),
+                "day_change_pct": round(float(d.get("day_change_pct") or 0), 2),
+                "rsi": round(float(d.get("rsi") or 50), 1),
+                "verdict": "",
+            }
+            for d in stocks if d.get("ticker")
+        ],
+    }
+    all_dates = sorted(history.keys(), reverse=True)
+    history = {k: history[k] for k in all_dates[:60]}  # ultimi 60 giorni
+    try:
+        HISTORY_FILE.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"[history] snapshot mattutino salvato: {date_iso} ({len(history[date_iso]['stocks'])} titoli)")
+    except Exception as e:
+        print(f"[history] errore salvataggio snapshot: {e}")
+
+
+def _close_history_snapshot_web():
+    """Chiude lo snapshot di oggi con i prezzi di chiusura → previsione vs realtà."""
+    import yfinance as yf
+    today = datetime.now().strftime("%Y-%m-%d")
+    if not HISTORY_FILE.exists():
+        return
+    try:
+        history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return
+    snap = history.get(today)
+    if not snap or snap.get("closed"):
+        return
+    for s in snap.get("stocks", []):
+        try:
+            pc = round(float(yf.Ticker(s["ticker"]).fast_info.last_price or 0), 4)
+        except Exception:
+            pc = 0.0
+        pa = s.get("price_at_analysis", 0.0)
+        s["price_at_close"] = pc
+        if pa > 0 and pc > 0:
+            s["close_vs_morning_pct"] = round((pc - pa) / pa * 100, 2)
+    snap["closed"] = True
+    snap["closed_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    history[today] = snap
+    try:
+        HISTORY_FILE.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"[history] snapshot chiuso: {today}")
+    except Exception as e:
+        print(f"[history] errore chiusura: {e}")
+
+
 async def _pdf_scheduler():
-    """Scheduler giornaliero: 07:30 scan, 07:35 PDF mattina, 22:05 recap serale."""
+    """Scheduler giornaliero: 07:30 scan, 07:35 PDF mattina + storico, 22:05 recap + chiusura storico."""
     while True:
         now = datetime.now()
         h, m = now.hour, now.minute
@@ -729,13 +806,17 @@ async def _pdf_scheduler():
             print("[scheduler] Avvio scan mattutino 07:30")
             asyncio.create_task(_refresh_scan_background(10))
             await asyncio.sleep(60)
-        # 07:35 — PDF analisi mattutina (dopo che lo scan ha avuto 5 min)
+        # 07:35 — PDF analisi mattutina + snapshot storico (solo lun–ven)
         elif h == 7 and m == 35:
             await _generate_morning_pdf()
+            if now.weekday() < 5:
+                await asyncio.to_thread(_save_history_snapshot_web, _morning_data)
             await asyncio.sleep(60)
-        # 22:05 — recap serale con confronto prezzi chiusura USA
+        # 22:05 — recap serale + chiusura storico (previsione vs realtà)
         elif h == 22 and m == 5:
             await _generate_evening_pdf()
+            if now.weekday() < 5:
+                await asyncio.to_thread(_close_history_snapshot_web)
             await asyncio.sleep(60)
         else:
             await asyncio.sleep(30)
