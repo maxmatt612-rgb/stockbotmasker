@@ -695,6 +695,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
     <button class="dw-tab" data-t="consenso">Consenso</button>
     <button class="dw-tab" data-t="dibattito">Dibattito</button>
     <button class="dw-tab" data-t="compro">Compro?</button>
+    <button class="dw-tab" data-t="options">Opzioni</button>
   </div>
   <div class="dw-body" id="dw-body"></div>
 </aside>
@@ -846,7 +847,8 @@ const I18N_EXACT={
 "Storico":"History","I giorni analizzati":"The days analyzed",
 "Rivivi le analisi passate: per ogni giornata vedi i titoli scelti e quanto sono saliti o scesi.":"Relive past analyses: for each day see the picked stocks and how much they rose or fell.",
 "Capitalizz.":"Market cap","Ricavi":"Revenue","Margine netto":"Net margin","Debito/Equity":"Debt/Equity","Dividendo":"Dividend",
-"🧠 Spiega gli indicatori con l'AI":"🧠 Explain the indicators with AI"
+"🧠 Spiega gli indicatori con l'AI":"🧠 Explain the indicators with AI",
+"Opzioni":"Options"
 };
 const I18N_PHRASES=[
 ["NON COMPRARE","DO NOT BUY"],["NON COMPRA","DO NOT BUY"],["non comprare","don't buy"],["COMPRARE","BUY"],["COMPRA","BUY"],
@@ -1082,6 +1084,34 @@ function setDwTab(t){$('#dw-tabs').dataset.cur=t;
   if(t==='consenso')loadCons();
   if(t==='dibattito')loadDebate();
   if(t==='compro')loadCompro();
+  if(t==='options')loadOptions();
+}
+async function loadOptions(){
+  const b=$('#dw-body');b.innerHTML='<div class="lline">'+T('Carico l\'attività opzioni…','Loading options activity…')+'</div>';
+  const d=await J('/api/stock/'+curTk+'/options');
+  if(!d||d.__err||!d.available){b.innerHTML='<div class="lline">'+T('Opzioni non disponibili per questo titolo.','Options not available for this stock.')+'</div>';return;}
+  const st2=(l,v)=>`<div class="stat"><div class="l">${l}</div><div class="v">${v}</div></div>`;
+  const smap={rialzista:['rialzista','bullish'],ribassista:['ribassista','bearish'],neutro:['neutro','neutral']};
+  const sm=smap[d.sentiment]||[d.sentiment,d.sentiment];
+  const scl=d.sentiment==='rialzista'?'pos':d.sentiment==='ribassista'?'neg':'';
+  const rows=(d.unusual||[]).map(u=>`<div class="wl-row" style="cursor:default">
+    <span class="tk" style="min-width:52px;color:var(${u.type==='CALL'?'--pos':'--neg'})">${u.type}</span>
+    <span style="flex:1;font-size:.76rem">Strike $${u.strike} · ${esc(u.exp)}</span>
+    <span style="font-size:.72rem;color:var(--dim)">Vol ${(+u.vol).toLocaleString()} · ${u.ratio}× OI</span>
+  </div>`).join('')||('<div class="lline">'+T('Nessun contratto con attività insolita.','No contracts with unusual activity.')+'</div>');
+  b.innerHTML=`<div class="res" style="max-width:none">
+    <div class="res-kick">${T('Attività opzioni (stima gratuita)','Options activity (free estimate)')}</div>
+    <div class="stat-grid">
+      ${st2('Put/Call',d.pc_ratio)}
+      ${st2('Sentiment',`<span class="${scl}">${T(sm[0],sm[1])}</span>`)}
+      ${st2(T('Volume call','Call volume'),(+d.call_vol).toLocaleString())}
+      ${st2(T('Volume put','Put volume'),(+d.put_vol).toLocaleString())}
+      ${d.iv_avg!=null?st2(T('Volatilità implicita','Implied vol'),d.iv_avg+'%'):''}
+    </div>
+    <div class="flab" style="margin-top:16px">${T('Contratti con attività insolita','Contracts with unusual activity')}</div>
+    <div style="margin-top:8px">${rows}</div>
+    <div class="fnote">${T('Stima da volume/open interest pubblici (Yahoo) — non è il flusso istituzionale in tempo reale.','Estimated from public volume/open interest (Yahoo) — not real-time institutional flow.')}</div>
+  </div>`;
 }
 function goTab(t){const b=$$('.dw-tab').find(x=>x.dataset.t===t);if(b){$$('.dw-tab').forEach(x=>x.classList.toggle('on',x===b));setDwTab(t);}}
 function renderSintesi(){

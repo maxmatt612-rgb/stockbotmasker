@@ -2515,6 +2515,14 @@ async def api_deep_analysis(ticker: str):
         regime = await asyncio.to_thread(_market_regime)
         _store("market-regime", regime)
     regime_line = f"{regime.get('label', 'Neutrale')} — {regime.get('detail', '')}"
+    opt = _cached(f"options:{t}")
+    if opt is None:
+        opt = await asyncio.to_thread(_options_summary, t)
+        _store(f"options:{t}", opt)
+    opt_line = ""
+    if opt and opt.get("available"):
+        opt_line = (f"Flusso opzioni (proxy Yahoo): put/call {opt.get('pc_ratio')} → sentiment {opt.get('sentiment')}; "
+                    f"volume call {opt.get('call_vol')} vs put {opt.get('put_vol')}.")
     ccy = data.get("currency", "USD")
     sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
 
@@ -2564,8 +2572,10 @@ async def api_deep_analysis(ticker: str):
         f"- Market cap: {_big(data.get('market_cap'))} | Ricavi: {_big(data.get('revenue'))}\n\n"
         f"EVENTI E SENTIMENT:\n"
         f"- Prossimi earnings: {data.get('next_earnings_str', 'N/D')} | Sentiment news: {data.get('news_sentiment_label', 'N/D')}\n"
-        f"- Notizie recenti (reali):\n{news_str}\n\n"
-        f"CONTESTO STORICO DEL BOT (usalo per calibrare la CONFIDENZA):\n- {track}\n\n"
+        f"- Notizie recenti (reali):\n{news_str}\n"
+        + (f"- {opt_line}\n" if opt_line else "")
+        + "\n"
+        + f"CONTESTO STORICO DEL BOT (usalo per calibrare la CONFIDENZA):\n- {track}\n\n"
         f"REGIME DI MERCATO (S&P 500): {regime_line}\n"
         "REGOLA DI REGIME: se il mercato è Sfavorevole (risk-off) NON dare COMPRA aggressivo, salvo forza "
         "eccezionale del titolo (abbassa la CONFIDENZA); se è Favorevole un buon setup vale di più.\n\n"
@@ -2741,6 +2751,72 @@ async def api_market_regime():
     if (c := _cached(key, 3600)) is not None:
         return c
     data = await asyncio.to_thread(_market_regime)
+    _store(key, data)
+    return data
+
+
+def _options_summary(ticker: str) -> dict:
+    """Stima gratuita dell'attività opzioni da Yahoo (volume/open interest).
+    NON è il flusso istituzionale in tempo reale di Unusual Whales, ma un proxy utile:
+    put/call ratio, sentiment e i contratti con volume anomalo (volume >> posizioni aperte)."""
+    import yfinance as yf
+    import math
+
+    def _i(x):
+        try:
+            x = float(x); return 0 if math.isnan(x) else int(x)
+        except Exception:
+            return 0
+
+    def _f(x):
+        try:
+            x = float(x); return None if math.isnan(x) else round(x, 4)
+        except Exception:
+            return None
+
+    try:
+        tk = yf.Ticker(ticker)
+        exps = list(tk.options or [])[:2]
+        if not exps:
+            return {"available": False}
+        call_vol = put_vol = call_oi = put_oi = 0
+        unusual = []; ivs = []
+        for e in exps:
+            try:
+                ch = tk.option_chain(e)
+            except Exception:
+                continue
+            for typ, df in (("CALL", ch.calls), ("PUT", ch.puts)):
+                for _, r in df.iterrows():
+                    v = _i(r.get("volume")); oi = _i(r.get("openInterest")); iv = _f(r.get("impliedVolatility"))
+                    if iv:
+                        ivs.append(iv)
+                    if typ == "CALL":
+                        call_vol += v; call_oi += oi
+                    else:
+                        put_vol += v; put_oi += oi
+                    if v >= 200 and v > oi:  # volume forte e sopra le posizioni aperte = attività nuova insolita
+                        unusual.append({"type": typ, "strike": float(r["strike"]), "exp": e,
+                                        "vol": v, "oi": oi, "ratio": round(v / max(oi, 1), 1),
+                                        "last": _f(r.get("lastPrice"))})
+        pc = round(put_vol / max(call_vol, 1), 2)
+        sentiment = "rialzista" if pc < 0.7 else ("ribassista" if pc > 1.3 else "neutro")
+        unusual.sort(key=lambda x: x["vol"], reverse=True)
+        return {"available": True, "pc_ratio": pc, "call_vol": call_vol, "put_vol": put_vol,
+                "sentiment": sentiment, "iv_avg": round(sum(ivs) / len(ivs) * 100, 1) if ivs else None,
+                "unusual": unusual[:8], "expiries": exps}
+    except Exception:
+        return {"available": False}
+
+
+@app.get("/api/stock/{ticker}/options")
+async def api_options(ticker: str):
+    """Attività opzioni (proxy gratuito da Yahoo). Cache 10 min."""
+    t = ticker.upper()
+    key = f"options:{t}"
+    if (c := _cached(key, 600)) is not None:
+        return c
+    data = await asyncio.to_thread(_options_summary, t)
     _store(key, data)
     return data
 
