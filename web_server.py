@@ -2510,6 +2510,11 @@ async def api_deep_analysis(ticker: str):
     news_titles = (data.get("news") or [])[:5]
     news_str = "\n".join(f"- {n}" for n in news_titles) or "Nessuna notizia recente disponibile."
     track = _bot_track_record()
+    regime = _cached("market-regime", 3600)
+    if regime is None:
+        regime = await asyncio.to_thread(_market_regime)
+        _store("market-regime", regime)
+    regime_line = f"{regime.get('label', 'Neutrale')} — {regime.get('detail', '')}"
     ccy = data.get("currency", "USD")
     sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
 
@@ -2561,8 +2566,11 @@ async def api_deep_analysis(ticker: str):
         f"- Prossimi earnings: {data.get('next_earnings_str', 'N/D')} | Sentiment news: {data.get('news_sentiment_label', 'N/D')}\n"
         f"- Notizie recenti (reali):\n{news_str}\n\n"
         f"CONTESTO STORICO DEL BOT (usalo per calibrare la CONFIDENZA):\n- {track}\n\n"
-        "Ragiona sui dati (trend tecnico + momentum + fondamentali + rischio) e SOPRATTUTTO sulle NOTIZIE "
-        "RECENTI reali qui sopra, poi rispondi SOLO in questo "
+        f"REGIME DI MERCATO (S&P 500): {regime_line}\n"
+        "REGOLA DI REGIME: se il mercato è Sfavorevole (risk-off) NON dare COMPRA aggressivo, salvo forza "
+        "eccezionale del titolo (abbassa la CONFIDENZA); se è Favorevole un buon setup vale di più.\n\n"
+        "Ragiona sui dati (trend tecnico + momentum + fondamentali + rischio), sul REGIME di mercato e "
+        "SOPRATTUTTO sulle NOTIZIE RECENTI reali qui sopra, poi rispondi SOLO in questo "
         "formato ESATTO, in ITALIANO, concreto e SPECIFICO (cita i numeri reali sopra e collega le notizie).\n"
         "SUL VERDETTO SII DECISO: se il quadro complessivo è favorevole all'acquisto (potenziale di crescita) "
         "→ COMPRA; se è chiaramente negativo → VENDI. Usa ASPETTA SOLO se i dati sono davvero contrastanti, "
@@ -2629,6 +2637,112 @@ async def api_deep_analysis(ticker: str):
         return result
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/stock/{ticker}/explain")
+async def api_explain(ticker: str):
+    """Spiega in modo semplice cosa dicono gli indicatori (RSI, P/E, ROE...) per QUESTO titolo."""
+    t = ticker.upper()
+    key = f"explain:{t}:{_lang()}"
+    if (c := _cached(key, 3600)) is not None:
+        return c
+    if not groq_client:
+        return JSONResponse({"error": "AI non disponibile"}, status_code=503)
+    data = await asyncio.to_thread(get_enriched_analysis, t)
+    if not data:
+        return JSONResponse({"error": "ticker non trovato"}, status_code=404)
+    data = _clean(data)
+
+    def _v(x, fmt="{:.2f}", dash=None):
+        try:
+            return fmt.format(x) if x is not None else dash
+        except Exception:
+            return dash
+
+    rows = [
+        ("RSI (14)", _v(data.get("rsi"), "{:.0f}")),
+        ("P/E", _v(data.get("pe_ratio"))),
+        ("P/E forward", _v(data.get("forward_pe"))),
+        ("EPS", _v(data.get("eps"))),
+        ("ROE", _v(data.get("roe"))),
+        ("Margine netto", _v(data.get("profit_margin"))),
+        ("Debito/Equity", _v(data.get("debt_equity"))),
+        ("Dividend yield", _v(data.get("dividend_yield"))),
+        ("Beta", _v(data.get("beta"))),
+    ]
+    metrics = "\n".join(f"- {n}: {v}" for n, v in rows if v is not None)
+    prompt = (
+        f"Titolo {t} ({data.get('name', t)}), settore {data.get('sector', 'N/D')}. Indicatori attuali:\n{metrics}\n\n"
+        "Spiega a un PRINCIPIANTE, in ITALIANO semplice, cosa significano. Per OGNI indicatore elencato scrivi "
+        "UNA riga in questo formato ESATTO (usa la barra verticale):\n"
+        "NOME | cosa misura in parole povere | cosa dice il valore di QUESTO titolo (es. buono / normale / attenzione)\n"
+        "Niente premesse né disclaimer. Una riga per indicatore."
+    )
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile", max_tokens=750,
+            messages=[
+                {"role": "system", "content": "Sei un divulgatore finanziario che spiega gli indicatori in modo semplice e concreto, in italiano, senza gergo inutile."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        items = []
+        for line in text.split("\n"):
+            l = line.strip().lstrip("-•*").strip()
+            if "|" not in l:
+                continue
+            parts = [p.strip() for p in l.split("|")]
+            if len(parts) >= 3 and parts[0]:
+                items.append({"nome": parts[0], "misura": parts[1], "valore": parts[2]})
+        result = {"items": items} if items else {"text": text}
+        _store(key, result)
+        return result
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+def _market_regime() -> dict:
+    """Regime di mercato dall'S&P 500: Favorevole (risk-on) / Neutrale / Sfavorevole (risk-off)."""
+    import yfinance as yf
+    import pandas as pd
+    try:
+        hist = yf.download("^GSPC", period="1y", interval="1d", auto_adjust=True, progress=False)
+        if hist.empty:
+            return {"state": "neutrale", "label": "Neutrale", "detail": "Dati di mercato non disponibili."}
+        close = hist["Close"]
+        if isinstance(close, pd.DataFrame):
+            close = close.iloc[:, 0]
+        close = close.dropna()
+        if len(close) < 55:
+            return {"state": "neutrale", "label": "Neutrale", "detail": "Storico di mercato insufficiente."}
+        price = float(close.iloc[-1])
+        sma50 = float(close.tail(50).mean())
+        ret20 = (price / float(close.iloc[-21]) - 1) * 100 if len(close) >= 21 else 0.0
+        above50 = price > sma50
+        if above50 and ret20 > -1:
+            state, label = "risk-on", "Favorevole"
+            detail = f"S&P 500 sopra la media a 50 giorni, trend positivo ({ret20:+.1f}% nell'ultimo mese)."
+        elif (not above50) and ret20 < 0:
+            state, label = "risk-off", "Sfavorevole"
+            detail = f"S&P 500 sotto la media a 50 giorni, mercato debole ({ret20:+.1f}% nell'ultimo mese)."
+        else:
+            state, label = "neutrale", "Neutrale"
+            detail = f"Mercato incerto: S&P {'sopra' if above50 else 'sotto'} la media 50gg ({ret20:+.1f}% nell'ultimo mese)."
+        return {"state": state, "label": label, "detail": detail, "sp_ret_20d": round(ret20, 1)}
+    except Exception:
+        return {"state": "neutrale", "label": "Neutrale", "detail": "Regime non disponibile."}
+
+
+@app.get("/api/market/regime")
+async def api_market_regime():
+    """Regime di mercato (per il badge in home e per calibrare l'AI). Cache 1h."""
+    key = "market-regime"
+    if (c := _cached(key, 3600)) is not None:
+        return c
+    data = await asyncio.to_thread(_market_regime)
+    _store(key, data)
+    return data
 
 
 @app.get("/api/stock/{ticker}/why-today")

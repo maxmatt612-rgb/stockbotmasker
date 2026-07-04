@@ -438,6 +438,25 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
 .hist-day.on{border-color:var(--accent);background:var(--accent-soft)}
 .hist-day .d{font-family:var(--mono);font-size:.82rem;font-weight:600}
 @media(max-width:780px){ .hist-grid{grid-template-columns:1fr} }
+/* Regime di mercato */
+.regime-badge{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:10px;
+  padding:9px 14px;font-size:.78rem;background:var(--surface);margin-top:14px}
+.regime-badge .dot{width:9px;height:9px;border-radius:50%;flex:none}
+.regime-badge.on .dot{background:var(--pos)} .regime-badge.off .dot{background:var(--neg)} .regime-badge.neu .dot{background:var(--warn)}
+.regime-badge b{font-weight:600}
+.regime-badge .rd{color:var(--dim);font-size:.72rem}
+/* Fondamentali */
+.fund-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:1px;background:var(--border);
+  border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-top:12px}
+.fund-grid .c{background:var(--surface);padding:10px 11px;text-align:center}
+.fund-grid .c .l{font-size:.62rem;color:var(--faint);text-transform:uppercase;letter-spacing:.03em}
+.fund-grid .c .v{font-family:var(--mono);font-weight:600;font-size:.92rem;margin-top:3px}
+/* Spiega con AI */
+.explain-item{display:grid;grid-template-columns:96px 1fr;gap:4px 12px;padding:9px 0;border-bottom:1px solid var(--border)}
+.explain-item:last-child{border-bottom:none}
+.explain-item .n{font-family:var(--mono);font-weight:600;font-size:.78rem;color:var(--accent)}
+.explain-item .m{font-size:.76rem;color:var(--dim);line-height:1.4}
+.explain-item .val{grid-column:2;font-size:.76rem;color:var(--text);line-height:1.4}
 </style>
 </head>
 <body>
@@ -488,6 +507,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
       <p id="dash-sub">Ecco come si muovono i mercati in questo momento.</p>
     </div>
     <div id="track-record"></div>
+    <div id="market-regime"></div>
     <div class="kpi-grid" id="kpi-grid"><div class="lline" style="padding:30px 0">Caricamento mercati…</div></div>
     <div class="card2" style="margin-top:16px">
       <div class="dash-chart-hd">
@@ -824,7 +844,9 @@ const I18N_EXACT={
 "In attesa della prima giornata di mercato chiusa · apri il Track record →":"Waiting for the first closed market day · open Track record →",
 "Simulazione su prezzi storici reali · esclude commissioni e dividendi · i risultati passati non garantiscono quelli futuri.":"Simulation on real historical prices · excludes fees and dividends · past results don't guarantee future ones.",
 "Storico":"History","I giorni analizzati":"The days analyzed",
-"Rivivi le analisi passate: per ogni giornata vedi i titoli scelti e quanto sono saliti o scesi.":"Relive past analyses: for each day see the picked stocks and how much they rose or fell."
+"Rivivi le analisi passate: per ogni giornata vedi i titoli scelti e quanto sono saliti o scesi.":"Relive past analyses: for each day see the picked stocks and how much they rose or fell.",
+"Capitalizz.":"Market cap","Ricavi":"Revenue","Margine netto":"Net margin","Debito/Equity":"Debt/Equity","Dividendo":"Dividend",
+"🧠 Spiega gli indicatori con l'AI":"🧠 Explain the indicators with AI"
 };
 const I18N_PHRASES=[
 ["NON COMPRARE","DO NOT BUY"],["NON COMPRA","DO NOT BUY"],["non comprare","don't buy"],["COMPRARE","BUY"],["COMPRA","BUY"],
@@ -855,7 +877,8 @@ const I18N_PHRASES=[
 ["previsioni corrette","correct predictions"],
 ["giornate","days"],
 ["segnali","signals"],
-["Previsione","Forecast"]
+["Previsione","Forecast"],
+["Fondamentali","Fundamentals"]
 ];
 function _trText(v){
   const k=v.trim(); if(!k) return v;
@@ -1093,11 +1116,52 @@ function renderSintesi(){
       ${st('Settore',d.sector||'—')}
       ${st('Earnings',d.next_earnings_str||'—')}
     </div>
+    ${fundamentalsHTML(d)}
     ${setupCardHTML(d)}
     <div id="dw-forecast" style="margin-top:18px"></div>`;
   loadChart(chartTF);
   loadForecast(curTk);
   recalcPos();
+}
+// Fondamentali dell'azienda + pulsante "Spiega con AI"
+function _pct(v){return v==null||isNaN(+v)?null:(Math.abs(+v)<=5?(+v*100):+v);}
+function _big(v){if(v==null||isNaN(+v))return null;v=+v;const a=Math.abs(v);
+  if(a>=1e12)return (v/1e12).toFixed(2)+'T';if(a>=1e9)return (v/1e9).toFixed(1)+'B';if(a>=1e6)return (v/1e6).toFixed(0)+'M';return ''+Math.round(v);}
+function fundamentalsHTML(d){
+  const cell=(l,v)=>`<div class="c"><div class="l">${l}</div><div class="v">${v==null?'—':v}</div></div>`;
+  const roe=_pct(d.roe), mar=_pct(d.profit_margin), dyd=_pct(d.dividend_yield);
+  const sym=(d.currency&&ccySym(d.currency))||'$';
+  return `<div class="setup-card">
+    <div class="flab" style="margin:0">Fondamentali · ${esc(d.sector||'—')}</div>
+    <div class="fund-grid">
+      ${cell('Capitalizz.',_big(d.market_cap)!=null?sym+_big(d.market_cap):null)}
+      ${cell('Ricavi',_big(d.revenue)!=null?sym+_big(d.revenue):null)}
+      ${cell('P/E',d.pe_ratio!=null?(+d.pe_ratio).toFixed(1):null)}
+      ${cell('P/E fwd',d.forward_pe!=null?(+d.forward_pe).toFixed(1):null)}
+      ${cell('EPS',d.eps!=null?(+d.eps).toFixed(2):null)}
+      ${cell('ROE',roe!=null?roe.toFixed(0)+'%':null)}
+      ${cell('Margine netto',mar!=null?mar.toFixed(0)+'%':null)}
+      ${cell('Debito/Equity',d.debt_equity!=null?(+d.debt_equity).toFixed(2):null)}
+      ${cell('Dividendo',dyd!=null?dyd.toFixed(2)+'%':null)}
+    </div>
+    <button class="mini-btn" style="margin-top:12px;width:100%" onclick="loadExplain()">🧠 Spiega gli indicatori con l'AI</button>
+    <div id="explain-box" style="margin-top:12px"></div>
+  </div>`;
+}
+async function loadExplain(){
+  const box=$('#explain-box');if(!box||!curTk)return;
+  if(box.dataset.loaded==='1'){box.innerHTML='';box.dataset.loaded='';return;} // toggle
+  box.innerHTML='<div class="lline">'+T('L\'AI sta spiegando gli indicatori…','AI is explaining the indicators…')+'</div>';
+  const d=await J('/api/stock/'+curTk+'/explain');
+  if(!d||d.__err||d.error){box.innerHTML='<div class="lline">'+T('Spiegazione non disponibile.','Explanation not available.')+'</div>';return;}
+  box.dataset.loaded='1';
+  if(Array.isArray(d.items)&&d.items.length){
+    box.innerHTML=d.items.map(it=>`<div class="explain-item">
+      <span class="n">${esc(it.nome)}</span><span class="m">${esc(it.misura)}</span>
+      <span class="val">→ ${esc(it.valore)}</span></div>`).join('');
+  } else {
+    box.innerHTML=`<div class="news-ai" style="display:block">${esc(d.text||'')}</div>`;
+  }
 }
 // previsioni analisti + target tra gli anni
 const fpc=v=>v==null||isNaN(+v)?'—':((+v)>=0?'+':'')+((+v)*100).toFixed(1)+'%';
@@ -1773,6 +1837,20 @@ async function loadHistoryDay(date){
   </div>`;
 }
 renderTrack();
+
+// ── Regime di mercato (badge in home + calibra l'AI lato server) ──
+async function loadRegime(){
+  const box=$('#market-regime');if(!box)return;
+  const d=await J('/api/market/regime');
+  if(!d||d.__err||!d.state){box.innerHTML='';return;}
+  const map={'risk-on':['on',T('Favorevole','Favorable')],'risk-off':['off',T('Sfavorevole','Unfavorable')],'neutrale':['neu',T('Neutrale','Neutral')]};
+  const mv=map[d.state]||map['neutrale'];
+  const ret=d.sp_ret_20d;
+  const detail=ret!=null?(T('S&P 500 ','S&P 500 ')+(ret>=0?'+':'')+ret+T('% nell\'ultimo mese','% over the last month')):'';
+  box.innerHTML=`<div class="regime-badge ${mv[0]}" title="${T('Regime di mercato: influenza i giudizi COMPRA/VENDI dell\'AI','Market regime: influences the AI BUY/SELL calls')}"><span class="dot"></span>
+    <span><b>${T('Mercato','Market')}: ${mv[1]}</b> <span class="rd">${esc(detail)}</span></span></div>`;
+}
+loadRegime();
 
 // ── Watchlist (localStorage + prezzi live) ──
 function wlGet(){return lsGet('watchlist',[]);}
