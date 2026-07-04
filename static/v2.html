@@ -1117,11 +1117,9 @@ function renderSintesi(){
       ${st('Earnings',d.next_earnings_str||'—')}
     </div>
     ${fundamentalsHTML(d)}
-    ${setupCardHTML(d)}
     <div id="dw-forecast" style="margin-top:18px"></div>`;
   loadChart(chartTF);
   loadForecast(curTk);
-  recalcPos();
 }
 // Fondamentali dell'azienda + pulsante "Spiega con AI"
 function _pct(v){return v==null||isNaN(+v)?null:(Math.abs(+v)<=5?(+v*100):+v);}
@@ -1945,62 +1943,6 @@ async function newsAI(i){
   box.innerHTML=`${esc(d.spiegazione||'')}${d.impatto?`<br><b>${LANG==='en'?'Impact':'Impatto'}:</b> ${esc(d.impatto)}`:''}${sent?`<br><span class="sent ${sc}">${LANG==='en'?'Sentiment':'Sentiment'}: ${esc(d.sentiment)}</span>`:''}`;
 }
 
-// ── Calcolatore di posizione (nel pannello titolo) ──
-let _setup=null;
-function computeSetup(d){
-  if(d&&d.trade_setup&&d.trade_setup.entry)return d.trade_setup;
-  const entry=+(d&&d.current_price)||0;if(!entry)return null;
-  const vol=(d&&d.volatility!=null)?+d.volatility:40;
-  const dailyVol=entry*(vol/100)/Math.sqrt(252);
-  const mult=vol<30?1.5:(vol<60?2:2.5);
-  const stopDist=Math.max(dailyVol*mult,entry*0.02);const tgtDist=stopDist*2.5;
-  return {entry:+entry.toFixed(2),stop:+(entry-stopDist).toFixed(2),target:+(entry+tgtDist).toFixed(2),
-    stop_pct:+(-stopDist/entry*100).toFixed(1),target_pct:+(tgtDist/entry*100).toFixed(1),rr:2.5,_derived:true};
-}
-function setupCardHTML(d){
-  _setup=computeSetup(d);if(!_setup)return '';
-  const cur=d.currency||'USD';const sym=ccySym(cur);
-  const cap=lsGet('calcCap',1000),risk=lsGet('calcRisk',2);
-  return `<div class="setup-card">
-    <div class="flab" style="margin:0">Setup operativo ${_setup._derived?'<span style="color:var(--faint);font-weight:400">(stimato dai dati)</span>':''}</div>
-    <div class="setup-row">
-      <div class="c"><div class="l">Entrata</div><div class="v">${sym}${_setup.entry}</div></div>
-      <div class="c"><div class="l">Stop loss</div><div class="v" style="color:var(--neg)">${sym}${_setup.stop} <span style="font-size:.7rem">(${_setup.stop_pct}%)</span></div></div>
-      <div class="c"><div class="l">Target</div><div class="v" style="color:var(--pos)">${sym}${_setup.target} <span style="font-size:.7rem">(+${_setup.target_pct}%)</span></div></div>
-    </div>
-    <div class="flab" style="margin-top:16px">Calcolatore di posizione · R/R 1:${_setup.rr}</div>
-    <div class="calc-grid">
-      <div><label>Capitale totale (${sym})</label><input class="inp" id="pc-cap" type="number" value="${cap}" oninput="recalcPos()"></div>
-      <div><label>Rischio per trade (%)</label><input class="inp" id="pc-risk" type="number" step="0.5" value="${risk}" oninput="recalcPos()"></div>
-    </div>
-    <div class="calc-out">
-      <div class="c"><div class="l">Azioni</div><div class="v" id="pc-shares">—</div></div>
-      <div class="c"><div class="l">Capitale impiegato</div><div class="v" id="pc-cost">—</div></div>
-      <div class="c"><div class="l">Guadagno se target</div><div class="v" id="pc-gain" style="color:var(--pos)">—</div></div>
-    </div>
-    <button class="mini-btn" style="margin-top:12px;width:100%" onclick="copySetup()">📋 Copia setup</button>
-  </div>`;
-}
-function recalcPos(){
-  if(!_setup)return;
-  const cap=parseFloat($('#pc-cap').value)||0,riskpct=parseFloat($('#pc-risk').value)||0;
-  lsSet('calcCap',cap);lsSet('calcRisk',riskpct);
-  const perShare=Math.abs(_setup.entry-_setup.stop);
-  const riskAmt=cap*riskpct/100;
-  let shares=perShare>0?Math.floor(riskAmt/perShare):0;
-  const maxByCap=_setup.entry>0?Math.floor(cap/_setup.entry):0;
-  if(shares>maxByCap)shares=maxByCap; // non comprare più di quanto il capitale consente
-  const cost=shares*_setup.entry,gain=shares*(_setup.target-_setup.entry);
-  const sym=(curData&&ccySym(curData.currency))||'$';
-  $('#pc-shares').textContent=shares;
-  $('#pc-cost').textContent=sym+cost.toFixed(0);
-  $('#pc-gain').textContent='+'+sym+gain.toFixed(0);
-}
-function copySetup(){
-  if(!_setup)return;const tk=curTk||'';const sym=(curData&&ccySym(curData.currency))||'$';
-  const txt=`${tk} — Setup\nEntrata: ${sym}${_setup.entry}\nStop: ${sym}${_setup.stop} (${_setup.stop_pct}%)\nTarget: ${sym}${_setup.target} (+${_setup.target_pct}%)\nR/R 1:${_setup.rr}`;
-  try{navigator.clipboard.writeText(txt);toast('Setup copiato',tk);}catch(e){toast('Copia non riuscita');}
-}
 // Stella dall'header del pannello titolo
 function dwStar(){if(curTk)wlToggle(curTk,$('#dw-star'));}
 
