@@ -9,6 +9,11 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, List, Optional
+from zoneinfo import ZoneInfo
+
+# Fuso orario di riferimento: così lo scheduler (07:35/22:05) funziona identico
+# sul PC italiano E su un server cloud (che gira in UTC).
+ROME = ZoneInfo("Europe/Rome")
 
 from fastapi import FastAPI, Header, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -730,7 +735,7 @@ def _save_history_snapshot_web(stocks: list):
     Girato dal sito stesso: non serve il bot Telegram."""
     if not stocks:
         return
-    date_iso = datetime.now().strftime("%Y-%m-%d")
+    date_iso = datetime.now(ROME).strftime("%Y-%m-%d")
     try:
         history = json.loads(HISTORY_FILE.read_text(encoding="utf-8")) if HISTORY_FILE.exists() else {}
     except Exception:
@@ -739,7 +744,7 @@ def _save_history_snapshot_web(stocks: list):
         return  # giornata già chiusa, non sovrascrivere
     history[date_iso] = {
         "date": date_iso,
-        "generated_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "generated_at": datetime.now(ROME).strftime("%Y-%m-%dT%H:%M:%S"),
         "closed": False,
         "stocks": [
             {
@@ -767,7 +772,7 @@ def _save_history_snapshot_web(stocks: list):
 def _close_history_snapshot_web():
     """Chiude lo snapshot di oggi con i prezzi di chiusura → previsione vs realtà."""
     import yfinance as yf
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(ROME).strftime("%Y-%m-%d")
     if not HISTORY_FILE.exists():
         return
     try:
@@ -787,7 +792,7 @@ def _close_history_snapshot_web():
         if pa > 0 and pc > 0:
             s["close_vs_morning_pct"] = round((pc - pa) / pa * 100, 2)
     snap["closed"] = True
-    snap["closed_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    snap["closed_at"] = datetime.now(ROME).strftime("%Y-%m-%dT%H:%M:%S")
     history[today] = snap
     try:
         HISTORY_FILE.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -799,7 +804,7 @@ def _close_history_snapshot_web():
 async def _pdf_scheduler():
     """Scheduler giornaliero: 07:30 scan, 07:35 PDF mattina + storico, 22:05 recap + chiusura storico."""
     while True:
-        now = datetime.now()
+        now = datetime.now(ROME)
         h, m = now.hour, now.minute
         # 07:30 — scan mattutino (dati fissati per la giornata)
         if h == 7 and m == 30:
