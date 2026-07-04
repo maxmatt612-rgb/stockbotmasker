@@ -2367,6 +2367,44 @@ async def api_timing(ticker: str):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+def _bot_track_record() -> str:
+    """Riassunto del track record del bot (segnali già chiusi) da passare all'AI
+    perché calibri la confidenza sulla base dei risultati reali passati."""
+    try:
+        if not HISTORY_FILE.exists():
+            return "Ancora nessuno storico di previsioni chiuse: mantieni una CONFIDENZA prudente (max ~75%)."
+        history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return "Storico non disponibile: mantieni una CONFIDENZA prudente."
+    total = correct = 0
+    for snap in history.values():
+        if not snap.get("closed"):
+            continue
+        for s in snap.get("stocks", []):
+            pa = s.get("price_at_analysis") or 0.0
+            pc = s.get("price_at_close") or 0.0
+            score = s.get("score_10") or 5.0
+            if pa <= 0 or pc <= 0:
+                continue
+            verdict = (s.get("verdict") or "").upper()
+            if score >= 7 or any(k in verdict for k in ("COMPRA", "BUY")):
+                up = True
+            elif score <= 4 or any(k in verdict for k in ("VENDI", "SELL")):
+                up = False
+            else:
+                continue
+            pct = (pc - pa) / pa * 100
+            total += 1
+            if (up and pct > 0) or (not up and pct < 0):
+                correct += 1
+    if total == 0:
+        return "Ancora nessuno storico di previsioni chiuse: mantieni una CONFIDENZA prudente (max ~75%)."
+    acc = round(correct / total * 100)
+    tone = "solido" if acc >= 65 else ("nella media" if acc >= 55 else "debole")
+    return (f"Track record reale del bot su segnali simili: {acc}% di previsioni corrette su {total} chiuse "
+            f"(storico {tone}). Calibra la CONFIDENZA di conseguenza: evita valori alti se lo storico è debole.")
+
+
 @app.get("/api/stock/{ticker}/deep")
 async def api_deep_analysis(ticker: str):
     """Analizzatore AI completo: descrizione azienda, verdetto, perché, rischi,
@@ -2385,6 +2423,7 @@ async def api_deep_analysis(ticker: str):
 
     news_titles = (data.get("news") or [])[:5]
     news_str = "\n".join(f"- {n}" for n in news_titles) or "Nessuna notizia recente disponibile."
+    track = _bot_track_record()
     ccy = data.get("currency", "USD")
     sym = "€" if ccy == "EUR" else ("£" if ccy == "GBP" else "$")
 
@@ -2434,9 +2473,11 @@ async def api_deep_analysis(ticker: str):
         f"- Market cap: {_big(data.get('market_cap'))} | Ricavi: {_big(data.get('revenue'))}\n\n"
         f"EVENTI E SENTIMENT:\n"
         f"- Prossimi earnings: {data.get('next_earnings_str', 'N/D')} | Sentiment news: {data.get('news_sentiment_label', 'N/D')}\n"
-        f"- Notizie recenti:\n{news_str}\n\n"
-        "Ragiona sui dati (trend tecnico + momentum + fondamentali + rischio), poi rispondi SOLO in questo "
-        "formato ESATTO, in ITALIANO, concreto e SPECIFICO (cita i numeri reali sopra).\n"
+        f"- Notizie recenti (reali):\n{news_str}\n\n"
+        f"CONTESTO STORICO DEL BOT (usalo per calibrare la CONFIDENZA):\n- {track}\n\n"
+        "Ragiona sui dati (trend tecnico + momentum + fondamentali + rischio) e SOPRATTUTTO sulle NOTIZIE "
+        "RECENTI reali qui sopra, poi rispondi SOLO in questo "
+        "formato ESATTO, in ITALIANO, concreto e SPECIFICO (cita i numeri reali sopra e collega le notizie).\n"
         "SUL VERDETTO SII DECISO: se il quadro complessivo è favorevole all'acquisto (potenziale di crescita) "
         "→ COMPRA; se è chiaramente negativo → VENDI. Usa ASPETTA SOLO se i dati sono davvero contrastanti, "
         "MAI come risposta prudente di default. Privilegia una direzione chiara.\n"
@@ -2447,6 +2488,9 @@ async def api_deep_analysis(ticker: str):
         "RISCHI: [2-3 rischi specifici e reali]\n"
         "CONCORRENTI: [3-4 aziende concorrenti con i TICKER in maiuscolo es: AMD, INTC, QCOM]\n"
         "NOTIZIE: [1-2 frasi sulla situazione attuale]\n"
+        "PREVISIONE: [cosa potrebbe succedere nelle prossime 2-4 settimane: scenario più probabile con stima "
+        "direzionale (rialzo/laterale/ribasso), + 1 catalizzatore che lo confermerebbe e 1 che lo ribalterebbe. "
+        "Collega ESPLICITAMENTE le notizie recenti reali qui sopra.]\n"
     )
     try:
         resp = await groq_client.chat.completions.create(
@@ -2460,7 +2504,7 @@ async def api_deep_analysis(ticker: str):
         )
         text = resp.choices[0].message.content.strip()
         sec = {"descrizione": "", "verdetto": "ASPETTA", "confidenza": 70,
-               "perche": "", "rischi": "", "concorrenti": "", "notizie": ""}
+               "perche": "", "rischi": "", "concorrenti": "", "notizie": "", "previsione": ""}
         cur = None
         for line in text.split("\n"):
             l = line.strip()
@@ -2485,6 +2529,8 @@ async def api_deep_analysis(ticker: str):
                 sec["concorrenti"] = l.split(":", 1)[1].strip(); cur = "concorrenti"
             elif lu.startswith("NOTIZIE:"):
                 sec["notizie"] = l.split(":", 1)[1].strip(); cur = "notizie"
+            elif lu.startswith("PREVISIONE:"):
+                sec["previsione"] = l.split(":", 1)[1].strip(); cur = "previsione"
             elif cur and l:
                 sec[cur] += " " + l
 

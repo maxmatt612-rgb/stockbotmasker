@@ -854,7 +854,8 @@ const I18N_PHRASES=[
 ["segnali chiusi · apri il Track record →","closed signals · open Track record →"],
 ["previsioni corrette","correct predictions"],
 ["giornate","days"],
-["segnali","signals"]
+["segnali","signals"],
+["Previsione","Forecast"]
 ];
 function _trText(v){
   const k=v.trim(); if(!k) return v;
@@ -1282,6 +1283,7 @@ async function loadDeep(){
     <div class="prose"><div class="h">Cos'è</div>${esc(d.descrizione)}</div>
     <div class="prose"><div class="h">Perché</div>${esc(d.perche)}</div>
     <div class="prose"><div class="h">Rischi</div>${esc(d.rischi)}</div>
+    ${d.previsione?`<div class="prose" style="border-left:2px solid var(--accent);padding-left:12px"><div class="h">🔮 Previsione</div>${esc(d.previsione)}</div>`:''}
     ${d.notizie?`<div class="prose"><div class="h">Situazione</div>${esc(d.notizie)}</div>`:''}
     ${(d.concorrenti_tickers||[]).length?`<div class="chips"><span style="font-size:.7rem;color:var(--dim)">Concorrenti:</span>${d.concorrenti_tickers.map(c=>`<span class="chip" onclick="openStock('${c}')">${esc(c)}</span>`).join('')}</div>`:''}
     <div class="fnote">GPT-OSS 120B con ragionamento · su dati reali · non è consulenza finanziaria</div></div>`+aiToolsHTML();
