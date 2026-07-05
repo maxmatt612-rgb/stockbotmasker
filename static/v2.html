@@ -504,6 +504,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
   <button class="tab" data-v="timing"><span class="ti">◴</span>Timing</button>
   <button class="tab" data-v="portfolio"><span class="ti">▤</span>Portafoglio</button>
   <div class="side-sec">Decisioni AI</div>
+  <button class="tab" data-v="analisi"><span class="ti">◈</span>Analisi</button>
   <button class="tab" data-v="compare"><span class="ti">⇄</span>Confronto</button>
   <button class="tab" data-v="chartai"><span class="ti">◳</span>Grafico AI</button>
   <div class="side-sec">Strumenti</div>
@@ -576,6 +577,18 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
     <div class="lead"><div><div class="eyebrow">Track record</div><h2>Quanto ci azzecca il bot</h2>
       <p>Accuratezza reale dei segnali e backtest del portafoglio simulato. Si basa sulle giornate di mercato già chiuse.</p></div></div>
     <div id="track-page"><div class="lline" style="padding:24px 0">Caricamento track record…</div></div>
+  </section>
+
+  <section data-view="analisi" hidden>
+    <div class="lead"><div><div class="eyebrow">Report completo</div><h2>Analisi di un titolo</h2>
+      <p>Inserisci un ticker e ottieni un report d'investimento completo: verdetto, consenso analisti, target, fondamentali, tecnica, rischi e titoli simili.</p></div></div>
+    <div class="panel" style="max-width:none">
+      <div style="display:flex;gap:10px">
+        <input class="inp" id="an-tk" placeholder="Es. AAPL, NVDA, SPY" autocapitalize="characters" spellcheck="false" style="flex:1">
+        <button class="btn" onclick="runFullAnalysis()">Analizza</button>
+      </div>
+    </div>
+    <div id="an-res" style="margin-top:18px"></div>
   </section>
 
   <section data-view="chartai" hidden>
@@ -670,7 +683,6 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
   </div>
   <div class="dw-tabs" id="dw-tabs">
     <button class="dw-tab on" data-t="sintesi">Sintesi</button>
-    <button class="dw-tab" data-t="analisi">Analisi</button>
     <button class="dw-tab" data-t="ai">Analisi AI</button>
     <button class="dw-tab" data-t="consenso">Consenso</button>
     <button class="dw-tab" data-t="dibattito">Dibattito</button>
@@ -829,7 +841,10 @@ const I18N_EXACT={
 "Rivivi le analisi passate: per ogni giornata vedi i titoli scelti e quanto sono saliti o scesi.":"Relive past analyses: for each day see the picked stocks and how much they rose or fell.",
 "Capitalizz.":"Market cap","Ricavi":"Revenue","Margine netto":"Net margin","Debito/Equity":"Debt/Equity","Dividendo":"Dividend",
 "🧠 Spiega gli indicatori con l'AI":"🧠 Explain the indicators with AI",
-"Opzioni":"Options","Analisi":"Analysis"
+"Opzioni":"Options","Analisi":"Analysis",
+"Report completo":"Full report","Analisi di un titolo":"Analyze a stock",
+"Inserisci un ticker e ottieni un report d'investimento completo: verdetto, consenso analisti, target, fondamentali, tecnica, rischi e titoli simili.":"Enter a ticker and get a complete investment report: verdict, analyst consensus, targets, fundamentals, technicals, risks and similar stocks.",
+"Es. AAPL, NVDA, SPY":"e.g. AAPL, NVDA, SPY"
 };
 const I18N_PHRASES=[
 ["NON COMPRARE","DO NOT BUY"],["NON COMPRA","DO NOT BUY"],["non comprare","don't buy"],["COMPRARE","BUY"],["COMPRA","BUY"],
@@ -1066,20 +1081,22 @@ function setDwTab(t){$('#dw-tabs').dataset.cur=t;
   if(t==='compro')loadCompro();
   if(t==='options')loadOptions();
   if(t==='prompt')loadPrompts();
-  if(t==='analisi')loadAnalisi();
 }
-// ── Tab "Analisi": report d'investimento completo sul titolo ──
-async function loadAnalisi(){
-  const b=$('#dw-body');if(!b||!curTk)return;
-  b.innerHTML='<div class="lline">'+T('Report d\'investimento completo in preparazione… (~25s)','Full investment report in progress… (~25s)')+'</div>';
-  const d=await J('/api/stock/'+curTk+'/prompt?type=full');
-  if(!d||d.__err||d.error||!d.text){b.innerHTML='<div class="lline">'+T('Analisi non disponibile.','Analysis not available.')+'</div>';return;}
-  b.innerHTML=`<div class="res" style="max-width:none">
-    <div class="res-kick">${T('Report d\'investimento completo','Full investment report')}</div>
+// ── Vista "Analisi": report d'investimento completo da un ticker inserito ──
+async function runFullAnalysis(){
+  const tk=($('#an-tk').value||'').trim().toUpperCase();
+  const out=$('#an-res');if(!out)return;
+  if(!tk){$('#an-tk').focus();return;}
+  out.innerHTML='<div class="lline">'+T('Report d\'investimento completo in preparazione… (~25s)','Full investment report in progress… (~25s)')+'</div>';
+  const d=await J('/api/stock/'+encodeURIComponent(tk)+'/prompt?type=full');
+  if(!d||d.__err||d.error||!d.text){out.innerHTML='<div class="lline">'+T('Titolo non trovato o analisi non disponibile.','Stock not found or analysis unavailable.')+'</div>';return;}
+  out.innerHTML=`<div class="res" style="max-width:none">
+    <div class="res-kick">${esc(d.ticker)} · ${T('Report d\'investimento completo','Full investment report')}</div>
     <div class="prompt-out">${mdToHtml(d.text)}</div>
-    <div class="fnote">${T('Generato dall\'AI sui dati reali del titolo · alcune cifre sono stime (segnate) · non è consulenza finanziaria.','AI-generated on the stock\'s real data · some figures are estimates (flagged) · not financial advice.')}</div>
+    <div class="fnote">${T('Generato dall\'AI sui dati reali · alcune cifre sono stime (segnate) · non è consulenza finanziaria.','AI-generated on real data · some figures are estimates (flagged) · not financial advice.')}</div>
   </div>`;
 }
+{const _an=$('#an-tk');if(_an)_an.addEventListener('keydown',e=>{if(e.key==='Enter')runFullAnalysis();});}
 // ── Power prompt: analisi da grande banca sul titolo ──
 const POWER_PROMPTS=[
   {k:'dcf',e:'💰',it:'Valutazione DCF',en:'DCF Valuation',s_it:'Modello DCF stile Morgan Stanley',s_en:'Morgan Stanley–style DCF model'},
