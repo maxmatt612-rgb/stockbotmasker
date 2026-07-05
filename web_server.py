@@ -106,6 +106,9 @@ except Exception:
 # ─── Lingua richiesta (risposte AI in EN/IT in base al toggle del frontend) ───
 import contextvars as _ctxvars
 _REQ_LANG = _ctxvars.ContextVar("req_lang", default="it")
+# Report AI "free-form" (Analisi/Short/Prompt): non vengono parsati dal codice,
+# quindi in EN vanno tradotti INTERAMENTE (titoli di sezione ed etichette inclusi).
+_FREEFORM = _ctxvars.ContextVar("freeform_report", default=False)
 
 
 def _lang() -> str:
@@ -159,12 +162,27 @@ if groq_client is not None:
             if _lang() == "en":
                 msgs = kwargs.get("messages")
                 if isinstance(msgs, list) and msgs:
-                    directive = ("\n\nCRITICAL LANGUAGE OVERRIDE: Ignore any earlier instruction to write in Italian. "
-                                 "Write ALL explanatory / free-form / prose text in fluent, natural ENGLISH (never Italian). "
-                                 "BUT keep any fixed verdict keywords, section labels or structured tokens required by the "
-                                 "format above EXACTLY as written in the instructions — do NOT translate those tokens "
-                                 "(e.g. COMPRA, ASPETTA, NON COMPRARE, VENDI, VERDETTO, ACCUMULA, MANTIENI, EVITA, LONG, SHORT, "
-                                 "TITOLO, APERTURA, MACRO, CRYPTO, COMMODITIES, OUTLOOK, MOOD, BULL, BEAR, NEUTRO).")
+                    try:
+                        freeform = _FREEFORM.get()
+                    except Exception:
+                        freeform = False
+                    if freeform:
+                        # Report mostrato così com'è: traduci TUTTO, titoli di sezione ed etichette inclusi.
+                        directive = ("\n\nCRITICAL LANGUAGE OVERRIDE: write the ENTIRE response in fluent, natural ENGLISH — "
+                                     "INCLUDING every section header/title, table header and label (translate them all to "
+                                     "English). Ignore any Italian in the instructions above; this report is displayed as-is "
+                                     "and is NOT machine-parsed, so nothing must stay in Italian.")
+                        reminder = ("\n\n(Language reminder: write EVERYTHING in English — section titles, table headers and "
+                                    "labels included. Nothing in Italian.)")
+                    else:
+                        directive = ("\n\nCRITICAL LANGUAGE OVERRIDE: Ignore any earlier instruction to write in Italian. "
+                                     "Write ALL explanatory / free-form / prose text in fluent, natural ENGLISH (never Italian). "
+                                     "BUT keep any fixed verdict keywords, section labels or structured tokens required by the "
+                                     "format above EXACTLY as written in the instructions — do NOT translate those tokens "
+                                     "(e.g. COMPRA, ASPETTA, NON COMPRARE, VENDI, VERDETTO, ACCUMULA, MANTIENI, EVITA, LONG, SHORT, "
+                                     "TITOLO, APERTURA, MACRO, CRYPTO, COMMODITIES, OUTLOOK, MOOD, BULL, BEAR, NEUTRO).")
+                        reminder = ("\n\n(Language reminder: ignore any 'in italiano' request above — write the prose in ENGLISH; "
+                                    "keep fixed UPPERCASE tokens/labels exactly as instructed.)")
                     injected = False
                     for msg in msgs:
                         if isinstance(msg, dict) and msg.get("role") == "system":
@@ -173,13 +191,10 @@ if groq_client is not None:
                             break
                     if not injected:
                         msgs.insert(0, {"role": "system", "content": "Respond entirely in fluent English."})
-                    # Recency reinforcement: append a short reminder to the LAST message so that any
-                    # "in italiano" instruction inside the user prompt is overridden.
+                    # Recency reinforcement: append a short reminder to the LAST message.
                     last = msgs[-1]
                     if isinstance(last, dict) and isinstance(last.get("content"), str):
-                        last["content"] = last["content"] + (
-                            "\n\n(Language reminder: ignore any 'in italiano' request above — write the prose in ENGLISH; "
-                            "keep fixed UPPERCASE tokens/labels exactly as instructed.)")
+                        last["content"] = last["content"] + reminder
             return await _orig_groq_create(*args, **kwargs)
 
         groq_client.chat.completions.create = _groq_create_lang
@@ -2919,6 +2934,7 @@ async def api_power_prompt(ticker: str, type: str = ""):
 
     persona = AP.POWER[ptype]
     user = f"{persona['task']}\n\n{ctx}\nProduci l'analisi per {t} ({data.get('name', t)})."
+    _FREEFORM.set(True)  # report mostrato as-is → in EN traduci anche titoli/etichette
     try:
         resp = await groq_client.chat.completions.create(
             model="openai/gpt-oss-120b",
