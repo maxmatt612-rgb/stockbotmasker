@@ -95,6 +95,7 @@ app.add_middleware(
 )
 
 # ─── Groq AI client ───────────────────────────────────────────────────────────
+import analyst_prompts as AP  # prompt di analisi livello Wall Street
 _GROQ_KEY = os.getenv("GROQ_API_KEY")
 try:
     from groq import AsyncGroq
@@ -1474,7 +1475,7 @@ async def api_ai(ticker: str):
             model="llama-3.3-70b-versatile",
             max_tokens=350,
             messages=[
-                {"role": "system", "content": "Sei un analista finanziario AI che dà segnali di trading NETTI. Devi sempre dare una raccomandazione precisa: COMPRA, VENDI, o ASPETTA. Non usare mai 'valuta con cautela', 'dipende', 'potrebbe'. Analizza i dati tecnici e fondamentali e dai una decisione chiara. Rispondi in italiano."},
+                {"role": "system", "content": AP.SIGNAL},
                 {"role": "user",   "content": prompt},
             ],
         )
@@ -1567,7 +1568,7 @@ async def api_longterm(ticker: str):
                 model="llama-3.3-70b-versatile",
                 max_tokens=250,
                 messages=[
-                    {"role": "system", "content": "Sei un analista buy-side esperto di investimenti a lungo termine. Dai giudizi netti (ACCUMULA/MANTIENI/EVITA) basandoti su dati quantitativi. Rispondi in italiano."},
+                    {"role": "system", "content": AP.LONGTERM},
                     {"role": "user",   "content": prompt},
                 ],
             )
@@ -1730,7 +1731,7 @@ async def api_best_buy(horizon: str = "short"):
             )
             r = await groq_client.chat.completions.create(
                 model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="low",
-                messages=[{"role": "system", "content": "Sei un analista finanziario che descrive a scopo informativo ed educativo le caratteristiche tecniche dei titoli (trend, momentum, indicatori). NON dai consulenza personalizzata e NON rifiuti mai: descrivi i dati e i punti di forza tecnici. Italiano, conciso."},
+                messages=[{"role": "system", "content": AP.BEST_BUY},
                           {"role": "user", "content": prompt}])
             reasoning = r.choices[0].message.content.strip()
         except Exception:
@@ -1826,7 +1827,7 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
             )
             r = await groq_client.chat.completions.create(
                 model="openai/gpt-oss-120b", max_tokens=1400, reasoning_effort="low",
-                messages=[{"role": "system", "content": "Sei un trader deciso: dai verdetti netti (COMPRA/ASPETTA/NON COMPRARE) sull'orizzonte richiesto, valutando il potenziale di crescita su quell'arco temporale. Non rispondere ASPETTA per eccesso di prudenza: scegli una direzione quando i dati la suggeriscono. Italiano, diretto."},
+                messages=[{"role": "system", "content": AP.VERDICT},
                           {"role": "user", "content": prompt}])
             txt = r.choices[0].message.content.strip()
             for line in txt.split("\n"):
@@ -1988,10 +1989,10 @@ async def api_debate(ticker: str):
 
     async def _side(role):
         if role == "bull":
-            sysm = "Sei l'analista RIALZISTA (toro): costruisci la tesi più forte per COMPRARE il titolo."
+            sysm = AP.BULL
             ask = "A FAVORE dell'acquisto"
         else:
-            sysm = "Sei l'analista RIBASSISTA (orso): costruisci la tesi più forte per NON comprare o vendere."
+            sysm = AP.BEAR
             ask = "CONTRO l'acquisto"
         pr = (f"Dati di {t}:\n{brief}\n\nDai i 3 argomenti più forti {ask}, concreti e con NUMERI. "
               "Formato: esattamente 3 righe, ognuna inizia con '- '. Italiano, nient'altro.")
@@ -2019,7 +2020,7 @@ async def api_debate(ticker: str):
     try:
         r = await groq_client.chat.completions.create(
             model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="low",
-            messages=[{"role": "system", "content": "Sei il trader capo: equilibrato, deciso, in italiano."},
+            messages=[{"role": "system", "content": AP.JUDGE},
                       {"role": "user", "content": judge_pr}])
         for line in r.choices[0].message.content.split("\n"):
             lu = line.strip().upper()
@@ -2109,7 +2110,7 @@ async def api_deep_report(ticker: str):
             model="llama-3.3-70b-versatile",
             max_tokens=1700,
             messages=[
-                {"role": "system", "content": "Sei un analista azionario istituzionale rigoroso e diretto. Assegni punteggi numerici onesti e dai una decisione netta. Italiano."},
+                {"role": "system", "content": AP.REPORT},
                 {"role": "user", "content": prompt},
             ],
         )
@@ -2425,7 +2426,7 @@ async def api_timing(ticker: str):
         resp = await groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile", max_tokens=320,
             messages=[
-                {"role": "system", "content": "Sei un trader tecnico esperto di market timing. Dai indicazioni concrete su QUANDO entrare (ora, aspetta un pullback a un prezzo, aspetta una rottura, aspetta N giorni). Conciso, in italiano. Le previsioni sono incerte."},
+                {"role": "system", "content": AP.TIMING},
                 {"role": "user", "content": prompt},
             ],
         )
@@ -2515,7 +2516,7 @@ async def api_deep_analysis(ticker: str):
         regime = await asyncio.to_thread(_market_regime)
         _store("market-regime", regime)
     regime_line = f"{regime.get('label', 'Neutrale')} — {regime.get('detail', '')}"
-    opt = _cached(f"options:{t}")
+    opt = _cached(f"options:{t}", 600)
     if opt is None:
         opt = await asyncio.to_thread(_options_summary, t)
         _store(f"options:{t}", opt)
@@ -2602,7 +2603,7 @@ async def api_deep_analysis(ticker: str):
             max_tokens=1800,
             reasoning_effort="low",
             messages=[
-                {"role": "system", "content": "Sei un analista finanziario senior di Wall Street: esamini TUTTI i dati tecnici e fondamentali forniti e dai un verdetto NETTO e deciso (preferisci COMPRA o VENDI; ASPETTA solo se davvero contrastante), motivato e specifico, in italiano. Conosci bene i concorrenti delle aziende quotate. Niente giri di parole, niente prudenza eccessiva."},
+                {"role": "system", "content": AP.DEEP},
                 {"role": "user", "content": prompt},
             ],
         )
@@ -2821,6 +2822,78 @@ async def api_options(ticker: str):
     return data
 
 
+@app.get("/api/stock/{ticker}/prompt")
+async def api_power_prompt(ticker: str, type: str = ""):
+    """Esegue un 'power prompt' (DCF, pre-earnings, tecnica, competitiva, pattern)
+    sul titolo specifico, con i dati reali iniettati. Cache 1h."""
+    t = ticker.upper()
+    ptype = (type or "").lower()
+    if ptype not in AP.POWER:
+        return JSONResponse({"error": "tipo prompt non valido"}, status_code=400)
+    key = f"power:{t}:{ptype}:{_lang()}"
+    if (c := _cached(key, 3600)) is not None:
+        return c
+    if not groq_client:
+        return JSONResponse({"error": "AI non disponibile"}, status_code=503)
+    data = await asyncio.to_thread(get_enriched_analysis, t)
+    if not data:
+        return JSONResponse({"error": "ticker non trovato"}, status_code=404)
+    data = _clean(data)
+
+    def _v(x, fmt="{:.2f}", dash="N/D"):
+        try:
+            return fmt.format(x) if x is not None else dash
+        except Exception:
+            return dash
+
+    def _big(x):
+        try:
+            x = float(x)
+        except Exception:
+            return "N/D"
+        for u, dv in (("T", 1e12), ("B", 1e9), ("M", 1e6)):
+            if abs(x) >= dv:
+                return f"{x/dv:.1f}{u}"
+        return f"{x:.0f}"
+
+    ctx = (
+        f"DATI REALI ATTUALI di {t} ({data.get('name', t)}) — settore {data.get('sector', 'N/D')}:\n"
+        f"- Prezzo: ${_v(data.get('current_price'))} ({(data.get('day_change_pct') or 0):+.1f}% oggi)\n"
+        f"- 52 settimane: min ${_v(data.get('week_52_low'))} / max ${_v(data.get('week_52_high'))}\n"
+        f"- Performance: settimana {(data.get('week_return') or 0):+.1f}%, mese {(data.get('month_return') or 0):+.1f}%, YTD {(data.get('ytd_return') or 0):+.1f}%\n"
+        f"- RSI {_v(data.get('rsi'), '{:.0f}')} | Volatilità {_v(data.get('volatility'), '{:.0f}')}% | Beta {_v(data.get('beta'))}\n"
+        f"- P/E {_v(data.get('pe_ratio'))} (forward {_v(data.get('forward_pe'))}) | EPS {_v(data.get('eps'))} | ROE {_v(data.get('roe'))}\n"
+        f"- Margine netto {_v(data.get('profit_margin'))} | Debito/Equity {_v(data.get('debt_equity'))} | Dividend yield {_v(data.get('dividend_yield'))}\n"
+        f"- Market cap {_big(data.get('market_cap'))} | Ricavi {_big(data.get('revenue'))}\n"
+        f"- Prossimi earnings: {data.get('next_earnings_str', 'N/D')} | Sentiment news: {data.get('news_sentiment_label', 'N/D')}\n"
+    )
+    opt = _cached(f"options:{t}", 600)
+    if opt and opt.get("available"):
+        ctx += f"- Flusso opzioni: put/call {opt.get('pc_ratio')} → {opt.get('sentiment')}\n"
+    news = (data.get("news") or [])[:5]
+    if news:
+        ctx += "NOTIZIE RECENTI (reali):\n" + "\n".join(f"- {n}" for n in news) + "\n"
+
+    persona = AP.POWER[ptype]
+    user = f"{persona['task']}\n\n{ctx}\nProduci l'analisi per {t} ({data.get('name', t)})."
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            max_tokens=3000,
+            reasoning_effort="low",
+            messages=[
+                {"role": "system", "content": persona["system"]},
+                {"role": "user", "content": user},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        result = {"type": ptype, "ticker": t, "name": data.get("name", t), "text": text}
+        _store(key, result)
+        return result
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.get("/api/stock/{ticker}/why-today")
 async def api_why_today(ticker: str):
     """3 bullet points: perché il titolo si è mosso oggi (AI, cached 30 min)."""
@@ -2913,7 +2986,7 @@ async def api_forecast(ticker: str):
             model="llama-3.3-70b-versatile",
             max_tokens=300,
             messages=[
-                {"role": "system", "content": "Sei un analista tecnico esperto. Fornisci previsioni orientative basate su indicatori tecnici. Sii preciso nel formato richiesto. Le previsioni sui mercati sono intrinsecamente incerte."},
+                {"role": "system", "content": AP.FORECAST},
                 {"role": "user", "content": prompt},
             ],
         )
@@ -4698,18 +4771,13 @@ async def api_chat(body: ChatBody):
     }.get(level, "Rispondi in modo chiaro e professionale.")
 
     sys_prompt = (
-        "Sei Marco, trader e analista finanziario con 20 anni di esperienza "
-        "tra Goldman Sachs, Point72 e hedge fund europei. "
-        "Hai una conoscenza enciclopedica di analisi tecnica, fondamentale, macro, "
-        "opzioni, ETF, settori, earnings, Federal Reserve e BCE. "
-        "Hai accesso ai dati di mercato in tempo reale mostrati qui sotto. "
-        "\n\nREGOLE FONDAMENTALI:"
-        "\n- Rispondi SOLO alle domande finanziarie che ti vengono poste."
-        "\n- NON fare analisi spontanee o riepiloghi non richiesti."
-        "\n- Sii diretto, concreto, dai opinioni nette quando richiesto."
-        "\n- Se l'utente chiede di un titolo specifico, usa i dati real-time e il portafoglio."
-        "\n- DISCLAIMER: le tue risposte sono puramente informative."
-        "\n- Rispondi SEMPRE in italiano."
+        AP.CHAT
+        + "\n\nHai accesso ai dati di mercato in tempo reale mostrati qui sotto."
+        "\n\nREGOLE OPERATIVE:"
+        "\n- Rispondi SOLO alle domande finanziarie che ti vengono poste; niente analisi "
+        "spontanee o riepiloghi non richiesti."
+        "\n- Se l'utente cita un titolo, usa i dati real-time e il portafoglio qui sotto."
+        "\n- Dati prima, opinione netta dopo. Disclaimer minimo: risposte informative."
         f"\n\n{level_style}"
         + market_ctx + port_ctx + wl_ctx
     )

@@ -457,6 +457,27 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
 .explain-item .n{font-family:var(--mono);font-weight:600;font-size:.78rem;color:var(--accent)}
 .explain-item .m{font-size:.76rem;color:var(--dim);line-height:1.4}
 .explain-item .val{grid-column:2;font-size:.76rem;color:var(--text);line-height:1.4}
+/* Power prompt */
+.prompt-list{display:flex;flex-direction:column;gap:9px;margin-top:14px}
+.prompt-btn{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);
+  border-radius:11px;padding:13px 15px;cursor:pointer;text-align:left;transition:.15s;color:var(--text);width:100%}
+.prompt-btn:hover{border-color:var(--border-2);background:var(--surface-2)}
+.prompt-btn.on{border-color:var(--accent);background:var(--accent-soft)}
+.prompt-btn .pe{font-size:1.15rem;flex:none}
+.prompt-btn .pt{display:flex;flex-direction:column;flex:1}
+.prompt-btn .pt b{font-size:.9rem}
+.prompt-btn .ps{font-size:.72rem;color:var(--dim);margin-top:1px}
+.prompt-btn .par{color:var(--faint)}
+.prompt-out{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:16px 18px;font-size:.82rem;line-height:1.55}
+.prompt-out .md-h{font-weight:700;font-size:.92rem;margin:14px 0 6px;color:var(--text)}
+.prompt-out .md-p{margin:7px 0;color:var(--dim)}
+.prompt-out .md-ul{margin:6px 0 6px 4px;padding-left:16px;color:var(--dim)}
+.prompt-out .md-ul li{margin:3px 0}
+.prompt-out .md-hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+.prompt-out code{font-family:var(--mono);background:var(--surface-2);padding:1px 4px;border-radius:4px;font-size:.9em}
+.prompt-out .md-tbl{width:100%;border-collapse:collapse;margin:10px 0;font-size:.76rem;display:block;overflow-x:auto}
+.prompt-out .md-tbl th,.prompt-out .md-tbl td{border:1px solid var(--border);padding:6px 9px;text-align:left;white-space:nowrap}
+.prompt-out .md-tbl th{background:var(--surface-2);font-weight:600}
 </style>
 </head>
 <body>
@@ -696,6 +717,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
     <button class="dw-tab" data-t="dibattito">Dibattito</button>
     <button class="dw-tab" data-t="compro">Compro?</button>
     <button class="dw-tab" data-t="options">Opzioni</button>
+    <button class="dw-tab" data-t="prompt">Prompt</button>
   </div>
   <div class="dw-body" id="dw-body"></div>
 </aside>
@@ -1085,6 +1107,63 @@ function setDwTab(t){$('#dw-tabs').dataset.cur=t;
   if(t==='dibattito')loadDebate();
   if(t==='compro')loadCompro();
   if(t==='options')loadOptions();
+  if(t==='prompt')loadPrompts();
+}
+// ── Power prompt: analisi da grande banca sul titolo ──
+const POWER_PROMPTS=[
+  {k:'dcf',e:'💰',it:'Valutazione DCF',en:'DCF Valuation',s_it:'Modello DCF stile Morgan Stanley',s_en:'Morgan Stanley–style DCF model'},
+  {k:'earnings',e:'📊',it:'Pre-Trimestrale',en:'Pre-Earnings',s_it:'Preview earnings stile JPMorgan',s_en:'JPMorgan-style earnings preview'},
+  {k:'technical',e:'📈',it:'Analisi Tecnica',en:'Technical Analysis',s_it:'Sistema tecnico stile Citadel',s_en:'Citadel-grade technical system'},
+  {k:'competitive',e:'⚔️',it:'Vantaggio Competitivo',en:'Competitive Edge',s_it:'Analisi settore stile Bain',s_en:'Bain-style sector analysis'},
+  {k:'pattern',e:'🔬',it:'Ricerca Pattern',en:'Pattern Finder',s_it:'Pattern statistici stile Renaissance',s_en:'Renaissance-style pattern finder'},
+];
+function loadPrompts(){
+  const b=$('#dw-body');
+  b.innerHTML=`<div class="res" style="max-width:none">
+    <div class="res-kick">${T('Analisi da grande banca — scegline una','Big-bank analysis — pick one')}</div>
+    <div class="prompt-list">${POWER_PROMPTS.map(p=>`
+      <button class="prompt-btn" onclick="runPrompt('${p.k}')">
+        <span class="pe">${p.e}</span>
+        <span class="pt"><b>${T(p.it,p.en)}</b><span class="ps">${T(p.s_it,p.s_en)}</span></span>
+        <span class="par">→</span></button>`).join('')}</div>
+    <div id="prompt-out" style="margin-top:14px"></div>
+    <div class="fnote">${T('Generata dall\'AI sui dati reali del titolo · alcune cifre sono ipotesi · non è consulenza finanziaria.','AI-generated on the stock\'s real data · some figures are assumptions · not financial advice.')}</div>
+  </div>`;
+}
+async function runPrompt(k){
+  const out=$('#prompt-out');if(!out||!curTk)return;
+  $$('.prompt-btn').forEach(x=>x.classList.remove('on'));
+  const btn=[...$$('.prompt-btn')].find(x=>x.getAttribute('onclick').includes("'"+k+"'"));if(btn)btn.classList.add('on');
+  out.innerHTML='<div class="lline">'+T('L\'analista AI sta lavorando… (può richiedere ~20s)','The AI analyst is working… (may take ~20s)')+'</div>';
+  const d=await J('/api/stock/'+curTk+'/prompt?type='+k);
+  if(!d||d.__err||d.error||!d.text){out.innerHTML='<div class="lline">'+T('Analisi non disponibile.','Analysis not available.')+'</div>';return;}
+  out.innerHTML=`<div class="prompt-out">${mdToHtml(d.text)}</div>`;
+}
+// Mini-renderer Markdown (titoli, grassetto, elenchi, tabelle)
+function mdToHtml(md){
+  const e2=s=>(''+s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const inl=s=>e2(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`(.+?)`/g,'<code>$1</code>');
+  const L=(md||'').split('\n');let h='',i=0;
+  const isRow=s=>/^\s*\|.*\|\s*$/.test(s);
+  while(i<L.length){
+    let l=L[i];
+    if(isRow(l)){
+      const t=[];while(i<L.length&&isRow(L[i])){t.push(L[i]);i++;}
+      const rows=t.filter(r=>!/^\s*\|?[\s:|-]+\|?\s*$/.test(r));
+      h+='<table class="md-tbl">'+rows.map((r,ri)=>{
+        const c=r.replace(/^\s*\|/,'').replace(/\|\s*$/,'').split('|').map(x=>x.trim());
+        const tg=ri===0?'th':'td';
+        return '<tr>'+c.map(x=>`<${tg}>${inl(x)}</${tg}>`).join('')+'</tr>';
+      }).join('')+'</table>';continue;
+    }
+    const hm=l.match(/^(#{1,6})\s+(.*)$/);
+    if(hm){h+=`<div class="md-h">${inl(hm[2])}</div>`;i++;continue;}
+    if(/^\s*---+\s*$/.test(l)){h+='<hr class="md-hr">';i++;continue;}
+    if(/^\s*[-*•]\s+/.test(l)){h+='<ul class="md-ul">';while(i<L.length&&/^\s*[-*•]\s+/.test(L[i])){h+='<li>'+inl(L[i].replace(/^\s*[-*•]\s+/,''))+'</li>';i++;}h+='</ul>';continue;}
+    if(!l.trim()){i++;continue;}
+    h+='<p class="md-p">'+inl(l)+'</p>';i++;
+  }
+  return h;
 }
 async function loadOptions(){
   const b=$('#dw-body');b.innerHTML='<div class="lline">'+T('Carico l\'attività opzioni…','Loading options activity…')+'</div>';
