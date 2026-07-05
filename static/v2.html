@@ -503,10 +503,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
   <button class="tab" data-v="watchlist"><span class="ti">★</span>Watchlist</button>
   <button class="tab" data-v="timing"><span class="ti">◴</span>Timing</button>
   <button class="tab" data-v="portfolio"><span class="ti">▤</span>Portafoglio</button>
-  <button class="tab" data-v="history"><span class="ti">↺</span>Storico</button>
   <div class="side-sec">Decisioni AI</div>
-  <button class="tab" data-v="topbuy"><span class="ti">◆</span>Miglior acquisto</button>
-  <button class="tab" data-v="shouldbuy"><span class="ti">✓</span>Compro?</button>
   <button class="tab" data-v="compare"><span class="ti">⇄</span>Confronto</button>
   <button class="tab" data-v="chartai"><span class="ti">◳</span>Grafico AI</button>
   <div class="side-sec">Strumenti</div>
@@ -575,49 +572,10 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
     <div id="wl-list" style="margin-top:18px"></div>
   </section>
 
-  <section data-view="history" hidden>
-    <div class="lead"><div><div class="eyebrow">Storico</div><h2>I giorni analizzati</h2>
-      <p>Rivivi le analisi passate: per ogni giornata vedi i titoli scelti e quanto sono saliti o scesi.</p></div></div>
-    <div class="hist-grid">
-      <div id="hist-list"></div>
-      <div id="hist-detail"></div>
-    </div>
-  </section>
-
   <section data-view="track" hidden>
     <div class="lead"><div><div class="eyebrow">Track record</div><h2>Quanto ci azzecca il bot</h2>
       <p>Accuratezza reale dei segnali e backtest del portafoglio simulato. Si basa sulle giornate di mercato già chiuse.</p></div></div>
     <div id="track-page"><div class="lline" style="padding:24px 0">Caricamento track record…</div></div>
-  </section>
-
-  <section data-view="topbuy" hidden>
-    <div class="lead"><div><div class="eyebrow">Decisione AI</div><h2>Il miglior acquisto adesso</h2>
-      <p>L'AI scandaglia il mercato e indica la singola opportunità migliore per il tuo orizzonte.</p></div></div>
-    <div class="panel">
-      <div class="flab">Orizzonte d'investimento</div>
-      <div class="tf-row" id="tb-tf">
-        <div class="tf on" data-h="short"><b>Breve termine</b><span>3–6 mesi</span></div>
-        <div class="tf" data-h="long"><b>Lungo termine</b><span>12–24 mesi</span></div>
-      </div>
-      <button class="btn" style="margin-top:18px;width:100%" onclick="runTopBuy()">Ottieni il consiglio</button>
-    </div>
-    <div id="tb-res" style="margin-top:18px"></div>
-  </section>
-
-  <section data-view="shouldbuy" hidden>
-    <div class="lead"><div><div class="eyebrow">Verdetto</div><h2>Compro o no?</h2>
-      <p>Giudizio basato sui dati con zona d'ingresso, stop-loss e catalizzatori.</p></div></div>
-    <div class="panel">
-      <div class="flab">Ticker</div>
-      <input class="inp" id="sb-tk" placeholder="Es. TSLA" autocapitalize="characters" spellcheck="false">
-      <div class="flab" style="margin-top:16px">Orizzonte</div>
-      <div class="tf-row" id="sb-tf">
-        <div class="tf on" data-h="short"><b>Breve termine</b><span>3–6 mesi</span></div>
-        <div class="tf" data-h="long"><b>Lungo termine</b><span>12–24 mesi</span></div>
-      </div>
-      <button class="btn" style="margin-top:18px;width:100%" onclick="runShouldBuy()">Analizza</button>
-    </div>
-    <div id="sb-res" style="margin-top:18px"></div>
   </section>
 
   <section data-view="chartai" hidden>
@@ -955,7 +913,6 @@ $('#nav').addEventListener('click',e=>{const b=e.target.closest('.tab');if(!b)re
   const v=b.dataset.v;$$('section[data-view]').forEach(s=>s.hidden=s.dataset.view!==v);
   if(v==='watchlist')wlRender();
   if(v==='track')loadTrackPage();
-  if(v==='history')loadHistory();
   if(!_loaded[v]){_loaded[v]=true;
     if(v==='briefing')loadBriefing();
     if(v==='radar')loadRadar();
@@ -1493,43 +1450,10 @@ async function loadCompro(){
   injectPeers('#dw-body',curTk,()=>$('#dw-tabs').dataset.cur==='compro');
 }
 
-// ── Top Buy ──
-let tbH='short';
-$('#tb-tf').addEventListener('click',e=>{const t=e.target.closest('.tf');if(!t)return;tbH=t.dataset.h;$$('#tb-tf .tf').forEach(x=>x.classList.toggle('on',x===t));});
-async function runTopBuy(){
-  const r=$('#tb-res');r.innerHTML='<div class="lline">Scansione del mercato per il miglior acquisto…</div>';
-  const d=await J('/api/best-buy?horizon='+tbH);
-  if(d.__err){r.innerHTML='<div class="lline">Errore di rete.</div>';return;}
-  if(d.error){r.innerHTML=`<div class="lline">${esc(d.error)}</div>`;return;}
-  const up=(d.runners_up||[]).map(s=>`<span class="chip" onclick="openStock('${s.ticker}')">${esc(s.ticker)}${s.score_10!=null?' '+(+s.score_10).toFixed(1):''}</span>`).join('');
-  r.innerHTML=`<div class="res">
-    <div class="res-kick">Miglior acquisto · ${tbH==='long'?'lungo':'breve'} termine ${aiTag}</div>
-    <div class="res-hd"><div><span class="res-tk">${esc(d.ticker)}</span><span class="res-nm">${esc((d.name||'').slice(0,26))}</span></div><span class="res-px">${fx(d.price,d.currency)}</span></div>
-    <div class="cells">
-      ${d.score_10!=null?cell('Score',(+d.score_10).toFixed(1)+' / 10'):''}
-      ${d.entry!=null?cell('Ingresso',fx(d.entry,d.currency)):''}
-      ${d.stop!=null?cell('Stop-loss',fx(d.stop,d.currency),'r'):''}
-      ${d.target!=null?cell('Obiettivo',fx(d.target,d.currency),'g'):''}
-    </div>
-    ${d.reasoning?`<div class="prose"><div class="h">Perché questo</div>${esc(d.reasoning)}</div>`:''}
-    ${up?`<div class="chips"><span style="font-size:.7rem;color:var(--dim)">Alternative:</span>${up}</div>`:''}
-    <div class="fnote">Analisi AI · non è consulenza finanziaria</div></div>`;
-  if(d.ticker)injectPeers('#tb-res',d.ticker);
-}
+// Helper condiviso (fondamentali, Grafico AI, verdetto Compro nel pannello)
 function cell(l,v,cls){return `<div class="cell ${cls||''}"><div class="l">${l}</div><div class="v">${v}</div></div>`;}
 
-// ── Should Buy ──
-let sbH='short';
-$('#sb-tf').addEventListener('click',e=>{const t=e.target.closest('.tf');if(!t)return;sbH=t.dataset.h;$$('#sb-tf .tf').forEach(x=>x.classList.toggle('on',x===t));});
-$('#sb-tk').addEventListener('keydown',e=>{if(e.key==='Enter')runShouldBuy();});
-async function runShouldBuy(){
-  const tk=($('#sb-tk').value||'').trim().toUpperCase();if(!tk){$('#sb-tk').focus();return;}
-  const r=$('#sb-res');r.innerHTML='<div class="lline">Valutazione di '+esc(tk)+'…</div>';
-  const d=await J('/api/stock/'+tk+'/should-buy?horizon='+sbH);
-  if(d.__err||d.error){r.innerHTML=`<div class="lline">${esc((d&&d.error)||'Ticker non trovato')}</div>`;return;}
-  r.innerHTML=shouldHTML(d);
-  injectPeers('#sb-res',tk);
-}
+// ── Verdetto "Compro?" — usato dal tab del pannello titolo (loadCompro) ──
 function shouldHTML(d){
   const cats=(d.catalysts||[]).map(c=>`<li>${esc(c)}</li>`).join('');
   return `<div class="res" style="max-width:none">
@@ -1900,49 +1824,8 @@ async function loadTrackPage(){
   box.innerHTML=html;
 }
 
-// ── Storico: giorni analizzati + quanto sono saliti ──
+// Helper di traduzione condiviso (usato da opzioni, regime, prompt, ecc.)
 function T(it,en){return LANG==='en'?en:it;}
-async function loadHistory(){
-  const box=$('#hist-list');if(!box)return;
-  box.innerHTML='<div class="lline" style="padding:18px 0">'+T('Caricamento storico…','Loading history…')+'</div>';
-  const days=await J('/api/history');
-  if(!Array.isArray(days)||!days.length){
-    box.innerHTML='<div class="empty"><span class="ic">↺</span><h3>'+T('Ancora nessuno storico','No history yet')+'</h3><p>'+T('Lo storico si riempie quando il bot analizza una giornata di mercato. Torna tra un giorno o due.','History fills in once the bot analyzes a market day. Come back in a day or two.')+'</p></div>';
-    const dt=$('#hist-detail');if(dt)dt.innerHTML='';return;
-  }
-  box.innerHTML=days.map(d=>`<div class="hist-day" data-date="${esc(d.date)}" onclick="loadHistoryDay('${esc(d.date)}')">
-    <span class="d">${esc(d.date)}</span>
-    <span style="flex:1;font-size:.72rem;color:var(--dim)">${d.count} ${T('titoli','stocks')}</span>
-    <span class="rs-chip ${d.closed?'pos':''}">${d.closed?T('chiuso','closed'):T('in corso','open')}</span>
-  </div>`).join('');
-  loadHistoryDay(days[0].date);
-}
-async function loadHistoryDay(date){
-  const box=$('#hist-detail');if(!box)return;
-  $$('#hist-list .hist-day').forEach(el=>el.classList.toggle('on',el.dataset.date===date));
-  box.innerHTML='<div class="lline" style="padding:18px 0">'+esc(date)+'…</div>';
-  const d=await J('/api/history/'+encodeURIComponent(date));
-  if(!d||d.__err||!Array.isArray(d.stocks)){box.innerHTML='<div class="lline">'+T('Giorno non disponibile.','Day not available.')+'</div>';return;}
-  const stocks=d.stocks.slice().sort((a,b)=>(b.pct_since_analysis??-999)-(a.pct_since_analysis??-999));
-  const valid=stocks.filter(s=>s.pct_since_analysis!=null);
-  const avg=valid.length?valid.reduce((s,x)=>s+x.pct_since_analysis,0)/valid.length:0;
-  const rows=stocks.map(s=>{
-    const pct=s.pct_since_analysis,cl=(pct??0)>=0?'pos':'neg';
-    const exit=s.current_price||s.price_at_close;
-    return `<div class="wl-row" data-tk="${esc(s.ticker)}" onclick="openStock('${esc(s.ticker)}')">
-      <span class="tk">${esc(s.ticker)}</span>
-      <span style="flex:1;font-size:.72rem;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((s.name||'').slice(0,22))}</span>
-      <span class="px" style="font-size:.74rem">${fx(s.price_at_analysis,s.currency)} → ${fx(exit,s.currency)}</span>
-      <span class="chg ${cl}" style="min-width:62px;text-align:right">${pct!=null?(pct>=0?'+':'')+(+pct).toFixed(2)+'%':'—'}</span>
-    </div>`;}).join('');
-  box.innerHTML=`<div class="setup-card">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
-      <div class="flab" style="margin:0">${esc(date)} · ${stocks.length} ${T('titoli','stocks')} ${d.closed?'('+T('chiuso','closed')+')':'('+T('in corso','open')+')'}</div>
-      <span class="trk-sub">${T('Media giornata','Day average')}: <b style="color:var(${avg>=0?'--pos':'--neg'})">${avg>=0?'+':''}${avg.toFixed(2)}%</b></span>
-    </div>
-    <div style="margin-top:12px">${rows}</div>
-  </div>`;
-}
 renderTrack();
 
 // ── Regime di mercato (badge in home + calibra l'AI lato server) ──
