@@ -2811,7 +2811,7 @@ def _options_summary(ticker: str) -> dict:
 
 
 def _analyst_snapshot(t: str) -> dict:
-    """Consenso analisti reale (target medio/alto/basso, raccomandazione, n. analisti) da Yahoo."""
+    """Consenso analisti + short interest + ownership reali da Yahoo (per report completo/short)."""
     import yfinance as yf
     try:
         info = yf.Ticker(t).info or {}
@@ -2821,6 +2821,11 @@ def _analyst_snapshot(t: str) -> dict:
             "target_low": info.get("targetLowPrice"),
             "recommendation": info.get("recommendationKey", ""),
             "num_analysts": info.get("numberOfAnalystOpinions"),
+            "short_pct_float": info.get("shortPercentOfFloat"),
+            "days_to_cover": info.get("shortRatio"),
+            "inst_pct": info.get("heldPercentInstitutions"),
+            "insider_pct": info.get("heldPercentInsiders"),
+            "beta": info.get("beta"),
         }
     except Exception:
         return {}
@@ -2884,18 +2889,30 @@ async def api_power_prompt(ticker: str, type: str = ""):
         f"- Prossimi earnings: {data.get('next_earnings_str', 'N/D')} | Sentiment news: {data.get('news_sentiment_label', 'N/D')}\n"
     )
     opt = _cached(f"options:{t}", 600)
+    if opt is None and ptype == "short":  # per lo short il posizionamento opzioni è centrale
+        opt = await asyncio.to_thread(_options_summary, t)
+        _store(f"options:{t}", opt)
     if opt and opt.get("available"):
-        ctx += f"- Flusso opzioni: put/call {opt.get('pc_ratio')} → {opt.get('sentiment')}\n"
-    # Report completo: inietta anche il consenso analisti reale
-    if ptype == "full":
+        ctx += f"- Flusso opzioni: put/call {opt.get('pc_ratio')} → {opt.get('sentiment')}"
+        if opt.get("iv_avg") is not None:
+            ctx += f", IV media {opt.get('iv_avg')}%"
+        ctx += "\n"
+    # Report completo o short: inietta consenso analisti + short interest reali
+    if ptype in ("full", "short"):
         an = _cached(f"analyst:{t}", 3600)
         if an is None:
             an = await asyncio.to_thread(_analyst_snapshot, t)
             _store(f"analyst:{t}", an)
-        if an.get("target_mean") or an.get("num_analysts"):
+        if an and (an.get("target_mean") or an.get("num_analysts")):
             ctx += (f"- Consenso analisti (Yahoo): raccomandazione {an.get('recommendation') or 'N/D'}, "
                     f"{an.get('num_analysts') or 'N/D'} analisti; target medio ${_v(an.get('target_mean'))} "
                     f"(basso ${_v(an.get('target_low'))} / alto ${_v(an.get('target_high'))})\n")
+        if an and (an.get("short_pct_float") is not None or an.get("days_to_cover") is not None):
+            spf = an.get("short_pct_float")
+            ctx += (f"- Short interest: {_v(spf and spf*100, '{:.1f}')}% del flottante, "
+                    f"days-to-cover {_v(an.get('days_to_cover'), '{:.1f}')}; "
+                    f"istituzionali {_v(an.get('inst_pct') and an['inst_pct']*100, '{:.0f}')}%, "
+                    f"insider {_v(an.get('insider_pct') and an['insider_pct']*100, '{:.1f}')}%\n")
     news = (data.get("news") or [])[:5]
     if news:
         ctx += "NOTIZIE RECENTI (reali):\n" + "\n".join(f"- {n}" for n in news) + "\n"
@@ -2905,7 +2922,7 @@ async def api_power_prompt(ticker: str, type: str = ""):
     try:
         resp = await groq_client.chat.completions.create(
             model="openai/gpt-oss-120b",
-            max_tokens=4200 if ptype == "full" else 3000,
+            max_tokens=5200 if ptype in ("full", "short") else 3000,
             reasoning_effort="low",
             messages=[
                 {"role": "system", "content": persona["system"]},

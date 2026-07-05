@@ -505,6 +505,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
   <button class="tab" data-v="portfolio"><span class="ti">▤</span>Portafoglio</button>
   <div class="side-sec">Decisioni AI</div>
   <button class="tab" data-v="analisi"><span class="ti">◈</span>Analisi</button>
+  <button class="tab" data-v="short"><span class="ti">▼</span>Short</button>
   <button class="tab" data-v="compare"><span class="ti">⇄</span>Confronto</button>
   <button class="tab" data-v="chartai"><span class="ti">◳</span>Grafico AI</button>
   <div class="side-sec">Strumenti</div>
@@ -589,6 +590,18 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
       </div>
     </div>
     <div id="an-res" style="margin-top:18px"></div>
+  </section>
+
+  <section data-view="short" hidden>
+    <div class="lead"><div><div class="eyebrow">Tesi ribassista</div><h2>Analisi Short</h2>
+      <p>Inserisci un ticker: tesi short professionale (orizzonte 7 giorni – 1 mese) con convinzione, scorecard, catalizzatori e costruzione del trade. Il verdetto può essere Strong Sell / Sell / Hold.</p></div></div>
+    <div class="panel" style="max-width:none">
+      <div style="display:flex;gap:10px">
+        <input class="inp" id="sh-tk" placeholder="Es. TSLA, NVDA, COIN" autocapitalize="characters" spellcheck="false" style="flex:1">
+        <button class="btn" onclick="runShort()">Analizza short</button>
+      </div>
+    </div>
+    <div id="sh-res" style="margin-top:18px"></div>
   </section>
 
   <section data-view="chartai" hidden>
@@ -844,7 +857,9 @@ const I18N_EXACT={
 "Opzioni":"Options","Analisi":"Analysis",
 "Report completo":"Full report","Analisi di un titolo":"Analyze a stock",
 "Inserisci un ticker e ottieni un report d'investimento completo: verdetto, consenso analisti, target, fondamentali, tecnica, rischi e titoli simili.":"Enter a ticker and get a complete investment report: verdict, analyst consensus, targets, fundamentals, technicals, risks and similar stocks.",
-"Es. AAPL, NVDA, SPY":"e.g. AAPL, NVDA, SPY"
+"Es. AAPL, NVDA, SPY":"e.g. AAPL, NVDA, SPY",
+"Tesi ribassista":"Bearish thesis","Analisi Short":"Short Analysis","Analizza short":"Analyze short","Es. TSLA, NVDA, COIN":"e.g. TSLA, NVDA, COIN",
+"Inserisci un ticker: tesi short professionale (orizzonte 7 giorni – 1 mese) con convinzione, scorecard, catalizzatori e costruzione del trade. Il verdetto può essere Strong Sell / Sell / Hold.":"Enter a ticker: a professional short thesis (7 days – 1 month horizon) with conviction, scorecard, catalysts and trade construction. The verdict can be Strong Sell / Sell / Hold."
 };
 const I18N_PHRASES=[
 ["NON COMPRARE","DO NOT BUY"],["NON COMPRA","DO NOT BUY"],["non comprare","don't buy"],["COMPRARE","BUY"],["COMPRA","BUY"],
@@ -1097,6 +1112,21 @@ async function runFullAnalysis(){
   </div>`;
 }
 {const _an=$('#an-tk');if(_an)_an.addEventListener('keydown',e=>{if(e.key==='Enter')runFullAnalysis();});}
+// ── Vista "Short": tesi ribassista completa da un ticker inserito ──
+async function runShort(){
+  const tk=($('#sh-tk').value||'').trim().toUpperCase();
+  const out=$('#sh-res');if(!out)return;
+  if(!tk){$('#sh-tk').focus();return;}
+  out.innerHTML='<div class="lline">'+T('Tesi short in preparazione… (~30s)','Short thesis in progress… (~30s)')+'</div>';
+  const d=await J('/api/stock/'+encodeURIComponent(tk)+'/prompt?type=short');
+  if(!d||d.__err||d.error||!d.text){out.innerHTML='<div class="lline">'+T('Titolo non trovato o analisi non disponibile.','Stock not found or analysis unavailable.')+'</div>';return;}
+  out.innerHTML=`<div class="res" style="max-width:none">
+    <div class="res-kick">${esc(d.ticker)} · ${T('Tesi short (7 giorni – 1 mese)','Short thesis (7 days – 1 month)')}</div>
+    <div class="prompt-out">${mdToHtml(d.text)}</div>
+    <div class="fnote">${T('Generato dall\'AI sui dati reali · alcune cifre (short interest, borrow, insider) possono essere stime · non è consulenza finanziaria.','AI-generated on real data · some figures (short interest, borrow, insider) may be estimates · not financial advice.')}</div>
+  </div>`;
+}
+{const _sh=$('#sh-tk');if(_sh)_sh.addEventListener('keydown',e=>{if(e.key==='Enter')runShort();});}
 // ── Power prompt: analisi da grande banca sul titolo ──
 const POWER_PROMPTS=[
   {k:'dcf',e:'💰',it:'Valutazione DCF',en:'DCF Valuation',s_it:'Modello DCF stile Morgan Stanley',s_en:'Morgan Stanley–style DCF model'},
