@@ -500,9 +500,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
 <aside class="side" id="nav">
   <div class="side-sec">Principale</div>
   <button class="tab active" data-v="market"><span class="ti">▣</span>Mercato</button>
-  <button class="tab" data-v="watchlist"><span class="ti">★</span>Watchlist</button>
   <button class="tab" data-v="timing"><span class="ti">◴</span>Timing</button>
-  <button class="tab" data-v="portfolio"><span class="ti">▤</span>Portafoglio</button>
   <div class="side-sec">Decisioni AI</div>
   <button class="tab" data-v="analisi"><span class="ti">◈</span>Analisi</button>
   <button class="tab" data-v="short"><span class="ti">▼</span>Short</button>
@@ -560,18 +558,6 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
         <button class="btn" onclick="runScan()">Analizza ora</button>
       </div>
     </div>
-  </section>
-
-  <section data-view="watchlist" hidden>
-    <div class="lead"><div><div class="eyebrow">La tua lista</div><h2>Watchlist</h2>
-      <p>I titoli che segui, con prezzo e variazione live. Aggiungi con la ⭐ sulle card o cercando un titolo.</p></div></div>
-    <div class="panel" style="max-width:none">
-      <div style="display:flex;gap:10px">
-        <input class="inp" id="wl-add" placeholder="Aggiungi ticker (es. AAPL)" autocapitalize="characters" spellcheck="false" style="flex:1">
-        <button class="mini-btn" onclick="wlAddFromInput()">+ Aggiungi</button>
-      </div>
-    </div>
-    <div id="wl-list" style="margin-top:18px"></div>
   </section>
 
   <section data-view="track" hidden>
@@ -645,24 +631,6 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
     <div id="rd-res"><div class="lline">Scansione in corso…</div></div>
   </section>
 
-  <section data-view="portfolio" hidden>
-    <div class="lead"><div><div class="eyebrow">Portafoglio</div><h2>Le tue posizioni</h2>
-      <p>Aggiungi le tue azioni: prezzo, P&L e una valutazione AI. Si salva nel browser.</p></div>
-      <button class="btn ghost" onclick="pfEval()">Valuta con AI</button></div>
-    <div class="panel">
-      <div class="tf-row" style="grid-template-columns:1fr 1fr 1fr auto">
-        <input class="inp" id="pf-tk" placeholder="Ticker" autocapitalize="characters">
-        <input class="inp" id="pf-px" placeholder="Prezzo acquisto" type="number" step="0.0001">
-        <input class="inp" id="pf-qt" placeholder="Quantità" type="number" step="1">
-        <button class="btn" onclick="pfAdd()">+ Aggiungi</button>
-      </div>
-    </div>
-    <div id="pf-chart" style="margin-top:18px"></div>
-    <div id="pf-sum" style="margin-top:18px"></div>
-    <div id="pf-grid" class="grid"></div>
-    <div id="pf-ai" style="margin-top:18px"></div>
-  </section>
-
   <section data-view="compare" hidden>
     <div class="lead"><div><div class="eyebrow">Confronto AI</div><h2>Quale azione è meglio?</h2>
       <p>Metti due titoli a confronto: l'AI analizza i fondamentali e indica il vincitore.</p></div></div>
@@ -689,7 +657,6 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
       <div class="dw-px" id="dw-px">—</div>
     </div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
-      <button class="star-btn" id="dw-star" onclick="dwStar()" title="Watchlist">★</button>
       <a class="tv-link" id="dw-tv" href="#" target="_blank" rel="noopener" title="Apri il grafico su TradingView">📈 TradingView</a>
       <button class="dw-x" onclick="closeDrawer()">✕</button>
     </div>
@@ -942,12 +909,10 @@ const _loaded={};
 $('#nav').addEventListener('click',e=>{const b=e.target.closest('.tab');if(!b)return;
   $$('.tab').forEach(x=>x.classList.toggle('active',x===b));
   const v=b.dataset.v;$$('section[data-view]').forEach(s=>s.hidden=s.dataset.view!==v);
-  if(v==='watchlist')wlRender();
   if(v==='track')loadTrackPage();
   if(!_loaded[v]){_loaded[v]=true;
     if(v==='briefing')loadBriefing();
     if(v==='radar')loadRadar();
-    if(v==='portfolio')pfRender();
   }
 });
 
@@ -1036,7 +1001,6 @@ function rsVal(d){
 function cardHTML(s,rank){
   const ch=s.day_change_pct??0, cl=ch>=0?'pos':'neg';
   const sc=s.score_10; const scl=sc>=7.5?'':sc>=6?'mid':'low';
-  const star=wlHas(s.ticker)?'on':'';
   return `<div class="card" data-tk="${esc(s.ticker)}" onclick="openStock('${s.ticker}')">
     ${rank?`<div class="rank">#${rank}</div>`:''}
     <div class="card-tk">${esc(s.ticker)}</div>
@@ -1046,7 +1010,6 @@ function cardHTML(s,rank){
       ${sc!=null?`<span class="score ${scl}">${(+sc).toFixed(1)}</span>`:''}
       <span class="rk">${esc(s.risk_level||'')}</span>
       ${s.rsi!=null?`<span class="rsi">RSI ${(+s.rsi).toFixed(0)}</span>`:''}
-      <button class="star-btn ${star}" onclick="event.stopPropagation();wlToggle('${esc(s.ticker)}',this)" title="Aggiungi/togli dalla watchlist">★</button>
       <a class="tv-link" href="${tvUrl(s.ticker)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Apri il grafico su TradingView">📈 TV</a>
     </div></div>`;
 }
@@ -1071,7 +1034,6 @@ async function openStock(tk){
   $('#scrim').classList.add('open'); $('#drawer').classList.add('open');
   $('#dw-tk').textContent=tk; $('#dw-nm').textContent='Caricamento…'; $('#dw-px').textContent='…';
   $('#dw-tv').href=tvUrl(tk);
-  $('#dw-star').classList.toggle('on',wlHas(tk));
   $$('.dw-tab').forEach((t,i)=>t.classList.toggle('on',i===0)); $('#dw-tabs').dataset.cur='sintesi';
   $('#dw-body').innerHTML='<div class="lline">Caricamento dati…</div>';
   const d=await J('/api/stock/'+tk);
@@ -1662,59 +1624,6 @@ async function explainNews(i){
   box.innerHTML='<div class="rad-exp">'+esc(reply)+'</div>';
 }
 
-// ── Portafoglio ──
-function pf(){try{return JSON.parse(localStorage.getItem('masker_pf_v2')||'[]');}catch(_){return[];}}
-function pfSave(a){localStorage.setItem('masker_pf_v2',JSON.stringify(a));}
-function pfAdd(){
-  const t=($('#pf-tk').value||'').trim().toUpperCase(),px=parseFloat($('#pf-px').value),qt=parseFloat($('#pf-qt').value);
-  if(!t||isNaN(px)||isNaN(qt)||px<=0||qt<=0){alert('Inserisci ticker, prezzo e quantità validi.');return;}
-  const a=pf();a.push({ticker:t,buyPrice:px,qty:qt});pfSave(a);
-  $('#pf-tk').value='';$('#pf-px').value='';$('#pf-qt').value='';pfRender();
-}
-function pfDel(i){const a=pf();a.splice(i,1);pfSave(a);pfRender();}
-async function pfRender(){
-  const a=pf(),g=$('#pf-grid'),sum=$('#pf-sum');$('#pf-ai').innerHTML='';
-  if(!a.length){sum.innerHTML='';$('#pf-chart').innerHTML='';g.innerHTML='<div class="empty"><span class="ic">○</span><h3>Portafoglio vuoto</h3><p>Aggiungi le tue posizioni qui sopra.</p></div>';return;}
-  g.innerHTML=Array(a.length).fill('<div class="skel"></div>').join('');
-  const q=await J('/api/batch_quotes?tickers='+a.map(p=>p.ticker).join(','));
-  let inv=0,val=0;
-  const cards=a.map((p,i)=>{
-    const cur=(q&&q[p.ticker]&&q[p.ticker].price)||0;
-    const cost=p.buyPrice*p.qty,now=cur*p.qty,pl=now-cost,plp=cost>0?pl/cost*100:0;
-    inv+=cost;val+=now;
-    return `<div class="card" style="cursor:default">
-      <div style="display:flex;justify-content:space-between;align-items:baseline">
-        <span class="card-tk" style="cursor:pointer" onclick="openStock('${esc(p.ticker)}')">${esc(p.ticker)}</span>
-        <span class="dw-x" style="font-size:.9rem;padding:0 4px" onclick="pfDel(${i})">✕</span></div>
-      <div class="card-nm">${p.qty} × ${(+p.buyPrice).toFixed(2)}</div>
-      <div class="card-row"><span class="card-price">${cur?cur.toFixed(2):'—'}</span><span class="card-chg ${pl>=0?'pos':'neg'}">${fp(plp)}</span></div>
-      <div class="card-foot"><span class="rk">P&L</span><span class="rsi ${pl>=0?'pos':'neg'}" style="margin-left:auto">${pl>=0?'+':''}${pl.toFixed(2)}</span></div></div>`;
-  }).join('');
-  const totPl=val-inv,totPlp=inv>0?totPl/inv*100:0;
-  sum.innerHTML=`<div class="cells" style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
-    ${cell('Investito',inv.toFixed(2))}${cell('Valore attuale',val.toFixed(2))}
-    <div class="cell ${totPl>=0?'g':'r'}"><div class="l">P&L totale</div><div class="v">${totPl>=0?'+':''}${totPl.toFixed(2)} (${fp(totPlp)})</div></div>
-    ${cell('Posizioni',a.length)}</div>`;
-  g.innerHTML=cards;
-  pfChartRender(a);
-}
-async function pfEval(){
-  const a=pf();if(!a.length){alert('Aggiungi prima delle posizioni.');return;}
-  const ai=$('#pf-ai');ai.innerHTML='<div class="lline">Valutazione AI del portafoglio…</div>';
-  const q=await J('/api/batch_quotes?tickers='+a.map(p=>p.ticker).join(','));
-  const positions=a.map(p=>({ticker:p.ticker,buyPrice:p.buyPrice,qty:p.qty,currentPrice:(q&&q[p.ticker]&&q[p.ticker].price)||0,name:p.ticker}));
-  const d=await J('/api/portfolio/evaluate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({positions,level:'intermedio'})});
-  if(d.__err||d.error){ai.innerHTML=`<div class="lline">${esc((d&&d.error)||'Valutazione non disponibile')}</div>`;return;}
-  const v=(d.verdict||'NEUTRO').toUpperCase();const vc=v.includes('POSITIV')?'v-yes':v.includes('ATTENZ')?'v-no':'v-wait';
-  ai.innerHTML=`<div class="res" style="max-width:none">
-    <div class="res-kick">Valutazione AI</div>
-    ${d.verdict?`<div class="verdict ${vc}">${esc(d.verdict)}</div>`:''}
-    ${d.panoramica?`<div class="prose"><div class="h">Panoramica</div>${esc(d.panoramica)}</div>`:''}
-    ${d.rischi?`<div class="prose"><div class="h">Rischi</div>${esc(d.rischi)}</div>`:''}
-    ${d.consigli?`<div class="prose"><div class="h">Consigli</div>${esc(d.consigli)}</div>`:''}
-    <div class="fnote">Analisi AI · non è consulenza finanziaria</div></div>`;
-}
-
 // ── Confronto ──
 $('#cmp-a').addEventListener('keydown',e=>{if(e.key==='Enter')runCompare();});
 $('#cmp-b').addEventListener('keydown',e=>{if(e.key==='Enter')runCompare();});
@@ -1747,20 +1656,6 @@ function pfAreaSVG(vals,gid,h){
     <polygon points="${X(0).toFixed(1)},${H} ${pts} ${X(n-1).toFixed(1)},${H}" fill="url(#${gid})"/>
     <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
 }
-async function pfChartRender(positions){
-  const box=$('#pf-chart');if(!box)return;
-  if(!positions.length){box.innerHTML='';return;}
-  box.innerHTML='<div class="lline" style="padding:20px 0">Caricamento andamento…</div>';
-  const series=await Promise.all(positions.map(p=>J(`/api/stock/${p.ticker}/ohlc?period=6mo&interval=1d`)));
-  let common=null;
-  series.forEach(rows=>{if(!Array.isArray(rows))return;const set=new Set(rows.map(r=>r.time));common=common?new Set([...common].filter(x=>set.has(x))):set;});
-  const dates=[...(common||[])].sort();
-  if(dates.length<2){box.innerHTML='';return;}
-  const maps=series.map(rows=>{const m={};(rows||[]).forEach(r=>m[r.time]=r.close);return m;});
-  const vals=dates.map(dt=>positions.reduce((s,p,i)=>s+(maps[i][dt]||0)*p.qty,0));
-  box.innerHTML=`<div class="flab" style="margin-bottom:8px">Valore del portafoglio · ultimi 6 mesi</div><div class="chart-card">`+pfAreaSVG(vals,'pfg')+`</div>`;
-}
-
 // ── Dashboard home (panoramica mercati) ──
 const _DMI={SP500:['^GSPC','S&P 500'],NASDAQ:['^IXIC','NASDAQ'],BTC:['BTC-USD','Bitcoin'],GOLD:['GC=F','Oro'],OIL:['CL=F','Petrolio']};
 let dashTF='1A',dashSym='^GSPC',dashName='S&P 500';
@@ -1903,38 +1798,6 @@ async function loadRegime(){
 }
 loadRegime();
 
-// ── Watchlist (localStorage + prezzi live) ──
-function wlGet(){return lsGet('watchlist',[]);}
-function wlHas(tk){return wlGet().includes((tk||'').toUpperCase());}
-function wlToggle(tk,btn){tk=(tk||'').toUpperCase();let l=wlGet();
-  if(l.includes(tk)){l=l.filter(x=>x!==tk);toast('Rimosso dalla watchlist',tk);}
-  else{l.push(tk);toast('Aggiunto alla watchlist',tk);}
-  lsSet('watchlist',l);
-  if(btn)btn.classList.toggle('on',l.includes(tk));
-  if(!$('section[data-view=watchlist]').hidden)wlRender();
-}
-function wlAddFromInput(){const i=$('#wl-add');const v=(i.value||'').trim().toUpperCase();if(!v)return;
-  let l=wlGet();if(!l.includes(v)){l.push(v);lsSet('watchlist',l);}i.value='';wlRender();}
-function wlDel(tk){lsSet('watchlist',wlGet().filter(x=>x!==tk));wlRender();}
-async function wlRender(){
-  const box=$('#wl-list');if(!box)return;
-  const l=wlGet();
-  if(!l.length){box.innerHTML='<div class="empty"><span class="ic">★</span><h3>Watchlist vuota</h3><p>Aggiungi titoli con la stella sulle card o dalla casella qui sopra.</p></div>';return;}
-  box.innerHTML=l.map(()=>'<div class="skel skel-row"></div>').join('');
-  const q=await J('/api/batch_quotes?tickers='+encodeURIComponent(l.join(',')));
-  box.innerHTML=l.map(tk=>{
-    const x=(q&&q[tk])||{};
-    const ch=x.chg; const cl=(ch??0)>=0?'pos':'neg';
-    return `<div class="wl-row" data-tk="${esc(tk)}" onclick="openStock('${tk}')">
-      <span class="tk">${esc(tk)}</span>
-      <span class="px">${x.price!=null?fx(x.price,'USD'):'—'}</span>
-      <span class="chg ${cl}">${ch!=null?fp(ch):''}</span>
-      <a class="tv-link" href="${tvUrl(tk)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📈 TV</a>
-      <button class="del" onclick="event.stopPropagation();wlDel('${tk}')" title="Rimuovi">✕</button>
-    </div>`;}).join('');
-  annotateEarnings(l,'#wl-list');
-}
-
 // ── Avviso earnings: badge "Earnings tra Xg" su card e watchlist ──
 function daysUntil(s){if(!s)return null;const p=(''+s).slice(0,10).split('-').map(Number);if(p.length<3||!p[0])return null;
   const d=new Date(p[0],p[1]-1,p[2]);const t=new Date();t.setHours(0,0,0,0);return Math.round((d-t)/864e5);}
@@ -1996,8 +1859,6 @@ async function newsAI(i){
   box.innerHTML=`${esc(d.spiegazione||'')}${d.impatto?`<br><b>${LANG==='en'?'Impact':'Impatto'}:</b> ${esc(d.impatto)}`:''}${sent?`<br><span class="sent ${sc}">${LANG==='en'?'Sentiment':'Sentiment'}: ${esc(d.sentiment)}</span>`:''}`;
 }
 
-// Stella dall'header del pannello titolo
-function dwStar(){if(curTk)wlToggle(curTk,$('#dw-star'));}
 
 i18nInit();
 </script>
