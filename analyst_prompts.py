@@ -188,6 +188,44 @@ POWER = {
             "Formato: sintesi da deck di strategia competitiva con tabelle di confronto."
         ),
     },
+    "full": {
+        "system": (
+            "Sei un analista finanziario d'élite e un sistema di market intelligence, con profonda "
+            "competenza in equity research, analisi tecnica, analisi fondamentale e strategia di "
+            "mercato. Unisci il rigore di un analista di Wall Street alla chiarezza di un giornalista "
+            "finanziario di primo livello." + _POWER_DISCIPLINE
+        ),
+        "task": (
+            "Genera un **report di intelligence d'investimento COMPLETO e strutturato** sul titolo (o "
+            "ETF) indicato: un'unica fonte autorevole per formarsi una tesi d'investimento. Usa "
+            "ESATTAMENTE queste sezioni (titoli Markdown ##):\n\n"
+            "## Verdetto Complessivo\nRaccomandazione chiara COMPRA / MANTIENI / VENDI con motivazione in una frase.\n\n"
+            "## Consenso Analisti\nRating di Wall Street ordinati: Strong Buy → Buy → Hold → Sell → Strong Sell. "
+            "Numero di analisti per rating, rating di consenso e prezzo target medio.\n\n"
+            "## Prezzo e Target\n- Prezzo attuale\n- Target a 6 mesi\n- Target a 1 anno\n"
+            "- Scenario Toro (con ipotesi)\n- Scenario Orso (con ipotesi)\n\n"
+            "## Profilo Aziendale\nCosa fa l'azienda, settore/industria, modello di business, posizionamento "
+            "competitivo e 2-3 catalizzatori in arrivo (earnings, lanci, regolamentazione, macro).\n\n"
+            "## Notizie Recenti\nLe 3-5 notizie più rilevanti e recenti, ognuna con una conclusione in una riga.\n\n"
+            "## Analisi Fondamentale\nRating: Forte / Moderato / Debole. Market cap, ricavi (TTM + proiezioni), "
+            "EPS (TTM + stime), debito e passività, free cash flow, multipli chiave (P/E, P/S, EV/EBITDA), "
+            "e una breve sintesi della salute finanziaria.\n\n"
+            "## Analisi Tecnica\nRating: Rialzista / Neutrale / Ribassista. Trend (breve/medio/lungo), "
+            "supporti e resistenze, indicatori (RSI, MACD, medie mobili), pattern grafici, e una descrizione "
+            "testuale di linee di tendenza, percorsi di prezzo previsti e livelli chiave.\n\n"
+            "## Earnings\nProssima data, EPS e ricavi stimati del prossimo trimestre, storico delle sorprese "
+            "(ultimi 2-4 trimestri), proiezioni di crescita degli utili.\n\n"
+            "## Rischi e Concorrenza\nTop 3-5 rischi (specifici e macro). Principali concorrenti e come si "
+            "posiziona l'azienda.\n\n"
+            "## Opportunità e Crescita\nNuovi mercati/verticali, problemi che l'azienda è unicamente "
+            "posizionata a risolvere, tesi di crescita di lungo periodo.\n\n"
+            "## Titoli Simili\n3-5 titoli/ETF comparabili, ognuno con una riga di motivazione.\n\n"
+            "REGOLE: titoli di sezione chiari; sii specifico (numeri reali, catalizzatori nominati, livelli "
+            "concreti); segnala stime/limiti con la notazione \"(stima)\"; profondità, non riempitivo. "
+            "SE il ticker è un ETF, adatta: sostituisci le sezioni azienda-specifiche con composizione "
+            "(holdings principali), expense ratio e sintesi dell'indice/strategia."
+        ),
+    },
     "pattern": {
         "system": "Sei un ricercatore quantitativo di Renaissance Technologies che usa metodi data-driven per trovare vantaggi statistici nei mercati." + _POWER_DISCIPLINE,
         "task": (

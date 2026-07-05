@@ -2810,6 +2810,22 @@ def _options_summary(ticker: str) -> dict:
         return {"available": False}
 
 
+def _analyst_snapshot(t: str) -> dict:
+    """Consenso analisti reale (target medio/alto/basso, raccomandazione, n. analisti) da Yahoo."""
+    import yfinance as yf
+    try:
+        info = yf.Ticker(t).info or {}
+        return {
+            "target_mean": info.get("targetMeanPrice"),
+            "target_high": info.get("targetHighPrice"),
+            "target_low": info.get("targetLowPrice"),
+            "recommendation": info.get("recommendationKey", ""),
+            "num_analysts": info.get("numberOfAnalystOpinions"),
+        }
+    except Exception:
+        return {}
+
+
 @app.get("/api/stock/{ticker}/options")
 async def api_options(ticker: str):
     """Attività opzioni (proxy gratuito da Yahoo). Cache 10 min."""
@@ -2870,6 +2886,16 @@ async def api_power_prompt(ticker: str, type: str = ""):
     opt = _cached(f"options:{t}", 600)
     if opt and opt.get("available"):
         ctx += f"- Flusso opzioni: put/call {opt.get('pc_ratio')} → {opt.get('sentiment')}\n"
+    # Report completo: inietta anche il consenso analisti reale
+    if ptype == "full":
+        an = _cached(f"analyst:{t}", 3600)
+        if an is None:
+            an = await asyncio.to_thread(_analyst_snapshot, t)
+            _store(f"analyst:{t}", an)
+        if an.get("target_mean") or an.get("num_analysts"):
+            ctx += (f"- Consenso analisti (Yahoo): raccomandazione {an.get('recommendation') or 'N/D'}, "
+                    f"{an.get('num_analysts') or 'N/D'} analisti; target medio ${_v(an.get('target_mean'))} "
+                    f"(basso ${_v(an.get('target_low'))} / alto ${_v(an.get('target_high'))})\n")
     news = (data.get("news") or [])[:5]
     if news:
         ctx += "NOTIZIE RECENTI (reali):\n" + "\n".join(f"- {n}" for n in news) + "\n"
@@ -2879,7 +2905,7 @@ async def api_power_prompt(ticker: str, type: str = ""):
     try:
         resp = await groq_client.chat.completions.create(
             model="openai/gpt-oss-120b",
-            max_tokens=3000,
+            max_tokens=4200 if ptype == "full" else 3000,
             reasoning_effort="low",
             messages=[
                 {"role": "system", "content": persona["system"]},
