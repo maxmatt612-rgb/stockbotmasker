@@ -11,14 +11,44 @@ def get_full_analysis(ticker: str) -> dict | None:
     try:
         stock = yf.Ticker(ticker.upper())
         hist = stock.history(period="1y")
-        if hist.empty or len(hist) < 5:
+        if hist is None or hist.empty or len(hist) < 5:
+            # Fallback: su alcuni IP (datacenter/Render) Ticker.history viene limitato;
+            # yf.download (chart API bulk) è più tollerante.
+            try:
+                hist = yf.download(ticker.upper(), period="1y", interval="1d",
+                                   auto_adjust=True, progress=False)
+                if hist is not None and isinstance(hist.columns, pd.MultiIndex):
+                    hist.columns = hist.columns.get_level_values(0)
+            except Exception:
+                hist = None
+        if hist is None or hist.empty or len(hist) < 5:
             return None
 
-        info = stock.info
-        fast = stock.fast_info
+        # .info e fast_info usano API Yahoo (quoteSummary) che gli IP dei datacenter
+        # — es. Render — spesso bloccano. Rendiamoli OPZIONALI e ricaviamo prezzo e
+        # massimi/minimi 52w dai dati storici (chart API), che funzionano ovunque.
+        try:
+            info = stock.info or {}
+        except Exception:
+            info = {}
+        try:
+            fast = stock.fast_info
+        except Exception:
+            fast = None
 
-        current_price = fast.last_price
-        prev_close = fast.previous_close
+        closes = hist["Close"].dropna()
+        current_price = float(closes.iloc[-1])
+        prev_close = float(closes.iloc[-2]) if len(closes) >= 2 else current_price
+        y_high = float(hist["High"].max())
+        y_low = float(hist["Low"].min())
+        try:
+            if fast is not None:
+                if fast.last_price:      current_price = float(fast.last_price)
+                if fast.previous_close:  prev_close = float(fast.previous_close)
+                if fast.year_high:       y_high = float(fast.year_high)
+                if fast.year_low:        y_low = float(fast.year_low)
+        except Exception:
+            pass
         if not current_price or not prev_close:
             return None
 
@@ -70,8 +100,8 @@ def get_full_analysis(ticker: str) -> dict | None:
             "current_price": current_price,
             "currency": info.get("currency", "USD"),
             "day_change_pct": day_change_pct,
-            "week_52_high": fast.year_high,
-            "week_52_low": fast.year_low,
+            "week_52_high": y_high,
+            "week_52_low": y_low,
             "volatility": volatility,
             "risk_level": risk_level,
             "risk_emoji": risk_emoji,
