@@ -869,30 +869,118 @@ def _tg_send(text: str) -> bool:
         return False
 
 
-def _format_top10(stocks: list) -> str:
-    now = datetime.now(ROME).strftime("%d/%m %H:%M")
-    lines = [f"\U0001F4CA <b>MASKER — Top 10 di oggi</b>  ({now})", ""]
-    for i, s in enumerate((stocks or [])[:10], 1):
-        tk = s.get("ticker", "?")
+_TG_SEP = "\n━━━━━━━━━━\n"  # ━━━━━━━━━━
+
+
+def _tg_send_chunks(msg: str) -> bool:
+    """Invia il messaggio spezzandolo se supera il limite Telegram (4096)."""
+    LIMIT = 3800
+    if len(msg) <= LIMIT:
+        return _tg_send(msg)
+    ok, buf = True, ""
+    for block in msg.split(_TG_SEP):
+        if buf and len(buf) + len(block) + len(_TG_SEP) > LIMIT:
+            ok = _tg_send(buf) and ok
+            buf = block
+        else:
+            buf = (buf + _TG_SEP + block) if buf else block
+    if buf:
+        ok = _tg_send(buf) and ok
+    return ok
+
+
+async def _tg_batch_insights(top: list, emap: dict) -> dict:
+    """UNA chiamata Groq: una riga di insight concreto per ciascun titolo."""
+    out: dict = {}
+    if not groq_client:
+        return out
+    rows = []
+    for s in top:
+        tk = s["ticker"]; e = emap.get(tk, {})
+        pe = e.get("pe_ratio"); pe_s = f"{pe:.1f}" if pe else "N/D"
+        rows.append(f"{tk}: ${(s.get('current_price') or 0):.2f}, {(s.get('day_change_pct') or 0):+.1f}%, "
+                    f"RSI {(s.get('rsi') or 50):.0f}, score {(s.get('score_10') or 5):.1f}/10, P/E {pe_s}, "
+                    f"notizie {e.get('news_sentiment_label', 'N/D')}")
+    prompt = ("Per OGNI azione scrivi UNA riga di insight concreto (max 18 parole, italiano) sul perché è "
+              "interessante o rischiosa ORA, considerando prezzo/RSI/notizie. Formato ESATTO 'TICKER: insight', "
+              "una riga per titolo, niente altro.\n\n" + "\n".join(rows))
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile", max_tokens=700,
+            messages=[{"role": "system", "content": "Analista finanziario conciso e diretto, in italiano."},
+                      {"role": "user", "content": prompt}])
+        for line in resp.choices[0].message.content.strip().split("\n"):
+            if ":" in line:
+                tk, ins = line.split(":", 1)
+                tk = tk.strip().lstrip("0123456789.-) ").upper()
+                if tk and ins.strip():
+                    out[tk] = ins.strip()
+    except Exception as e:
+        print(f"[tg] insight batch: {e}")
+    return out
+
+
+def _format_top10_rich(top: list, emap: dict, insights: dict) -> str:
+    blocks = [f"\U0001F4CA <b>MASKER — Top 10 di oggi</b>  ({datetime.now(ROME).strftime('%d/%m %H:%M')})"]
+    for s in top:
+        tk = s["ticker"]; e = emap.get(tk, {})
         px = s.get("current_price") or 0
+        chg = s.get("day_change_pct") or 0
         sc = s.get("score_10", 5) or 5
-        ch = s.get("day_change_pct", 0) or 0
         rsi = s.get("rsi", 50) or 50
-        dot = "\U0001F7E2" if ch >= 0 else "\U0001F534"
-        lines.append(f"{i}. <b>{tk}</b>  ${px:.2f}  {dot}{ch:+.1f}%  ·  {sc:.1f}/10  ·  RSI {rsi:.0f}")
-    lines.append("\n<i>Solo a scopo informativo — non è consulenza finanziaria</i>")
-    return "\n".join(lines)
+        ts = s.get("trade_setup") or {}
+        entry = ts.get("entry") or px
+        target = ts.get("target")
+        stop = ts.get("stop")
+        pe = e.get("pe_ratio"); pe_s = f"{pe:.1f}" if pe else "N/D"
+        earn = e.get("next_earnings_str") or "N/D"
+        parts = [f"\U0001F4CA <b>{tk}</b>  —  ${px:.2f}  ({chg:+.1f}%)",
+                 f"\U0001F3AF Voto AI: {sc:.0f}/10"]
+        ins = insights.get(tk)
+        if ins:
+            parts.append(f"\U0001F4A1 {ins}")
+        parts.append(f"\U0001F535 Entry: ${entry*0.985:.2f} – ${entry*1.015:.2f}")
+        if target:
+            parts.append(f"\U0001F3AF Take profit: ${target:.2f}")
+        if stop:
+            parts.append(f"⛔️ Stop loss: ${stop:.2f}")
+        parts.append(f"\U0001F4C8 RSI {rsi:.0f} · P/E {pe_s}")
+        parts.append(f"\U0001F4C5 Earnings: {earn}")
+        ns = (e.get("news_sentiment") or "").lower()
+        if "posit" in ns:
+            parts.append("\U0001F4F0 Notizie: positive \U0001F7E2")
+        elif "negat" in ns:
+            parts.append("\U0001F4F0 Notizie: negative \U0001F534")
+        blocks.append("\n".join(parts))
+    blocks.append("<i>Solo a scopo informativo — non è consulenza finanziaria</i>")
+    return _TG_SEP.join(blocks)
 
 
-def _maybe_send_top10(stocks: list, force: bool = False) -> bool:
-    """Invia la top 10 su Telegram, al massimo UNA volta al giorno (salvo force)."""
+async def _send_top10_rich(stocks: list, force: bool = False) -> bool:
+    """Costruisce e invia la top 10 ARRICCHITA (insight AI, P/E, earnings, news) su Telegram.
+    Max 1 volta al giorno salvo force."""
     global _last_tg_signal_date
     if not stocks:
+        return False
+    if not (os.getenv("TG_SIGNAL_TOKEN") or os.getenv("BOT_TOKEN")) or not os.getenv("TG_SIGNAL_CHAT"):
         return False
     today = datetime.now(ROME).strftime("%Y-%m-%d")
     if not force and _last_tg_signal_date == today:
         return False
-    ok = _tg_send(_format_top10(stocks))
+    top = stocks[:10]
+    # Fondamentali (P/E, earnings, news) — best effort (su Render .info può dare N/D)
+    emap: dict = {}
+    try:
+        enr = await asyncio.gather(*[asyncio.to_thread(get_enriched_analysis, s["ticker"]) for s in top],
+                                   return_exceptions=True)
+        for s, e in zip(top, enr):
+            if isinstance(e, dict):
+                emap[s["ticker"]] = e
+    except Exception as e:
+        print(f"[tg] enrich: {e}")
+    insights = await _tg_batch_insights(top, emap)
+    msg = _format_top10_rich(top, emap, insights)
+    ok = await asyncio.to_thread(_tg_send_chunks, msg)
     if ok:
         _last_tg_signal_date = today
     return ok
@@ -926,7 +1014,7 @@ async def _refresh_scan_background(top: int):
             _store(f"scan:{top}", display)
             if top == 10:
                 try:
-                    if await asyncio.to_thread(_maybe_send_top10, display):
+                    if await _send_top10_rich(display):
                         print("[tg] Top 10 inviata su Telegram")
                 except Exception as e:
                     print(f"[tg] errore invio scan: {e}")
@@ -976,7 +1064,7 @@ async def api_tg_send_top10():
     stocks = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
     if not stocks:
         return JSONResponse({"ok": False, "error": "Nessuno scan disponibile: avvia prima 'Analizza ora'."}, status_code=400)
-    ok = await asyncio.to_thread(_maybe_send_top10, stocks, True)
+    ok = await _send_top10_rich(stocks, True)
     return {"ok": ok, "sent": len(stocks[:10]) if ok else 0}
 
 
