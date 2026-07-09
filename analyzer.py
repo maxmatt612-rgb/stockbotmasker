@@ -877,6 +877,13 @@ def get_enriched_analysis(ticker: str) -> dict | None:
         score_raw += 1
     score_10 = round(min(10.0, max(0.0, (score_raw + 5) / 15 * 10)), 1)
 
+    # ── Stima direzionale a 5 giorni: direzione dallo score, ampiezza dalla volatilità ──
+    vol = base.get("volatility") or 40.0
+    vol_5d = vol * 0.1409                      # ~ deviazione su 5 sedute (annua/√252·√5)
+    conviction = (score_10 - 5.5) / 4.5        # <0 ribassista, >0 rialzista
+    estimate_5d_pct = round(max(-15.0, min(15.0, conviction * vol_5d)), 1)
+    estimate_5d_price = round(base["current_price"] * (1 + estimate_5d_pct / 100), 2)
+
     base.update({
         "earnings_today": earnings_today,
         "next_earnings_str": next_earnings_str,
@@ -887,6 +894,8 @@ def get_enriched_analysis(ticker: str) -> dict | None:
         "upside_52w": upside_52w,
         "daily_estimate_pct": daily_estimate_pct,
         "daily_estimate_price": daily_estimate_price,
+        "estimate_5d_pct": estimate_5d_pct,
+        "estimate_5d_price": estimate_5d_price,
         "score_10": score_10,
     })
     return base

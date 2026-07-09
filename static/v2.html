@@ -840,7 +840,8 @@ const I18N_EXACT={
 "Punteggio finale":"Final score","Qualità del business":"Business quality","Bilancio":"Balance sheet",
 "Crescita":"Growth","Valutazione":"Valuation","Politica & policy":"Politics & policy",
 "Concorrenti":"Competitors","Come investire":"How to invest","Cosa cambierebbe idea":"What would change the thesis",
-"1G":"1D","1S":"1W","1A":"1Y","5A":"5Y"
+"1G":"1D","1S":"1W","1A":"1Y","5A":"5Y",
+"Stima 5gg":"5-day est."
 };
 const I18N_PHRASES=[
 ["NON COMPRARE","DO NOT BUY"],["NON COMPRA","DO NOT BUY"],["non comprare","don't buy"],["COMPRARE","BUY"],["COMPRA","BUY"],
@@ -1214,6 +1215,7 @@ function renderSintesi(){
     </div>
     <div class="stat-grid">
       ${st('Score',d.score_10!=null?(+d.score_10).toFixed(1)+' / 10':'—')}
+      ${st('Stima 5gg',d.estimate_5d_pct!=null?`<span class="${d.estimate_5d_pct>=0?'pos':'neg'}">${d.estimate_5d_pct>=0?'+':''}${d.estimate_5d_pct}%</span>`:'—')}
       ${st('Rischio',(d.risk_emoji||'')+' '+(d.risk_level||'—'))}
       ${st('RSI (14)',d.rsi!=null?(+d.rsi).toFixed(0):'—')}
       ${st('vs S&P 500',rsVal(d))}

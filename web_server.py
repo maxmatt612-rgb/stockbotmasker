@@ -855,18 +855,21 @@ def _tg_send(text: str) -> bool:
     if not token or not chat:
         print("[tg] token o chat non configurati (TG_SIGNAL_TOKEN / TG_SIGNAL_CHAT)")
         return False
-    import urllib.request, urllib.parse
+    import urllib.request, urllib.parse, time as _t
     data = urllib.parse.urlencode({
         "chat_id": chat, "text": text, "parse_mode": "HTML",
         "disable_web_page_preview": "true",
     }).encode()
-    req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=data)
-    try:
-        with urllib.request.urlopen(req, timeout=15) as r:
-            return 200 <= r.status < 300
-    except Exception as e:
-        print(f"[tg] errore invio: {e}")
-        return False
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    for attempt in range(3):  # retry: reset di connessione transitori
+        try:
+            req = urllib.request.Request(url, data=data)
+            with urllib.request.urlopen(req, timeout=15) as r:
+                return 200 <= r.status < 300
+        except Exception as e:
+            print(f"[tg] tentativo {attempt+1} fallito: {e}")
+            _t.sleep(1.5)
+    return False
 
 
 _TG_SEP = "\n━━━━━━━━━━\n"  # ━━━━━━━━━━
@@ -936,6 +939,9 @@ def _format_top10_rich(top: list, emap: dict, insights: dict) -> str:
         earn = e.get("next_earnings_str") or "N/D"
         parts = [f"\U0001F4CA <b>{tk}</b>  —  ${px:.2f}  ({chg:+.1f}%)",
                  f"\U0001F3AF Voto AI: {sc:.0f}/10"]
+        est = e.get("estimate_5d_pct")
+        if est is not None:
+            parts.append(f"\U0001F52E Stima 5gg: {est:+.1f}%")
         ins = insights.get(tk)
         if ins:
             parts.append(f"\U0001F4A1 {ins}")
