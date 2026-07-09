@@ -843,6 +843,61 @@ async def _pdf_scheduler():
             await asyncio.sleep(30)
 
 
+# ─── Segnale Telegram: top 10 titoli dello scan ──────────────────────────────
+_last_tg_signal_date: str = ""
+
+
+def _tg_send(text: str) -> bool:
+    """Invia un messaggio a un bot Telegram. Config via env:
+    TG_SIGNAL_TOKEN (o BOT_TOKEN) + TG_SIGNAL_CHAT (id chat/canale)."""
+    token = os.getenv("TG_SIGNAL_TOKEN") or os.getenv("BOT_TOKEN")
+    chat = os.getenv("TG_SIGNAL_CHAT")
+    if not token or not chat:
+        print("[tg] token o chat non configurati (TG_SIGNAL_TOKEN / TG_SIGNAL_CHAT)")
+        return False
+    import urllib.request, urllib.parse
+    data = urllib.parse.urlencode({
+        "chat_id": chat, "text": text, "parse_mode": "HTML",
+        "disable_web_page_preview": "true",
+    }).encode()
+    req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=data)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return 200 <= r.status < 300
+    except Exception as e:
+        print(f"[tg] errore invio: {e}")
+        return False
+
+
+def _format_top10(stocks: list) -> str:
+    now = datetime.now(ROME).strftime("%d/%m %H:%M")
+    lines = [f"\U0001F4CA <b>MASKER — Top 10 di oggi</b>  ({now})", ""]
+    for i, s in enumerate((stocks or [])[:10], 1):
+        tk = s.get("ticker", "?")
+        px = s.get("current_price") or 0
+        sc = s.get("score_10", 5) or 5
+        ch = s.get("day_change_pct", 0) or 0
+        rsi = s.get("rsi", 50) or 50
+        dot = "\U0001F7E2" if ch >= 0 else "\U0001F534"
+        lines.append(f"{i}. <b>{tk}</b>  ${px:.2f}  {dot}{ch:+.1f}%  ·  {sc:.1f}/10  ·  RSI {rsi:.0f}")
+    lines.append("\n<i>Solo a scopo informativo — non è consulenza finanziaria</i>")
+    return "\n".join(lines)
+
+
+def _maybe_send_top10(stocks: list, force: bool = False) -> bool:
+    """Invia la top 10 su Telegram, al massimo UNA volta al giorno (salvo force)."""
+    global _last_tg_signal_date
+    if not stocks:
+        return False
+    today = datetime.now(ROME).strftime("%Y-%m-%d")
+    if not force and _last_tg_signal_date == today:
+        return False
+    ok = _tg_send(_format_top10(stocks))
+    if ok:
+        _last_tg_signal_date = today
+    return ok
+
+
 async def _refresh_scan_background(top: int):
     """Aggiorna il scan in background senza bloccare la risposta.
     Scansiona sempre top 100 per avere un pool completo per lo screening;
@@ -869,6 +924,12 @@ async def _refresh_scan_background(top: int):
                 _morning_data = list(display)
                 _save_scan_to_disk(display)
             _store(f"scan:{top}", display)
+            if top == 10:
+                try:
+                    if await asyncio.to_thread(_maybe_send_top10, display):
+                        print("[tg] Top 10 inviata su Telegram")
+                except Exception as e:
+                    print(f"[tg] errore invio scan: {e}")
             print(f"[scan_bg] Completato: pool totale={len(clean)}, display={len(display)}")
         else:
             print("[scan_bg] Scan restituito vuoto")
@@ -905,6 +966,18 @@ async def api_scan_force():
     if not _scan_in_progress:
         asyncio.create_task(_refresh_scan_background(10))
     return {"ok": True, "scan_in_progress": _scan_in_progress}
+
+
+@app.post("/api/telegram/send-top10")
+async def api_tg_send_top10():
+    """Invia SUBITO la top 10 corrente sul bot Telegram (bottone 'Invia su Telegram')."""
+    if not (os.getenv("TG_SIGNAL_TOKEN") or os.getenv("BOT_TOKEN")) or not os.getenv("TG_SIGNAL_CHAT"):
+        return JSONResponse({"ok": False, "error": "Bot Telegram non configurato (TG_SIGNAL_TOKEN/TG_SIGNAL_CHAT)."}, status_code=503)
+    stocks = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
+    if not stocks:
+        return JSONResponse({"ok": False, "error": "Nessuno scan disponibile: avvia prima 'Analizza ora'."}, status_code=400)
+    ok = await asyncio.to_thread(_maybe_send_top10, stocks, True)
+    return {"ok": ok, "sent": len(stocks[:10]) if ok else 0}
 
 
 @app.get("/api/scan/screen")

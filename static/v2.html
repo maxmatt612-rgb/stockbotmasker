@@ -548,7 +548,10 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
         <h2>Le migliori opportunità del momento</h2>
         <p>Scansione AI dell'intero mercato con punteggio di qualità, rischio e momentum. Parte quando lo chiedi tu.</p>
       </div>
-      <button class="btn" id="scanBtn">Analizza ora</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" id="scanBtn">Analizza ora</button>
+        <button class="mini-btn" id="tgBtn" onclick="sendTop10Telegram()" title="Invia la top 10 sul bot Telegram">📤 Telegram</button>
+      </div>
     </div>
     <div class="grid" id="grid">
       <div class="empty">
@@ -984,6 +987,14 @@ setInterval(loadTape,20000);
 let scanTimer=null;
 function runScan(){clearTimeout(scanTimer);$('#grid').innerHTML=Array(8).fill('<div class="skel"></div>').join('');poll();}
 $('#scanBtn').onclick=runScan;
+async function sendTop10Telegram(){
+  const btn=$('#tgBtn');if(btn)btn.disabled=true;
+  toast(T('Invio su Telegram…','Sending to Telegram…'));
+  const d=await J('/api/telegram/send-top10',{method:'POST'});
+  if(btn)btn.disabled=false;
+  if(d&&d.ok)toast(T('Top 10 inviata ✓','Top 10 sent ✓'),'Telegram');
+  else toast(T('Invio non riuscito','Send failed'),(d&&d.error)||'');
+}
 async function poll(){
   const d=await J('/api/scan?top=10');
   if(!Array.isArray(d)||!d.length){
