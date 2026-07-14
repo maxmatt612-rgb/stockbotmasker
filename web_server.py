@@ -2674,6 +2674,21 @@ def _bot_track_record() -> str:
             f"(storico {tone}). Calibra la CONFIDENZA di conseguenza: evita valori alti se lo storico è debole.")
 
 
+def _friendly_ai_error(e: Exception) -> tuple[str, int]:
+    """Traduce un errore Groq in un messaggio chiaro per l'utente + status code.
+    Distingue il limite GIORNALIERO (account esaurito, si sblocca da solo) dal
+    rate-limit al MINUTO (il retry lo gestisce altrove) da un errore generico."""
+    import re
+    msg = str(e)
+    m = re.search(r'try again in ([\d.]+)m?([\d.]+)?s', msg)
+    if "tokens per day" in msg or "(TPD)" in msg:
+        wait = f" (riprova tra ~{m.group(1)} min)" if m else ""
+        return (f"Limite giornaliero dell'AI raggiunto{wait}. Non è un errore del titolo: riprova più tardi.", 503)
+    if "rate_limit_exceeded" in msg:
+        return ("L'AI è momentaneamente sovraccarica, riprova tra qualche secondo.", 503)
+    return ("Analisi non disponibile al momento.", 500)
+
+
 def _extract_labeled_value(text: str, labels: list) -> str:
     """Trova 'LABEL' (bilingue IT/EN), tollerante a decorazioni Markdown (**, ###, -) prima/dopo,
     e ritorna il contenuto: stesso rigo, oppure le righe successive fino al prossimo header
@@ -2862,7 +2877,8 @@ async def api_deep_analysis(ticker: str):
         _store(key, result)
         return result
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        msg, code = _friendly_ai_error(e)
+        return JSONResponse({"error": msg}, status_code=code)
 
 
 @app.get("/api/stock/{ticker}/explain")
@@ -3190,7 +3206,8 @@ async def api_power_prompt(ticker: str, type: str = ""):
         _store(key, result)
         return result
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        msg, code = _friendly_ai_error(e)
+        return JSONResponse({"error": msg}, status_code=code)
 
 
 @app.get("/api/stock/{ticker}/why-today")

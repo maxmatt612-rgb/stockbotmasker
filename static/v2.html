@@ -1089,7 +1089,10 @@ async function runFullAnalysis(){
   if(!tk){$('#an-tk').focus();return;}
   out.innerHTML='<div class="lline">'+T('Report buy-side in preparazione… (framework completo, può richiedere ~30-40s)','Buy-side report in progress… (full framework, may take ~30-40s)')+'</div>';
   const d=await J('/api/stock/'+encodeURIComponent(tk)+'/prompt?type=full');
-  if(!d||d.__err||d.error||!d.text){out.innerHTML='<div class="lline">'+T('Titolo non trovato o analisi non disponibile.','Stock not found or analysis unavailable.')+'</div>';return;}
+  if(!d||d.__err||d.error||!d.text){
+    const msg=(d&&d.error)?esc(d.error):T('Titolo non trovato o analisi non disponibile.','Stock not found or analysis unavailable.');
+    out.innerHTML='<div class="lline">'+msg+'</div>';return;
+  }
   out.innerHTML=`<div class="res" style="max-width:none">
     <div class="res-kick">${esc(d.ticker)} · ${T('Report buy-side completo','Full buy-side report')}</div>
     ${d.verdetto?`<div class="verdict ${vcls(d.verdetto)}">${vico(d.verdetto)} ${esc(d.verdetto)}<small>${T('Confidenza','Confidence')} ${d.confidenza??'—'}%</small></div>`:''}
@@ -1453,7 +1456,8 @@ async function loadReport13(){
 }
 async function loadDeep(){
   const b=$('#dw-body');b.innerHTML='<div class="lline">Analisi approfondita in corso…</div>';
-  const d=await J('/api/stock/'+curTk+'/deep');if(d.__err||d.error){b.innerHTML='<div class="lline">Analisi non disponibile.</div>'+aiToolsHTML();return;}
+  const d=await J('/api/stock/'+curTk+'/deep');
+  if(d.__err||d.error){b.innerHTML='<div class="lline">'+(d.error?esc(d.error):'Analisi non disponibile.')+'</div>'+aiToolsHTML();return;}
   b.innerHTML=`<div class="res" style="max-width:none">
     <div class="res-kick">Analisi completa ${aiTag}</div>
     <div class="verdict ${vcls(d.verdetto)}">${vico(d.verdetto)} ${esc(d.verdetto||'ASPETTA')}<small>Confidenza ${d.confidenza??'—'}%</small></div>
