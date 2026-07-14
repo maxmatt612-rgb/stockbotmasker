@@ -2674,10 +2674,44 @@ def _bot_track_record() -> str:
             f"(storico {tone}). Calibra la CONFIDENZA di conseguenza: evita valori alti se lo storico è debole.")
 
 
+def _extract_labeled_value(text: str, labels: list) -> str:
+    """Trova 'LABEL' (bilingue IT/EN), tollerante a decorazioni Markdown (**, ###, -) prima/dopo,
+    e ritorna il contenuto: stesso rigo, oppure le righe successive fino al prossimo header
+    (salta righe vuote singole/doppie, utile quando il modello mette il valore sotto una tabella)."""
+    import re as _re
+    label_alt = '|'.join(_re.escape(l) for l in labels)
+    head_pat = _re.compile(r'(?im)^[\s#>_*-]{0,6}(?:' + label_alt + r')[\s*_:-]{0,6}(.*)$')
+    # nuovo header: '### Titolo', '**Titolo**' o '**Titolo:**' (i due punti possono stare dentro o
+    # fuori i marcatori), oppure una riga separatrice orizzontale (---, ===).
+    is_header = _re.compile(r'^\s*(#{1,6}\s|\*\*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ /]{2,40}:?\*\*\s*:?\s*$|[-=]{3,}\s*$)')
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        m = head_pat.match(line)
+        if not m:
+            continue
+        same_line = m.group(1).strip(" *_-:")
+        if same_line:
+            return same_line
+        out, blanks = [], 0
+        for nxt in lines[i + 1:i + 10]:
+            s = nxt.strip()
+            if not s:
+                blanks += 1
+                if blanks > 2:
+                    break
+                continue
+            if is_header.match(nxt):
+                break
+            out.append(s)
+        return " ".join(out).strip()
+    return ""
+
+
 @app.get("/api/stock/{ticker}/deep")
 async def api_deep_analysis(ticker: str):
-    """Analizzatore AI completo: descrizione azienda, verdetto, perché, rischi,
-    concorrenti (con ticker cliccabili) e notizie. Cache 1h."""
+    """Analisi buy-side completa in stile portfolio manager (framework a ~30 sezioni:
+    tesi, moat, qualità della crescita, asimmetria, scorecard pesata, portfolio decision...).
+    Report mostrato as-is (Markdown); estrae solo verdetto/confidenza/concorrenti per la UI."""
     t = ticker.upper()
     key = f"deep:{t}:{_lang()}"
     if (c := _cached(key, 0)) is not None:  # analisi sempre fresca (no cache)
@@ -2734,20 +2768,21 @@ async def api_deep_analysis(ticker: str):
     else:
         trend = "misto / laterale"
 
-    prompt = (
-        f"Analizza IN PROFONDITÀ il titolo {t} ({data.get('name', t)}), settore {data.get('sector', 'N/D')}.\n\n"
+    ctx = (
         f"PREZZO E TREND:\n"
         f"- Prezzo: {sym}{_v(cur)} ({(data.get('day_change_pct') or 0):+.1f}% oggi)\n"
         f"- 52 settimane: min {sym}{_v(data.get('week_52_low'))} / max {sym}{_v(data.get('week_52_high'))}"
         f" (distanza dal max: {_v(data.get('upside_52w'), '{:+.0f}')}%)\n"
         f"- Medie mobili: SMA20 {sym}{_v(sma20)} · SMA50 {sym}{_v(sma50)} → trend {trend}\n"
         f"- Performance: settimana {(data.get('week_return') or 0):+.1f}%, mese {(data.get('month_return') or 0):+.1f}%,"
-        f" YTD {(data.get('ytd_return') or 0):+.1f}%\n\n"
+        f" YTD {(data.get('ytd_return') or 0):+.1f}%\n"
+        f"- Stima direzionale 5 giorni (proprietaria): {_v(data.get('estimate_5d_pct'), '{:+.1f}')}%\n\n"
         f"INDICATORI E RISCHIO:\n"
         f"- RSI: {(data.get('rsi') or 50):.0f}/100 | Volatilità annua: {(data.get('volatility') or 0):.0f}%"
         f" | Rischio: {data.get('risk_level', 'N/D')} | Beta: {_v(data.get('beta'))}\n"
         f"- Score qualità Masker: {_v(data.get('score_10'), '{:.1f}')}/10\n\n"
         f"FONDAMENTALI:\n"
+        f"- Settore: {data.get('sector', 'N/D')}\n"
         f"- P/E: {_v(data.get('pe_ratio'))} (forward {_v(data.get('forward_pe'))}) | EPS: {_v(data.get('eps'))}"
         f" | ROE: {_v(data.get('roe'))}\n"
         f"- Margine netto: {_v(data.get('profit_margin'))} | Debito/Equity: {_v(data.get('debt_equity'))}"
@@ -2761,71 +2796,74 @@ async def api_deep_analysis(ticker: str):
         + f"CONTESTO STORICO DEL BOT (usalo per calibrare la CONFIDENZA):\n- {track}\n\n"
         f"REGIME DI MERCATO (S&P 500): {regime_line}\n"
         "REGOLA DI REGIME: se il mercato è Sfavorevole (risk-off) NON dare COMPRA aggressivo, salvo forza "
-        "eccezionale del titolo (abbassa la CONFIDENZA); se è Favorevole un buon setup vale di più.\n\n"
-        "Ragiona sui dati (trend tecnico + momentum + fondamentali + rischio), sul REGIME di mercato e "
-        "SOPRATTUTTO sulle NOTIZIE RECENTI reali qui sopra, poi rispondi SOLO in questo "
-        "formato ESATTO, in ITALIANO, concreto e SPECIFICO (cita i numeri reali sopra e collega le notizie).\n"
-        "SUL VERDETTO SII DECISO: se il quadro complessivo è favorevole all'acquisto (potenziale di crescita) "
-        "→ COMPRA; se è chiaramente negativo → VENDI. Usa ASPETTA SOLO se i dati sono davvero contrastanti, "
-        "MAI come risposta prudente di default. Privilegia una direzione chiara.\n"
-        "DESCRIZIONE: [cosa fa l'azienda in 1-2 frasi]\n"
-        "VERDETTO: COMPRA oppure VENDI oppure ASPETTA\n"
-        "CONFIDENZA: [numero intero 50-95]\n"
-        "PERCHE: [2-3 motivi concreti basati sui dati, cita i numeri]\n"
-        "RISCHI: [2-3 rischi specifici e reali]\n"
-        "CONCORRENTI: [3-4 aziende concorrenti con i TICKER in maiuscolo es: AMD, INTC, QCOM]\n"
-        "NOTIZIE: [1-2 frasi sulla situazione attuale]\n"
-        "PREVISIONE: [cosa potrebbe succedere nelle prossime 2-4 settimane: scenario più probabile con stima "
-        "direzionale (rialzo/laterale/ribasso), + 1 catalizzatore che lo confermerebbe e 1 che lo ribalterebbe. "
-        "Collega ESPLICITAMENTE le notizie recenti reali qui sopra.]\n"
+        "eccezionale del titolo (abbassa la CONFIDENZA); se è Favorevole un buon setup vale di più."
     )
+    prompt = (
+        f"DATI REALI di {t} ({data.get('name', t)}):\n\n{ctx}\n\n"
+        f"Analizza {t} ({data.get('name', t)}) seguendo ESATTAMENTE il framework e il formato OUTPUT definiti "
+        "nelle istruzioni di sistema. Compila TUTTE le sezioni elencate in OUTPUT con contenuto reale e "
+        "specifico basato sui dati sopra (cita i numeri); se un dato non è disponibile scrivi 'N/D' e riduci "
+        "la CONFIDENZA di conseguenza. Il portafoglio dell'investitore è di circa 2.000€, orizzonte 1-3 anni."
+    )
+    _FREEFORM.set(True)  # report mostrato as-is → in EN traduce anche titoli/etichette
+    import re as _re_tpm
+    messages = [{"role": "system", "content": AP.DEEP}, {"role": "user", "content": prompt}]
+    max_tok = 5200  # il framework DEEP è enorme: parte già prudente sul limite TPM dell'account
     try:
-        resp = await groq_client.chat.completions.create(
-            model="openai/gpt-oss-120b",
-            max_tokens=1800,
-            reasoning_effort="low",
-            messages=[
-                {"role": "system", "content": AP.DEEP},
-                {"role": "user", "content": prompt},
-            ],
-        )
+        resp = None
+        for _attempt in range(3):
+            try:
+                resp = await groq_client.chat.completions.create(
+                    model="openai/gpt-oss-120b", max_tokens=max_tok,
+                    reasoning_effort="low", messages=messages,
+                )
+                break
+            except Exception as tpm_err:
+                # "Limit 8000, Requested 9278" -> il prompt è troppo grande per il completion richiesto:
+                # riduci max_tokens esattamente della differenza (+ margine) e riprova.
+                m = _re_tpm.search(r'Limit (\d+), Requested (\d+)', str(tpm_err))
+                if m and "rate_limit_exceeded" in str(tpm_err):
+                    overage = int(m.group(2)) - int(m.group(1))
+                    max_tok = max(1200, max_tok - overage - 300)
+                    continue
+                raise
+        if resp is None:
+            return JSONResponse({"error": "Budget token esaurito per questa analisi, riprova tra poco."}, status_code=503)
         text = resp.choices[0].message.content.strip()
-        sec = {"descrizione": "", "verdetto": "ASPETTA", "confidenza": 70,
-               "perche": "", "rischi": "", "concorrenti": "", "notizie": "", "previsione": ""}
-        cur = None
-        for line in text.split("\n"):
-            l = line.strip()
-            lu = l.upper()
-            if lu.startswith("DESCRIZIONE:"):
-                sec["descrizione"] = l.split(":", 1)[1].strip(); cur = "descrizione"
-            elif lu.startswith("VERDETTO:"):
-                v = l.split(":", 1)[1].strip().upper()
-                sec["verdetto"] = "COMPRA" if "COMPRA" in v else ("VENDI" if "VENDI" in v else "ASPETTA")
-                cur = None
-            elif lu.startswith("CONFIDENZA:"):
-                try:
-                    sec["confidenza"] = max(50, min(95, int("".join(ch for ch in l if ch.isdigit())[:2] or "70")))
-                except Exception:
-                    pass
-                cur = None
-            elif lu.startswith("PERCHE") or lu.startswith("PERCHÉ"):
-                sec["perche"] = l.split(":", 1)[1].strip() if ":" in l else ""; cur = "perche"
-            elif lu.startswith("RISCHI:"):
-                sec["rischi"] = l.split(":", 1)[1].strip(); cur = "rischi"
-            elif lu.startswith("CONCORRENTI:"):
-                sec["concorrenti"] = l.split(":", 1)[1].strip(); cur = "concorrenti"
-            elif lu.startswith("NOTIZIE:"):
-                sec["notizie"] = l.split(":", 1)[1].strip(); cur = "notizie"
-            elif lu.startswith("PREVISIONE:"):
-                sec["previsione"] = l.split(":", 1)[1].strip(); cur = "previsione"
-            elif cur and l:
-                sec[cur] += " " + l
 
+        v_raw = _extract_labeled_value(text, ["VERDETTO", "VERDICT"]).upper()
+        if ("FORTE" in v_raw or "STRONG" in v_raw) and ("COMPRA" in v_raw or "BUY" in v_raw):
+            verdetto = "COMPRA FORTE"
+        elif "COMPRA" in v_raw or "BUY" in v_raw:
+            verdetto = "COMPRA"
+        elif "VENDI" in v_raw or "SELL" in v_raw:
+            verdetto = "VENDI"
+        else:
+            verdetto = "ASPETTA"
+
+        c_raw = _extract_labeled_value(text, ["CONFIDENZA", "CONFIDENCE"])
         import re as _re
-        comp_tickers = [c for c in _re.findall(r'\b[A-Z]{2,5}\b', sec["concorrenti"]) if c != t]
-        # dedup preservando ordine
-        comp_tickers = list(dict.fromkeys(comp_tickers))[:5]
-        result = {**sec, "concorrenti_tickers": comp_tickers, "ticker": t, "name": data.get("name", t)}
+        digits = _re.findall(r'\d{1,3}', c_raw)
+        try:
+            confidenza = max(10, min(95, int(digits[0]))) if digits else 70
+        except Exception:
+            confidenza = 70
+
+        comp_raw = _extract_labeled_value(text, ["CONCORRENTI", "COMPETITORS"])
+        _STOP = {"ROE", "EPS", "ETF", "P/E", "PE", "SMA", "RSI", "YTD", "N/D", "N/A", "FCF", "ROIC",
+                 "USD", "EUR", "CAGR", "TTM", "EBIT", "EBITDA", "GAAP", "ESG", "CEO", "CFO",
+                 "GPU", "CPU", "CAP", "R&D", "IPO", "SEC", "FDA"}
+        # esclude suffissi di borsa tipo ".KS"/".MI" (lookbehind sul punto) e parole della stoplist
+        comp_tickers = [c for c in _re.findall(r'(?<!\.)\b[A-Z]{2,5}\b', comp_raw)
+                        if c != t and c not in _STOP]
+        comp_tickers = list(dict.fromkeys(comp_tickers))[:5]  # dedup preservando ordine
+
+        result = {
+            "ticker": t, "name": data.get("name", t),
+            "verdetto": verdetto, "confidenza": confidenza,
+            "concorrenti_tickers": comp_tickers,
+            "text": text,
+        }
         _store(key, result)
         return result
     except Exception as e:

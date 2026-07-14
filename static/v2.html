@@ -1422,7 +1422,7 @@ async function loadChart(tf){
   renderChart();
 }
 
-const vcls=v=>{const u=(v||'').toUpperCase();return u.includes('NON')?'v-no':(u.includes('COMPRA')||u.includes('BUY')?'v-yes':'v-wait');};
+const vcls=v=>{const u=(v||'').toUpperCase();return u.includes('NON')||u.includes('VENDI')||u.includes('SELL')?'v-no':(u.includes('COMPRA')||u.includes('BUY')?'v-yes':'v-wait');};
 const vico=v=>{const c=vcls(v);return c==='v-yes'?'▲':c==='v-no'?'▼':'■';};
 const aiTag='<span class="ai-tag">✦ AI</span>';
 
@@ -1450,18 +1450,14 @@ async function loadReport13(){
     <div class="fnote">Llama 3.3 70B · su dati reali · non è consulenza finanziaria</div></div>`+aiToolsHTML();
 }
 async function loadDeep(){
-  const b=$('#dw-body');b.innerHTML='<div class="lline">Analisi approfondita in corso…</div>';
-  const d=await J('/api/stock/'+curTk+'/deep');if(d.__err||d.error){b.innerHTML='<div class="lline">Analisi non disponibile.</div>'+aiToolsHTML();return;}
+  const b=$('#dw-body');b.innerHTML='<div class="lline">Analisi approfondita in corso… (framework completo, può richiedere ~30-40s)</div>';
+  const d=await J('/api/stock/'+curTk+'/deep');if(d.__err||d.error||!d.text){b.innerHTML='<div class="lline">Analisi non disponibile.</div>'+aiToolsHTML();return;}
   b.innerHTML=`<div class="res" style="max-width:none">
-    <div class="res-kick">Analisi completa ${aiTag}</div>
+    <div class="res-kick">Analisi buy-side completa ${aiTag}</div>
     <div class="verdict ${vcls(d.verdetto)}">${vico(d.verdetto)} ${esc(d.verdetto||'ASPETTA')}<small>Confidenza ${d.confidenza??'—'}%</small></div>
-    <div class="prose"><div class="h">Cos'è</div>${esc(d.descrizione)}</div>
-    <div class="prose"><div class="h">Perché</div>${esc(d.perche)}</div>
-    <div class="prose"><div class="h">Rischi</div>${esc(d.rischi)}</div>
-    ${d.previsione?`<div class="prose" style="border-left:2px solid var(--accent);padding-left:12px"><div class="h">🔮 Previsione</div>${esc(d.previsione)}</div>`:''}
-    ${d.notizie?`<div class="prose"><div class="h">Situazione</div>${esc(d.notizie)}</div>`:''}
     ${(d.concorrenti_tickers||[]).length?`<div class="chips"><span style="font-size:.7rem;color:var(--dim)">Concorrenti:</span>${d.concorrenti_tickers.map(c=>`<span class="chip" onclick="openStock('${c}')">${esc(c)}</span>`).join('')}</div>`:''}
-    <div class="fnote">GPT-OSS 120B con ragionamento · su dati reali · non è consulenza finanziaria</div></div>`+aiToolsHTML();
+    <div class="prompt-out" style="margin-top:14px">${mdToHtml(d.text)}</div>
+    <div class="fnote">GPT-OSS 120B · framework buy-side (portafoglio ~2.000€, orizzonte 1-3 anni) · non è consulenza finanziaria</div></div>`+aiToolsHTML();
 }
 async function loadCons(){
   const b=$('#dw-body');b.innerHTML='<div class="lline">3 modelli (Meta · OpenAI · Alibaba) stanno valutando…</div>';
