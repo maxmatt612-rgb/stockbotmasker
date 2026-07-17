@@ -4,7 +4,8 @@ Resume: do the next unchecked item.
 
 ## Checklist
 
-### [ ] Item 1 — Fix the fake "YTD" (CRITICAL)
+### [x] Item 1 — Fix the fake "YTD" (CRITICAL)
+Evidence: added `_ytd_return(hist)` (analyzer.py:243-251), used at analyzer.py:62 for `ytd_return`; old trailing value kept as `one_year_return` (analyzer.py:61, dict key at 112). `pytest -q` → 3 passed, incl. 2 new synthetic-DataFrame tests asserting prior-year-close baseline and same-year fallback.
 `ytd_return` (analyzer.py:61, via `_pct(hist, 0)` defined at analyzer.py:239-241) is a trailing-12-month return, not year-to-date (audit verified: SPY showed 19.75% when true calendar YTD was 9.38%). Fix: add a new helper `_ytd_return(hist)` — baseline = the last close of the PREVIOUS calendar year if present in the 1y window, else the first close of the current year — and use it for `ytd_return`. Do NOT change `_pct` itself (other call sites use it). Keep the JSON key `ytd_return` (the frontend and the AI prompts at web_server.py:2150, 2793, 3151 consume it — they say "YTD", so the corrected value makes them honest). Add a new `one_year_return` field carrying the old trailing-1y value. Test: synthetic DataFrame spanning two calendar years; assert the baseline is the prior year's final close.
 
 ### [ ] Item 2 — Remove the fake "today's estimate" (HIGH)

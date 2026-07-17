@@ -58,7 +58,8 @@ def get_full_analysis(ticker: str) -> dict | None:
 
         week_return = _pct(hist, -6) if len(hist) >= 6 else None
         month_return = _pct(hist, -22) if len(hist) >= 22 else None
-        ytd_return = _pct(hist, 0)
+        one_year_return = _pct(hist, 0)
+        ytd_return = _ytd_return(hist)
 
         sma_20 = float(hist["Close"].rolling(20).mean().iloc[-1])
         sma_50 = float(hist["Close"].rolling(50).mean().iloc[-1]) if len(hist) >= 50 else None
@@ -108,6 +109,7 @@ def get_full_analysis(ticker: str) -> dict | None:
             "week_return": week_return,
             "month_return": month_return,
             "ytd_return": ytd_return,
+            "one_year_return": one_year_return,
             "rsi": rsi,
             "sma_20": sma_20,
             "sma_50": sma_50,
@@ -239,6 +241,17 @@ def _h(text) -> str:
 def _pct(hist, start_idx: int) -> float:
     first = hist["Close"].iloc[start_idx] if start_idx != 0 else hist["Close"].iloc[0]
     return ((hist["Close"].iloc[-1] - first) / first) * 100
+
+
+def _ytd_return(hist) -> float:
+    """Ritorno da inizio anno solare: baseline = ultima chiusura dell'anno
+    precedente se presente nella finestra storica, altrimenti la prima
+    chiusura dell'anno corrente (finestra troppo corta)."""
+    idx = hist.index
+    cur_year = idx[-1].year
+    prior = hist["Close"][idx.year == cur_year - 1]
+    baseline = prior.iloc[-1] if len(prior) else hist["Close"][idx.year == cur_year].iloc[0]
+    return ((hist["Close"].iloc[-1] - baseline) / baseline) * 100
 
 
 def format_analysis_message(d: dict) -> str:
