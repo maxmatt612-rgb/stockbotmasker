@@ -3085,6 +3085,25 @@ async def api_prompt_source(type: str = ""):
     if ptype == "deep":
         return {"type": ptype, "system": AP.DEEP,
                 "task": "(costruito dinamicamente con i dati reali del titolo ad ogni richiesta)"}
+    if ptype == "should-buy":
+        return {"type": ptype, "system": AP.VERDICT,
+                "task": "(costruito dinamicamente con i dati reali del titolo e l'orizzonte scelto ad ogni richiesta)"}
+    if ptype == "timing":
+        return {"type": ptype, "system": AP.TIMING,
+                "task": "(costruito dinamicamente con i dati reali del titolo ad ogni richiesta)"}
+    if ptype == "deepreport":
+        return {"type": ptype, "system": AP.REPORT,
+                "task": "(costruito dinamicamente con i dati reali del titolo ad ogni richiesta; l'AI compila 13 sezioni con punteggi in un formato fisso)"}
+    if ptype == "debate":
+        return {"type": ptype,
+                "system": f"[TORO — sostiene l'acquisto]\n{AP.BULL}\n\n[ORSO — sostiene di NON comprare]\n{AP.BEAR}\n\n[GIUDICE — decide il verdetto finale]\n{AP.JUDGE}",
+                "task": "(3 agenti AI in sequenza sui dati reali del titolo: Toro argomenta, Orso controbatte, Giudice decide)"}
+    if ptype == "consensus":
+        return {"type": ptype, "system": "Trader esperto che dà un verdetto netto e conciso in italiano.",
+                "task": "Titolo {ticker} ({nome}). Prezzo {prezzo}, RSI {rsi}, rischio {rischio}, settimana {var_1sett}%, mese {var_1mese}%, trend {trend}, volatilità {vol}%, sentiment news {sentiment}.\nConviene comprare adesso? Rispondi SOLO con questo formato:\nVERDETTO: COMPRA | ASPETTA | NON COMPRARE\nMOTIVO: [una frase concreta]\n\n(lo stesso prompt viene inviato a 3 modelli diversi — Llama 3.3, GPT-OSS 120B, Qwen3 — che votano indipendentemente)"}
+    if ptype == "compare":
+        return {"type": ptype, "system": "Sei un analista finanziario esperto. Confronta oggettivamente due azioni usando dati fondamentali e tecnici. Sii diretto e dai un vincitore chiaro. Rispondi in italiano.",
+                "task": "Confronta queste due azioni e dimmi quale preferire come investimento.\n\nAZIONE 1:\n{ticker1} ({nome1}) — prezzo, variazione, settore, market cap, P/E forward, EPS, margine, ROE, dividendo\n\nAZIONE 2:\n{ticker2} (stessi dati)\n\nRispondi SOLO con questo formato (in italiano, max 2 righe a sezione):\nPRO_1: [punti di forza di AZIONE 1]\nPRO_2: [punti di forza di AZIONE 2]\nCONTRO_1: [debolezze di AZIONE 1]\nCONTRO_2: [debolezze di AZIONE 2]\nVINCITORE: [solo il ticker vincitore, es: AAPL]\nMOTIVO: [1 frase secca che spiega perché]\nCONFIDENZA: [numero intero da 55 a 92]"}
     return JSONResponse({"error": "tipo non valido"}, status_code=400)
 
 
