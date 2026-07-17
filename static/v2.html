@@ -559,8 +559,10 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn" id="scanBtn">Analizza ora</button>
         <button class="mini-btn" id="tgBtn" onclick="sendTop10Telegram()" title="Invia la top 10 sul bot Telegram">📤 Telegram</button>
+        <button class="mini-btn" id="scan-prompt-btn" onclick="togglePromptSource('scan-insight','scan')">🔍 <span id="scan-prompt-btn-lbl">Mostra prompt</span></button>
       </div>
     </div>
+    <div id="scan-prompt-box" class="prompt-src" style="display:none"></div>
     <div class="grid" id="grid">
       <div class="empty">
         <span class="ic">○</span>
