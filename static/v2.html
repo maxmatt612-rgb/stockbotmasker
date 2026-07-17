@@ -478,6 +478,14 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
 .prompt-out .md-tbl{width:100%;border-collapse:collapse;margin:10px 0;font-size:.76rem;display:block;overflow-x:auto}
 .prompt-out .md-tbl th,.prompt-out .md-tbl td{border:1px solid var(--border);padding:6px 9px;text-align:left;white-space:nowrap}
 .prompt-out .md-tbl th{background:var(--surface-2);font-weight:600}
+/* Trasparenza: box "Mostra prompt" */
+.prompt-src{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:14px 16px;
+  margin:12px 0 0;font-size:.74rem;line-height:1.5}
+.prompt-src .psec{font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);
+  margin:12px 0 6px}
+.prompt-src .psec:first-child{margin-top:0}
+.prompt-src pre{white-space:pre-wrap;word-break:break-word;font-family:var(--mono);color:var(--dim);
+  background:var(--surface-2);border-radius:8px;padding:10px 12px;max-height:340px;overflow-y:auto;margin:0}
 </style>
 </head>
 <body>
@@ -571,7 +579,10 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
 
   <section data-view="analisi" hidden>
     <div class="lead"><div><div class="eyebrow">Report completo</div><h2>Analisi di un titolo</h2>
-      <p>Inserisci un ticker e ottieni un report d'investimento completo: verdetto, consenso analisti, target, fondamentali, tecnica, rischi e titoli simili.</p></div></div>
+      <p>Inserisci un ticker e ottieni un report d'investimento completo: verdetto, consenso analisti, target, fondamentali, tecnica, rischi e titoli simili.</p></div>
+      <button class="mini-btn" id="an-prompt-btn" onclick="togglePromptSource('full','an')">🔍 <span id="an-prompt-btn-lbl">Mostra prompt</span></button>
+    </div>
+    <div id="an-prompt-box" class="prompt-src" style="display:none"></div>
     <div class="panel" style="max-width:none">
       <div style="display:flex;gap:10px">
         <input class="inp" id="an-tk" placeholder="Es. AAPL, NVDA, SPY" autocapitalize="characters" spellcheck="false" style="flex:1">
@@ -583,7 +594,10 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
 
   <section data-view="short" hidden>
     <div class="lead"><div><div class="eyebrow">Tesi ribassista</div><h2>Analisi Short</h2>
-      <p>Inserisci un ticker: tesi short professionale (orizzonte 7 giorni – 1 mese) con convinzione, scorecard, catalizzatori e costruzione del trade. Il verdetto può essere Strong Sell / Sell / Hold.</p></div></div>
+      <p>Inserisci un ticker: tesi short professionale (orizzonte 7 giorni – 1 mese) con convinzione, scorecard, catalizzatori e costruzione del trade. Il verdetto può essere Strong Sell / Sell / Hold.</p></div>
+      <button class="mini-btn" id="sh-prompt-btn" onclick="togglePromptSource('short','sh')">🔍 <span id="sh-prompt-btn-lbl">Mostra prompt</span></button>
+    </div>
+    <div id="sh-prompt-box" class="prompt-src" style="display:none"></div>
     <div class="panel" style="max-width:none">
       <div style="display:flex;gap:10px">
         <input class="inp" id="sh-tk" placeholder="Es. TSLA, NVDA, COIN" autocapitalize="characters" spellcheck="false" style="flex:1">
@@ -1109,7 +1123,10 @@ async function runShort(){
   if(!tk){$('#sh-tk').focus();return;}
   out.innerHTML='<div class="lline">'+T('Tesi short in preparazione… (~30s)','Short thesis in progress… (~30s)')+'</div>';
   const d=await J('/api/stock/'+encodeURIComponent(tk)+'/prompt?type=short');
-  if(!d||d.__err||d.error||!d.text){out.innerHTML='<div class="lline">'+T('Titolo non trovato o analisi non disponibile.','Stock not found or analysis unavailable.')+'</div>';return;}
+  if(!d||d.__err||d.error||!d.text){
+    const msg=(d&&d.error)?esc(d.error):T('Titolo non trovato o analisi non disponibile.','Stock not found or analysis unavailable.');
+    out.innerHTML='<div class="lline">'+msg+'</div>';return;
+  }
   out.innerHTML=`<div class="res" style="max-width:none">
     <div class="res-kick">${esc(d.ticker)} · ${T('Tesi short (7 giorni – 1 mese)','Short thesis (7 days – 1 month)')}</div>
     <div class="prompt-out">${mdToHtml(d.text)}</div>
@@ -1117,6 +1134,24 @@ async function runShort(){
   </div>`;
 }
 {const _sh=$('#sh-tk');if(_sh)_sh.addEventListener('keydown',e=>{if(e.key==='Enter')runShort();});}
+
+// ── "Mostra prompt": trasparenza — mostra il prompt reale usato per il report ──
+const _promptSrcCache={};
+async function togglePromptSource(ptype,prefix){
+  const box=$('#'+prefix+'-prompt-box'), lbl=$('#'+prefix+'-prompt-btn-lbl');
+  if(!box)return;
+  const showing=box.style.display!=='none';
+  if(showing){box.style.display='none';if(lbl)lbl.textContent=T('Mostra prompt','Show prompt');return;}
+  box.style.display='block';if(lbl)lbl.textContent=T('Nascondi prompt','Hide prompt');
+  if(_promptSrcCache[ptype]){box.innerHTML=_promptSrcCache[ptype];return;}
+  box.innerHTML='<div class="lline">'+T('Caricamento…','Loading…')+'</div>';
+  const d=await J('/api/prompt-source?type='+encodeURIComponent(ptype));
+  if(!d||d.__err||d.error){box.innerHTML='<div class="lline">'+T('Prompt non disponibile.','Prompt not available.')+'</div>';return;}
+  const html=`<div class="psec">${T('System prompt','System prompt')}</div><pre>${esc(d.system||'')}</pre>`+
+             `<div class="psec">${T('Task / istruzioni','Task / instructions')}</div><pre>${esc(d.task||'')}</pre>`;
+  _promptSrcCache[ptype]=html;
+  box.innerHTML=html;
+}
 // ── Power prompt: analisi da grande banca sul titolo ──
 const POWER_PROMPTS=[
   {k:'dcf',e:'💰',it:'Valutazione DCF',en:'DCF Valuation',s_it:'Modello DCF stile Morgan Stanley',s_en:'Morgan Stanley–style DCF model'},

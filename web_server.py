@@ -3074,6 +3074,20 @@ async def api_options(ticker: str):
     return data
 
 
+@app.get("/api/prompt-source")
+async def api_prompt_source(type: str = ""):
+    """Espone il prompt (system + task) davvero usato per un tipo di report — trasparenza
+    per l'utente ('Mostra prompt'). Legge direttamente da analyst_prompts, sempre in sync."""
+    ptype = (type or "").lower()
+    if ptype in AP.POWER:
+        persona = AP.POWER[ptype]
+        return {"type": ptype, "system": persona["system"], "task": persona["task"]}
+    if ptype == "deep":
+        return {"type": ptype, "system": AP.DEEP,
+                "task": "(costruito dinamicamente con i dati reali del titolo ad ogni richiesta)"}
+    return JSONResponse({"error": "tipo non valido"}, status_code=400)
+
+
 @app.get("/api/stock/{ticker}/prompt")
 async def api_power_prompt(ticker: str, type: str = ""):
     """Esegue un 'power prompt' (DCF, pre-earnings, tecnica, competitiva, pattern)
