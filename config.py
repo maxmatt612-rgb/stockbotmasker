@@ -24,6 +24,50 @@ REPORT_HOUR = 7
 REPORT_MINUTE = 30
 ALERT_CHECK_INTERVAL = 300
 
+# Costo round-trip (ingresso+uscita) applicato a ogni trade nel backtest simulato:
+# stima prudente di commissioni+spread, in percento. Nessun broker reale è a costo zero.
+COST_PCT = 0.10
+
+# ── Costanti di scoring ──────────────────────────────────────────────────────
+# Tutte le soglie/punteggi qui sotto sono scelte a mano dall'autore (hand-set, no
+# backtest): non derivano da un'ottimizzazione storica, sono l'onesto default.
+SCORING = {
+    # get_enriched_analysis / format_apr_card ecc. — score 0-10 rapido per singolo titolo
+    "enriched": {
+        "rsi_oversold_strong": 35, "rsi_oversold_strong_pts": 3,       # hand-set, no backtest
+        "rsi_oversold": 45, "rsi_oversold_pts": 2,                     # hand-set, no backtest
+        "rsi_overbought_strong": 70, "rsi_overbought_strong_pts": -3,  # hand-set, no backtest
+        "rsi_overbought": 60, "rsi_overbought_pts": -1,                # hand-set, no backtest
+        "chg_strong": 3, "chg_strong_pts": 3,                          # hand-set, no backtest
+        "chg_mid": 1, "chg_mid_pts": 2,                                # hand-set, no backtest
+        "chg_positive_pts": 1,                                        # hand-set, no backtest
+        "chg_weak": -3, "chg_weak_pts": -2,                            # hand-set, no backtest
+        "above_sma20_pts": 1,                                         # hand-set, no backtest
+        "raw_offset": 5, "raw_range": 15,                             # normalizzazione a 0-10, hand-set
+    },
+    # scan_cheap_stocks — screening giornaliero dell'universo
+    "scan": {
+        "trend_component_pts": 1,                                     # hand-set, no backtest (x4: sma20/sma50/uptrend/pulito)
+        "week_return_pos": 0, "week_return_pos_pts": 1,                # hand-set, no backtest
+        "week_return_strong": 5, "week_return_strong_pts": 1,          # hand-set, no backtest
+        "month_return_pos": 0, "month_return_pos_pts": 1,              # hand-set, no backtest
+        "month_return_strong": 10, "month_return_strong_pts": 1,       # hand-set, no backtest
+        "month_return_weak": -15, "month_return_weak_pts": -1,         # hand-set, no backtest
+        "rsi_ideal_lo": 45, "rsi_ideal_hi": 65, "rsi_ideal_pts": 2,     # hand-set, no backtest
+        "rsi_pullback_lo": 40, "rsi_pullback_hi": 45, "rsi_pullback_pts": 1,  # hand-set, no backtest
+        "rsi_extended": 75, "rsi_extended_pts": -3,                    # hand-set, no backtest
+        "rsi_overbought": 70, "rsi_overbought_pts": -1,                # hand-set, no backtest
+        "rsi_falling_knife": 30, "rsi_falling_knife_pts": -2,          # hand-set, no backtest
+        "vol_ratio_confirm": 1.5, "vol_confirm_pts": 1,                # hand-set, no backtest
+        "volatility_healthy_lo": 15, "volatility_healthy_hi": 50, "volatility_healthy_pts": 1,  # hand-set, no backtest
+        "volatility_junk": 90, "volatility_junk_pts": -2,              # hand-set, no backtest
+        "volatility_high": 70, "volatility_high_pts": -1,              # hand-set, no backtest
+        "parabolic_spike_pct": 9, "parabolic_spike_pts": -1,           # hand-set, no backtest
+        "ai_ticker_bonus_pts": 1,                                     # hand-set, no backtest
+        "raw_offset": 7, "raw_range": 20,                             # normalizzazione a 0-10, hand-set
+    },
+}
+
 # ~550+ azioni disponibili su Revolut tipicamente sotto i €40 (~$43)
 REVOLUT_UNIVERSE = [
     # ── Crypto Mining ──

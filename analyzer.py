@@ -1,6 +1,7 @@
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import time
 import re
 
@@ -58,15 +59,13 @@ def get_full_analysis(ticker: str) -> dict | None:
 
         week_return = _pct(hist, -6) if len(hist) >= 6 else None
         month_return = _pct(hist, -22) if len(hist) >= 22 else None
-        ytd_return = _pct(hist, 0)
+        one_year_return = _pct(hist, 0)
+        ytd_return = _ytd_return(hist)
 
         sma_20 = float(hist["Close"].rolling(20).mean().iloc[-1])
         sma_50 = float(hist["Close"].rolling(50).mean().iloc[-1]) if len(hist) >= 50 else None
 
-        delta = hist["Close"].diff()
-        gain = delta.clip(lower=0).rolling(14).mean()
-        loss = (-delta.clip(upper=0)).rolling(14).mean()
-        rsi = float((100 - (100 / (1 + gain / loss))).iloc[-1])
+        rsi = wilder_rsi(hist["Close"])
 
         if volatility < 30:
             risk_level, risk_emoji = "Basso", "🟢"
@@ -108,6 +107,7 @@ def get_full_analysis(ticker: str) -> dict | None:
             "week_return": week_return,
             "month_return": month_return,
             "ytd_return": ytd_return,
+            "one_year_return": one_year_return,
             "rsi": rsi,
             "sma_20": sma_20,
             "sma_50": sma_50,
@@ -150,10 +150,7 @@ def get_trading_analysis(ticker: str) -> dict | None:
 
         day_change_pct = ((current_price - prev_close) / prev_close) * 100
 
-        delta = hist["Close"].diff()
-        gain = delta.clip(lower=0).rolling(14).mean()
-        loss = (-delta.clip(upper=0)).rolling(14).mean()
-        rsi = float((100 - (100 / (1 + gain / loss))).iloc[-1])
+        rsi = wilder_rsi(hist["Close"])
 
         ema_12 = hist["Close"].ewm(span=12, adjust=False).mean()
         ema_26 = hist["Close"].ewm(span=26, adjust=False).mean()
@@ -239,6 +236,49 @@ def _h(text) -> str:
 def _pct(hist, start_idx: int) -> float:
     first = hist["Close"].iloc[start_idx] if start_idx != 0 else hist["Close"].iloc[0]
     return ((hist["Close"].iloc[-1] - first) / first) * 100
+
+
+def _ytd_return(hist) -> float:
+    """Ritorno da inizio anno solare: baseline = ultima chiusura dell'anno
+    precedente se presente nella finestra storica, altrimenti la prima
+    chiusura dell'anno corrente (finestra troppo corta)."""
+    idx = hist.index
+    cur_year = idx[-1].year
+    prior = hist["Close"][idx.year == cur_year - 1]
+    baseline = prior.iloc[-1] if len(prior) else hist["Close"][idx.year == cur_year].iloc[0]
+    return ((hist["Close"].iloc[-1] - baseline) / baseline) * 100
+
+
+def wilder_rsi(close, period: int = 14) -> float:
+    """RSI standard (Wilder smoothing) come TradingView/i broker, non una media mobile piatta.
+    Ritorna 50.0 (neutro) se non calcolabile invece di propagare NaN nello scoring."""
+    if close is None or len(close) < period + 1:
+        return 50.0
+    delta = close.diff()
+    avg_gain = delta.clip(lower=0).ewm(alpha=1 / period, adjust=False).mean()
+    avg_loss = (-delta.clip(upper=0)).ewm(alpha=1 / period, adjust=False).mean()
+    rsi = 100 - (100 / (1 + avg_gain / avg_loss))
+    val = float(rsi.iloc[-1])
+    return 50.0 if pd.isna(val) else val
+
+
+def _quality_score_10(rsi: float, chg: float, sma_20, price: float) -> float:
+    """Score 0-10 rapido (get_enriched_analysis) da RSI, variazione giornaliera e trend
+    vs SMA20. Soglie in config.SCORING['enriched'] — hand-set, non ricalibrate su backtest."""
+    from config import SCORING
+    s = SCORING["enriched"]
+    score_raw = 0
+    if rsi < s["rsi_oversold_strong"]:        score_raw += s["rsi_oversold_strong_pts"]
+    elif rsi < s["rsi_oversold"]:              score_raw += s["rsi_oversold_pts"]
+    elif rsi > s["rsi_overbought_strong"]:     score_raw += s["rsi_overbought_strong_pts"]
+    elif rsi > s["rsi_overbought"]:            score_raw += s["rsi_overbought_pts"]
+    if chg > s["chg_strong"]:                  score_raw += s["chg_strong_pts"]
+    elif chg > s["chg_mid"]:                   score_raw += s["chg_mid_pts"]
+    elif chg > 0:                              score_raw += s["chg_positive_pts"]
+    elif chg < s["chg_weak"]:                  score_raw += s["chg_weak_pts"]
+    if sma_20 and price > sma_20:
+        score_raw += s["above_sma20_pts"]
+    return round(min(10.0, max(0.0, (score_raw + s["raw_offset"]) / s["raw_range"] * 10)), 1)
 
 
 def format_analysis_message(d: dict) -> str:
@@ -512,8 +552,9 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
     Fase 1 — pre-filtro rapido per prezzo (batch 2d): scarta tutto ciò che è sopra max_price.
     Fase 2 — analisi tecnica completa solo per i candidati rimasti.
     Se viene passato un universo esplicito (es. ETF_UNIVERSE) viene usata una sola fase."""
-    from config import EUROPEAN_UNIVERSE, AI_UNIVERSE
+    from config import EUROPEAN_UNIVERSE, AI_UNIVERSE, SCORING
     _AI_SET = set(AI_UNIVERSE)   # lookup O(1)
+    _sc = SCORING["scan"]
 
     if universe is not None:
         # Universo esplicito piccolo (ETF, watchlist…): analisi diretta, una fase
@@ -600,16 +641,7 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                     day_change_pct = ((current_price - prev_close) / prev_close) * 100
 
                     # RSI
-                    if len(close) >= 15:
-                        delta = close.diff()
-                        gain = delta.clip(lower=0).rolling(14).mean()
-                        loss = (-delta.clip(upper=0)).rolling(14).mean()
-                        rs = gain / loss
-                        rsi = float((100 - (100 / (1 + rs))).iloc[-1])
-                        if pd.isna(rsi):
-                            rsi = 50.0
-                    else:
-                        rsi = 50.0
+                    rsi = wilder_rsi(close)
 
                     # Volume ratio + LIQUIDITÀ (filtro qualità: scarta penny/junk illiquidi)
                     vol_ratio = 1.0
@@ -654,40 +686,40 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
 
                     # 1) QUALITÀ DEL TREND (la spina dorsale dei titoli buoni) — max +4
                     trend_pts = 0
-                    if above_sma20:   trend_pts += 1
-                    if above_sma50:   trend_pts += 1
-                    if uptrend_align: trend_pts += 1
-                    if above_sma20 and above_sma50 and uptrend_align: trend_pts += 1  # trend pulito
+                    if above_sma20:   trend_pts += _sc["trend_component_pts"]
+                    if above_sma50:   trend_pts += _sc["trend_component_pts"]
+                    if uptrend_align: trend_pts += _sc["trend_component_pts"]
+                    if above_sma20 and above_sma50 and uptrend_align: trend_pts += _sc["trend_component_pts"]  # trend pulito
                     score += trend_pts
 
                     # 2) MOMENTUM MULTI-TIMEFRAME (forza costante settimana+mese) — max +4
                     mom_pts = 0
-                    if week_return > 0:    mom_pts += 1
-                    if week_return > 5:    mom_pts += 1
-                    if month_return > 0:   mom_pts += 1
-                    if month_return > 10:  mom_pts += 1
-                    if month_return < -15: mom_pts -= 1   # downtrend forte = penalità
+                    if week_return > _sc["week_return_pos"]:      mom_pts += _sc["week_return_pos_pts"]
+                    if week_return > _sc["week_return_strong"]:   mom_pts += _sc["week_return_strong_pts"]
+                    if month_return > _sc["month_return_pos"]:    mom_pts += _sc["month_return_pos_pts"]
+                    if month_return > _sc["month_return_strong"]: mom_pts += _sc["month_return_strong_pts"]
+                    if month_return < _sc["month_return_weak"]:   mom_pts += _sc["month_return_weak_pts"]   # downtrend forte = penalità
                     score += mom_pts
 
                     # 3) RSI in ZONA SANA (non gli estremi: né ipercomprato né coltello che cade)
                     rsi_pts = 0
-                    if 45 <= rsi <= 65:    rsi_pts = 2     # zona ideale
-                    elif 40 <= rsi < 45:   rsi_pts = 1     # pullback leggero in trend
-                    elif rsi > 75:         rsi_pts = -3    # esteso / ipercomprato
-                    elif rsi > 70:         rsi_pts = -1
-                    elif rsi < 30:         rsi_pts = -2    # falling knife: penalizza, non premiare
+                    if _sc["rsi_ideal_lo"] <= rsi <= _sc["rsi_ideal_hi"]:            rsi_pts = _sc["rsi_ideal_pts"]      # zona ideale
+                    elif _sc["rsi_pullback_lo"] <= rsi < _sc["rsi_pullback_hi"]:     rsi_pts = _sc["rsi_pullback_pts"]   # pullback leggero in trend
+                    elif rsi > _sc["rsi_extended"]:                                  rsi_pts = _sc["rsi_extended_pts"]  # esteso / ipercomprato
+                    elif rsi > _sc["rsi_overbought"]:                                rsi_pts = _sc["rsi_overbought_pts"]
+                    elif rsi < _sc["rsi_falling_knife"]:                             rsi_pts = _sc["rsi_falling_knife_pts"]  # falling knife: penalizza, non premiare
                     score += rsi_pts
 
                     # 4) VOLUME come CONFERMA (solo se il prezzo sale) — modesto
-                    vol_pts = 1 if (vol_ratio > 1.5 and day_change_pct > 0) else 0
+                    vol_pts = _sc["vol_confirm_pts"] if (vol_ratio > _sc["vol_ratio_confirm"] and day_change_pct > 0) else 0
                     score += vol_pts
 
                     # 5) SANITÀ DELLA VOLATILITÀ
-                    if 15 <= volatility <= 50:   score += 1    # volatilità sana
-                    elif volatility > 90:        score -= 2    # territorio pump/junk
-                    elif volatility > 70:        score -= 1
+                    if _sc["volatility_healthy_lo"] <= volatility <= _sc["volatility_healthy_hi"]:  score += _sc["volatility_healthy_pts"]  # volatilità sana
+                    elif volatility > _sc["volatility_junk"]:    score += _sc["volatility_junk_pts"]    # territorio pump/junk
+                    elif volatility > _sc["volatility_high"]:    score += _sc["volatility_high_pts"]
                     # spike parabolico in un giorno = rischio di inseguire il top
-                    if day_change_pct > 9:       score -= 1
+                    if day_change_pct > _sc["parabolic_spike_pct"]:  score += _sc["parabolic_spike_pts"]
 
                     # ── Volatilità anomala: ultimi 5gg vs mese intero ─────────
                     recent_vol = float(returns.iloc[-5:].std() * (252**0.5) * 100) if len(returns) >= 5 else volatility
@@ -714,17 +746,17 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                     else:             bear_sigs += 1
                     if week_return > 0 and month_return > 0: bull_sigs += 1
                     elif week_return < 0 and month_return < 0: bear_sigs += 1
-                    if 45 <= rsi <= 65: bull_sigs += 1
-                    elif rsi > 75 or rsi < 30: bear_sigs += 1
+                    if _sc["rsi_ideal_lo"] <= rsi <= _sc["rsi_ideal_hi"]: bull_sigs += 1
+                    elif rsi > _sc["rsi_extended"] or rsi < _sc["rsi_falling_knife"]: bear_sigs += 1
                     double_signal = "bull" if bull_sigs >= 3 else ("bear" if bear_sigs >= 3 else "")
 
                     # Bonus AI: piccolo boost per aziende AI-focused
                     is_ai = ticker in _AI_SET
-                    if is_ai:
-                        score += 1
+                    ai_bonus_pts = _sc["ai_ticker_bonus_pts"] if is_ai else 0
+                    score += ai_bonus_pts
 
                     # Normalizza (range grezzo ~ -7..+13) → 0-10
-                    score_10 = round(min(10.0, max(0.0, (score + 7) / 20 * 10)), 1)
+                    score_10 = round(min(10.0, max(0.0, (score + _sc["raw_offset"]) / _sc["raw_range"] * 10)), 1)
 
                     # Trade setup
                     daily_vol_pct = volatility / (252 ** 0.5) / 100
@@ -771,6 +803,7 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                             "momentum": mom_pts,
                             "volume": vol_pts,
                             "trend": trend_pts,
+                            "ai_bonus": ai_bonus_pts,
                         },
                         "trade_setup": trade_setup,
                     })
@@ -799,7 +832,7 @@ def get_enriched_analysis(ticker: str) -> dict | None:
     try:
         stock = yf.Ticker(ticker.upper())
         cal = stock.calendar
-        today = datetime.now().date()
+        today = datetime.now(ZoneInfo("America/New_York")).date()  # earnings sono eventi del mercato USA
         future_dates = []
         if isinstance(cal, dict):
             for key in ("Earnings Date", "Earnings Dates"):
@@ -855,27 +888,15 @@ def get_enriched_analysis(ticker: str) -> dict | None:
     if base.get("week_52_high") and base["current_price"] > 0:
         upside_52w = (base["week_52_high"] - base["current_price"]) / base["current_price"] * 100
 
-    # ── Stima giornaliera = variazione attuale ──
+    # ── Variazione odierna (già realizzata, non una previsione) ──
     daily_estimate_pct = base["day_change_pct"]
-    daily_estimate_price = base["current_price"] * (1 + daily_estimate_pct / 100)
 
     # ── Score 0-10 basato su RSI, variazione e trend ──
     rsi = base.get("rsi", 50.0)
     chg = base.get("day_change_pct", 0.0)
     sma_20 = base.get("sma_20")
     price = base.get("current_price", 0.0)
-    score_raw = 0
-    if rsi < 35:      score_raw += 3
-    elif rsi < 45:    score_raw += 2
-    elif rsi > 70:    score_raw -= 3
-    elif rsi > 60:    score_raw -= 1
-    if chg > 3:       score_raw += 3
-    elif chg > 1:     score_raw += 2
-    elif chg > 0:     score_raw += 1
-    elif chg < -3:    score_raw -= 2
-    if sma_20 and price > sma_20:
-        score_raw += 1
-    score_10 = round(min(10.0, max(0.0, (score_raw + 5) / 15 * 10)), 1)
+    score_10 = _quality_score_10(rsi, chg, sma_20, price)
 
     # ── Stima direzionale a 5 giorni: direzione dallo score, ampiezza dalla volatilità ──
     vol = base.get("volatility") or 40.0
@@ -893,7 +914,6 @@ def get_enriched_analysis(ticker: str) -> dict | None:
         "news_sentiment_label": news_label,
         "upside_52w": upside_52w,
         "daily_estimate_pct": daily_estimate_pct,
-        "daily_estimate_price": daily_estimate_price,
         "estimate_5d_pct": estimate_5d_pct,
         "estimate_5d_price": estimate_5d_price,
         "score_10": score_10,
@@ -914,7 +934,6 @@ def format_apr_card(d: dict, ai: dict) -> str:
     news_line = f"{d.get('news_sentiment_emoji', '⚪')} {d.get('news_sentiment_label', 'Neutre')}"
 
     daily_pct = d.get("daily_estimate_pct", 0.0)
-    daily_price = d.get("daily_estimate_price", d["current_price"])
     daily_sign = "+" if daily_pct >= 0 else ""
 
     upside = d.get("upside_52w", 0.0)
@@ -950,7 +969,7 @@ def format_apr_card(d: dict, ai: dict) -> str:
 
     lines += [
         "",
-        f"📅 <b>Stima oggi:</b> {daily_sign}{daily_pct:.1f}% → ${daily_price:.2f}",
+        f"📊 <b>Oggi finora:</b> {daily_sign}{daily_pct:.1f}%",
         target_line,
         f"{d.get('risk_emoji', '🟡')} <b>Rischio:</b> {d.get('risk_level', 'Medio')} (volatilità {d.get('volatility', 0):.0f}%)",
         f"⭐ <b>Score:</b> {score_10}/10",
@@ -988,7 +1007,6 @@ def format_morning_card(d: dict, ai: dict, rank: int) -> str:
     news_line = f"{d.get('news_sentiment_emoji', '⚪')} {d.get('news_sentiment_label', 'Neutre')}"
 
     daily_pct = d.get("daily_estimate_pct", 0.0)
-    daily_price = d.get("daily_estimate_price", d["current_price"])
     daily_sign = "+" if daily_pct >= 0 else ""
 
     upside = d.get("upside_52w", 0.0)
@@ -1024,7 +1042,7 @@ def format_morning_card(d: dict, ai: dict, rank: int) -> str:
 
     lines += [
         "",
-        f"📅 <b>Stima oggi:</b> {daily_sign}{daily_pct:.1f}% → ${daily_price:.2f}",
+        f"📊 <b>Oggi finora:</b> {daily_sign}{daily_pct:.1f}%",
         target_line,
         f"{d.get('risk_emoji', '🟡')} {d.get('risk_level', 'Medio')}",
         f"⭐ {score_10}/10",
@@ -1051,7 +1069,6 @@ def format_scan_card(d: dict, ai: dict, rank: int) -> str:
         earn_str = "📅 N/D"
 
     daily_pct = d.get("daily_estimate_pct", 0.0)
-    daily_price = d.get("daily_estimate_price", d["current_price"])
     daily_sign = "+" if daily_pct >= 0 else ""
 
     upside = d.get("upside_52w", 0.0)
@@ -1067,7 +1084,7 @@ def format_scan_card(d: dict, ai: dict, rank: int) -> str:
         lines.append(f"🎯 {_h(verdict)}")
     if bullet1:
         lines.append(f"• {_h(bullet1)}")
-    lines.append(f"📅 Stima: {daily_sign}{daily_pct:.1f}% → ${daily_price:.2f} | 📊 {target_str}")
+    lines.append(f"📊 Oggi finora: {daily_sign}{daily_pct:.1f}% | 📊 {target_str}")
     return "\n".join(lines)
 
 
@@ -1083,6 +1100,16 @@ def _cagr(hist, trading_days: int) -> float | None:
         return None
     years = trading_days / 252
     return ((p1 / p0) ** (1 / years) - 1) * 100
+
+
+def _projection_basis(cagr_3y: float | None, cagr_1y: float | None) -> tuple[float, str]:
+    """Sceglie il tasso annuo usato per le proiezioni multi-anno e ne dichiara la fonte,
+    così un'ipotesi inventata non è mai indistinguibile da uno storico calcolato."""
+    if cagr_3y is not None:
+        return cagr_3y / 100, "CAGR 3 anni"
+    if cagr_1y is not None:
+        return cagr_1y / 100, "CAGR 1 anno"
+    return 7.0 / 100, "ipotesi 7%/anno (storico insufficiente)"
 
 
 def get_longterm_analysis(ticker: str) -> dict | None:
@@ -1101,7 +1128,7 @@ def get_longterm_analysis(ticker: str) -> dict | None:
         cagr_5y = _cagr(hist, 252 * 5)
 
         # Proiezione scenari a 3 anni
-        base_rate = (cagr_3y or cagr_1y or 7.0) / 100
+        base_rate, projection_basis = _projection_basis(cagr_3y, cagr_1y)
         proj = {}
         for label, mult, years in [
             ("1y_base", 1.0, 1), ("1y_bull", 1.5, 1), ("1y_bear", 0.4, 1),
@@ -1138,6 +1165,7 @@ def get_longterm_analysis(ticker: str) -> dict | None:
             "cagr_3y": round(cagr_3y, 1) if cagr_3y is not None else None,
             "cagr_5y": round(cagr_5y, 1) if cagr_5y is not None else None,
             "projections": proj,
+            "projection_basis": projection_basis,
             "target_mean": target_mean,
             "target_high": target_high,
             "target_low": target_low,

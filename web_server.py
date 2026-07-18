@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-from analyzer import get_enriched_analysis, scan_cheap_stocks, get_longterm_analysis
+from analyzer import get_enriched_analysis, scan_cheap_stocks, get_longterm_analysis, wilder_rsi
 
 # Carica le variabili dal file .env se presente (utile per l'esecuzione in locale).
 try:
@@ -53,10 +53,13 @@ async def _startup_load_cache():
                         s['morning_price'] = s.get('current_price')
                 global _morning_data
                 _morning_data = list(data)
-                _store("scan:10", data)
+                mtime = datetime.fromtimestamp(SCAN_FILE.stat().st_mtime, tz=ROME)
+                scan_is_today = mtime.date() == datetime.now(ROME).date()
+                if scan_is_today:
+                    # Solo se il file è davvero di oggi: altrimenti la chiave datata
+                    # etichetterebbe lo scan di ieri come "fresco" per oggi.
+                    _store(_scan_key(10), data)
                 loaded = True
-                mtime = datetime.fromtimestamp(SCAN_FILE.stat().st_mtime, tz=timezone.utc)
-                scan_is_today = mtime.date() == datetime.now(tz=timezone.utc).date()
                 print(f"[startup] Caricati {len(data)} titoli — dati di oggi: {scan_is_today}")
         except Exception as e:
             print(f"[startup] Impossibile caricare last_scan.json: {e}")
@@ -289,6 +292,12 @@ def _cached(key: str, ttl: int):
 
 def _store(key: str, data: Any):
     _cache[key] = {"data": data, "ts": time.monotonic()}
+
+
+def _scan_key(top: int) -> str:
+    """Chiave cache dello scan, datata: senza data un riavvio/redeploy a fine giornata
+    potrebbe servire lo scan di IERI etichettato come fresco fino a 24h dopo."""
+    return f"scan:{top}:{datetime.now(ROME).strftime('%Y-%m-%d')}"
 
 
 # ─── Serializzazione sicura (numpy → Python native) ──────────────────────────
@@ -528,7 +537,7 @@ def _build_pdf(stocks: list, title: str, subtitle: str) -> bytes:
 async def _generate_morning_pdf():
     """Genera il PDF analisi mattutina dai dati bloccati al mattino."""
     global _morning_pdf, _morning_pdf_ts
-    data = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
+    data = _morning_data or ((_cache.get(_scan_key(10)) or {}).get("data") or [])
     if not data:
         print("[pdf] Nessun dato per il PDF mattutino")
         return
@@ -553,7 +562,7 @@ async def _generate_evening_pdf():
     import pandas as pd
 
     # Usa _morning_data (bloccato alle 7:30) se disponibile, altrimenti fallback cache
-    morning_data = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
+    morning_data = _morning_data or ((_cache.get(_scan_key(10)) or {}).get("data") or [])
     if not morning_data:
         print("[pdf] Nessun dato mattutino per il recap serale")
         return
@@ -762,6 +771,7 @@ def _save_history_snapshot_web(stocks: list):
         "date": date_iso,
         "generated_at": datetime.now(ROME).strftime("%Y-%m-%dT%H:%M:%S"),
         "closed": False,
+        "engine_version": 3,  # 2 = price_at_open+costo backtest (Item 4); 3 = RSI Wilder standard (Item 5)
         "stocks": [
             {
                 "ticker": d["ticker"],
@@ -771,7 +781,6 @@ def _save_history_snapshot_web(stocks: list):
                 "risk_level": d.get("risk_level", "Medio"),
                 "day_change_pct": round(float(d.get("day_change_pct") or 0), 2),
                 "rsi": round(float(d.get("rsi") or 50), 1),
-                "verdict": "",
             }
             for d in stocks if d.get("ticker")
         ],
@@ -800,11 +809,16 @@ def _close_history_snapshot_web():
         return
     for s in snap.get("stocks", []):
         try:
-            pc = round(float(yf.Ticker(s["ticker"]).fast_info.last_price or 0), 4)
+            fi = yf.Ticker(s["ticker"]).fast_info
+            pc = round(float(fi.last_price or 0), 4)
+            po = round(float(fi.open or 0), 4)
         except Exception:
             pc = 0.0
+            po = 0.0
         pa = s.get("price_at_analysis", 0.0)
         s["price_at_close"] = pc
+        if po > 0:
+            s["price_at_open"] = po  # entry raggiungibile: apertura del giorno, non il close del giorno prima
         if pa > 0 and pc > 0:
             s["close_vs_morning_pct"] = round((pc - pa) / pa * 100, 2)
     snap["closed"] = True
@@ -817,30 +831,47 @@ def _close_history_snapshot_web():
         print(f"[history] errore chiusura: {e}")
 
 
+_last_run: dict = {}  # nome job -> date dell'ultima esecuzione (catch-up scheduler)
+
+
+def should_run(now, scheduled_time, last_run_date) -> bool:
+    """Un job va eseguito ora se: giorno feriale, l'orario schedulato è già passato
+    (o è esattamente ora), e non è già girato oggi. Fa da catch-up: se il tick esatto
+    viene mancato (restart, loop occupato, server addormentato su Render free), il job
+    parte comunque al primo giro utile dello stesso giorno invece di saltarlo in silenzio."""
+    if now.weekday() >= 5:
+        return False
+    if now.time() < scheduled_time:
+        return False
+    return last_run_date != now.date()
+
+
 async def _pdf_scheduler():
-    """Scheduler giornaliero: 07:30 scan, 07:35 PDF mattina + storico, 22:05 recap + chiusura storico."""
+    """Scheduler giornaliero: 07:30 scan, 07:35 PDF mattina + storico, 22:05 recap + chiusura storico.
+    Con catch-up (v. should_run): un tick mancato non salta la giornata."""
+    from datetime import time as _time
     while True:
         now = datetime.now(ROME)
-        h, m = now.hour, now.minute
-        # 07:30 — scan mattutino (dati fissati per la giornata)
-        if h == 7 and m == 30:
-            print("[scheduler] Avvio scan mattutino 07:30")
+        # 07:30 — scan mattutino (dati fissati per la giornata).
+        # Valutato PRIMA del job 07:35 così, in caso di catch-up simultaneo dopo un
+        # riavvio, lo scan viene almeno avviato prima che lo snapshot provi a leggerlo.
+        if should_run(now, _time(7, 30), _last_run.get("scan")):
+            print("[scheduler] Avvio scan mattutino (07:30 o catch-up)")
+            _last_run["scan"] = now.date()
             asyncio.create_task(_refresh_scan_background(10))
-            await asyncio.sleep(60)
-        # 07:35 — PDF analisi mattutina + snapshot storico (solo lun–ven)
-        elif h == 7 and m == 35:
+        # 07:35 — PDF analisi mattutina + snapshot storico
+        if should_run(now, _time(7, 35), _last_run.get("morning")):
+            print("[scheduler] Avvio PDF mattina + snapshot (07:35 o catch-up)")
+            _last_run["morning"] = now.date()
             await _generate_morning_pdf()
-            if now.weekday() < 5:
-                await asyncio.to_thread(_save_history_snapshot_web, _morning_data)
-            await asyncio.sleep(60)
+            await asyncio.to_thread(_save_history_snapshot_web, _morning_data)
         # 22:05 — recap serale + chiusura storico (previsione vs realtà)
-        elif h == 22 and m == 5:
+        if should_run(now, _time(22, 5), _last_run.get("evening")):
+            print("[scheduler] Avvio recap serale + chiusura (22:05 o catch-up)")
+            _last_run["evening"] = now.date()
             await _generate_evening_pdf()
-            if now.weekday() < 5:
-                await asyncio.to_thread(_close_history_snapshot_web)
-            await asyncio.sleep(60)
-        else:
-            await asyncio.sleep(30)
+            await asyncio.to_thread(_close_history_snapshot_web)
+        await asyncio.sleep(30)
 
 
 # ─── Segnale Telegram: top 10 titoli dello scan ──────────────────────────────
@@ -1017,7 +1048,7 @@ async def _refresh_scan_background(top: int):
                 global _morning_data
                 _morning_data = list(display)
                 _save_scan_to_disk(display)
-            _store(f"scan:{top}", display)
+            _store(_scan_key(top), display)
             if top == 10:
                 try:
                     if await _send_top10_rich(display):
@@ -1035,7 +1066,7 @@ async def _refresh_scan_background(top: int):
 
 @app.get("/api/scan")
 async def api_scan(top: int = 10):
-    key = f"scan:{top}"
+    key = _scan_key(top)
     fresh = _cached(key, _SCAN_TTL)
     if fresh is not None:
         return fresh
@@ -1056,7 +1087,7 @@ async def api_scan(top: int = 10):
 async def api_scan_force():
     """Invalida la cache dello scan e forza una nuova scansione in background."""
     # Rimuovi dalla cache così il prossimo /api/scan vede dati stale → refresh
-    _cache.pop("scan:10", None)
+    _cache.pop(_scan_key(10), None)
     if not _scan_in_progress:
         asyncio.create_task(_refresh_scan_background(10))
     return {"ok": True, "scan_in_progress": _scan_in_progress}
@@ -1067,7 +1098,7 @@ async def api_tg_send_top10():
     """Invia SUBITO la top 10 corrente sul bot Telegram (bottone 'Invia su Telegram')."""
     if not (os.getenv("TG_SIGNAL_TOKEN") or os.getenv("BOT_TOKEN")) or not os.getenv("TG_SIGNAL_CHAT"):
         return JSONResponse({"ok": False, "error": "Bot Telegram non configurato (TG_SIGNAL_TOKEN/TG_SIGNAL_CHAT)."}, status_code=503)
-    stocks = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
+    stocks = _morning_data or ((_cache.get(_scan_key(10)) or {}).get("data") or [])
     if not stocks:
         return JSONResponse({"ok": False, "error": "Nessuno scan disponibile: avvia prima 'Analizza ora'."}, status_code=400)
     ok = await _send_top10_rich(stocks, True)
@@ -1135,7 +1166,7 @@ async def api_scan_evening():
     """Stesso set di stock mattutino con PREZZI LIVE — usato sia di giorno che alla sera.
     Restituisce gli stessi titoli in ordine identico, con evening_price (live) e delta_from_morning.
     Cache 60s per non sovraccaricare yfinance (rate limiting)."""
-    morning = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
+    morning = _morning_data or ((_cache.get(_scan_key(10)) or {}).get("data") or [])
     if not morning:
         return JSONResponse([], status_code=404)
 
@@ -2370,8 +2401,7 @@ async def api_technicals(ticker: str):
             return {"name": label, "value": (None if value is None or (isinstance(value, float) and (value != value)) else round(float(value), 2)), "signal": s}
 
         # RSI(14)
-        d = c.diff(); g = d.clip(lower=0).rolling(14).mean(); l = (-d.clip(upper=0)).rolling(14).mean()
-        rsi = float((100 - 100 / (1 + g / l)).iloc[-1])
+        rsi = wilder_rsi(c)
         osc.append(sig("RSI (14)", rsi, "sell" if rsi > 70 else "buy" if rsi < 30 else "neutral"))
 
         # Stochastic %K(14)
@@ -4316,11 +4346,11 @@ async def api_score_history(ticker: str):
 async def api_accuracy():
     """Accuracy storica: quante volte il segnale di Masker ha predetto la direzione corretta."""
     if not HISTORY_FILE.exists():
-        return {"total": 0, "correct": 0, "accuracy_pct": 0, "by_score": {}}
+        return {"total": 0, "correct": 0, "accuracy_pct": 0, "by_score": {}, "by_engine_version": {}}
     try:
         history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
     except Exception:
-        return {"total": 0, "correct": 0, "accuracy_pct": 0, "by_score": {}}
+        return {"total": 0, "correct": 0, "accuracy_pct": 0, "by_score": {}, "by_engine_version": {}}
 
     total = 0
     correct = 0
@@ -4329,22 +4359,25 @@ async def api_accuracy():
         "mid":  {"label": "Score 6–7",  "total": 0, "correct": 0, "pct": 0},
         "low":  {"label": "Score 0–5",  "total": 0, "correct": 0, "pct": 0},
     }
+    by_engine_version: dict = {}
 
     for snap in history.values():
         if not snap.get("closed", False):
             continue
+        ev = snap.get("engine_version", 1)  # snapshot pre-fix, senza il campo, sono v1
         for s in snap.get("stocks", []):
-            pa = s.get("price_at_analysis") or 0.0
+            # v2: entry raggiungibile (apertura). v1 legacy: fallback al vecchio prezzo di analisi.
+            pa = s.get("price_at_open") or s.get("price_at_analysis") or 0.0
             pc = s.get("price_at_close") or 0.0
             score = s.get("score_10") or 5.0
             if pa <= 0 or pc <= 0:
                 continue
+            by_engine_version[str(ev)] = by_engine_version.get(str(ev), 0) + 1
             pct = (pc - pa) / pa * 100
-            verdict = (s.get("verdict") or "").upper()
-            # Determina se il segnale era bullish o bearish
-            if score >= 7 or any(k in verdict for k in ("COMPRA", "BUY", "SI", "SÌ")):
+            # Direzione attesa dallo score numerico dello screener (unico segnale disponibile)
+            if score >= 7:
                 expected_up = True
-            elif score <= 4 or any(k in verdict for k in ("VENDI", "SELL", "NO")):
+            elif score <= 4:
                 expected_up = False
             else:
                 continue  # neutro: skip
@@ -4365,32 +4398,29 @@ async def api_accuracy():
         "correct": correct,
         "accuracy_pct": round(correct / total * 100, 1) if total > 0 else 0,
         "by_score": by_score,
+        "by_engine_version": by_engine_version,
     }
 
 
 # ─── Backtest storico dei segnali ─────────────────────────────────────────────
 
-@app.get("/api/backtest")
-async def api_backtest():
-    """
-    Backtest: per ogni segnale nella history con price_at_close,
-    calcola il ritorno mattina→chiusura, raggruppato per score bucket.
-    Mostra avg return, win rate, best/worst, e portafoglio cumulativo simulato.
-    """
-    key = "backtest:v1"
-    if (c := _cached(key, 1800)) is not None:
-        return c
+_EMPTY_BACKTEST = {"total": 0, "days": 0, "date_from": None, "date_to": None,
+                    "by_score": {}, "portfolio": [], "portfolio_final": 10000.0,
+                    "portfolio_return_pct": 0}
 
-    if not HISTORY_FILE.exists():
-        return {"total": 0, "days": 0, "by_score": {}, "portfolio": []}
 
-    try:
-        history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return {"total": 0, "days": 0, "by_score": {}, "portfolio": []}
+def _compute_backtest(history: dict) -> dict:
+    """
+    Backtest puro (nessuna I/O): per ogni segnale con price_at_open E price_at_close,
+    calcola il ritorno apertura→chiusura (entry raggiungibile) meno il costo round-trip
+    COST_PCT, raggruppato per score bucket. Righe senza price_at_open (storico pre-fix,
+    che usava il close del giorno prima come entry irraggiungibile) sono escluse.
+    """
+    from config import COST_PCT
 
     signals: list = []
     portfolio_days: list = []  # per la curva cumulativa
+    dates_used: list = []
 
     # Ordina le date per simulare in cronologia
     sorted_keys = sorted(history.keys())
@@ -4403,13 +4433,13 @@ async def api_backtest():
         day_high_stocks = []
 
         for s in snap.get("stocks", []):
-            pa = s.get("price_at_analysis") or 0.0
+            pa = s.get("price_at_open") or 0.0  # niente fallback: entry deve essere raggiungibile
             pc = s.get("price_at_close") or 0.0
             score_10 = s.get("score_10") or 0.0
             ticker = s.get("ticker", "")
             if pa <= 0 or pc <= 0 or not ticker:
                 continue
-            ret = (pc - pa) / pa * 100
+            ret = (pc - pa) / pa * 100 - COST_PCT
             signals.append({
                 "ticker": ticker,
                 "date": date_str,
@@ -4419,6 +4449,7 @@ async def api_backtest():
                 "return_pct": round(ret, 2),
                 "win": ret > 0,
             })
+            dates_used.append(date_str)
             if score_10 >= 8:
                 day_high_stocks.append(ret)
 
@@ -4426,6 +4457,9 @@ async def api_backtest():
         if day_high_stocks:
             avg_day = sum(day_high_stocks) / len(day_high_stocks)
             portfolio_days.append({"date": date_str, "daily_return": round(avg_day, 2), "n": len(day_high_stocks)})
+
+    if not signals:
+        return dict(_EMPTY_BACKTEST)
 
     # Calcola valore cumulativo portafoglio ($10k iniziali)
     portfolio_value = 10000.0
@@ -4468,14 +4502,38 @@ async def api_backtest():
             "top3": [{"ticker": s["ticker"], "date": s["date"], "return_pct": s["return_pct"]} for s in top3],
         }
 
-    result = {
+    return {
         "total": len(signals),
         "days": len([k for k, v in history.items() if v.get("closed")]),
+        "date_from": min(dates_used),
+        "date_to": max(dates_used),
         "by_score": by_score,
         "portfolio": portfolio_curve,
         "portfolio_final": round(portfolio_value, 2),
         "portfolio_return_pct": round((portfolio_value - 10000) / 100, 2),
     }
+
+
+@app.get("/api/backtest")
+async def api_backtest():
+    """
+    Backtest: per ogni segnale nella history con price_at_open+price_at_close,
+    calcola il ritorno apertura→chiusura al netto dei costi, raggruppato per score bucket.
+    Mostra avg return, win rate, best/worst, e portafoglio cumulativo simulato.
+    """
+    key = "backtest:v2"
+    if (c := _cached(key, 1800)) is not None:
+        return c
+
+    if not HISTORY_FILE.exists():
+        return dict(_EMPTY_BACKTEST)
+
+    try:
+        history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return dict(_EMPTY_BACKTEST)
+
+    result = _compute_backtest(history)
     _store(key, result)
     return result
 
