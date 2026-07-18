@@ -1720,10 +1720,38 @@ async function runCompare(){
   const win=(d.vincitore||'').toUpperCase();
   const col=(tk,nm,pro,con)=>`<div class="cmp-col ${win===(tk||'').toUpperCase()?'win':''}"><h4>${esc(tk)} ${win===(tk||'').toUpperCase()?'🏆':''}</h4><div class="cmp-nm">${esc((nm||'').slice(0,30))}</div>
     <div class="cmp-pro">✓ ${esc(pro||'—')}</div><div class="cmp-con">✗ ${esc(con||'—')}</div></div>`;
+
+  const sc=d.scorecard||[];
+  const scorecardHTML=sc.length?`<div class="setup-card" style="margin-top:14px">
+      <div class="flab" style="margin:0">Confronto per fattore</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:.82rem">
+        <tr style="color:var(--dim)"><td></td><td style="text-align:right;padding:4px 6px">${esc(d.ticker1)}</td><td style="text-align:right;padding:4px 6px">${esc(d.ticker2)}</td></tr>
+        ${sc.map(row=>`<tr><td style="padding:4px 6px">${esc(row.factor)}</td><td style="text-align:right;padding:4px 6px;font-family:var(--mono)">${row.a}</td><td style="text-align:right;padding:4px 6px;font-family:var(--mono)">${row.b}</td></tr>`).join('')}
+        ${(d.totale1!=null&&d.totale2!=null)?`<tr style="border-top:1px solid var(--border);font-weight:700"><td style="padding:6px 6px 0">Totale</td><td style="text-align:right;padding:6px 6px 0;font-family:var(--mono)">${d.totale1}</td><td style="text-align:right;padding:6px 6px 0;font-family:var(--mono)">${d.totale2}</td></tr>`:''}
+      </table>
+    </div>`:'';
+
+  const sogliaHTML=(d.soglia1||d.soglia2)?`<div class="prose" style="margin-top:14px"><div class="h">Se cambiasse il prezzo</div>
+      ${d.soglia1?`<div>• ${esc(d.ticker1)}: ${esc(d.soglia1)}</div>`:''}
+      ${d.soglia2?`<div>• ${esc(d.ticker2)}: ${esc(d.soglia2)}</div>`:''}
+    </div>`:'';
+
+  const allocHTML=(d.alloc1_pct!=null&&d.alloc2_pct!=null)?`<div class="setup-card" style="margin-top:14px">
+      <div class="flab" style="margin:0">Se investissi 2.000€ oggi</div>
+      <div style="display:flex;height:22px;border-radius:8px;overflow:hidden;margin-top:8px;font-size:.72rem;font-family:var(--mono)">
+        <div style="width:${d.alloc1_pct}%;background:var(--pos);display:flex;align-items:center;justify-content:center;color:#fff">${d.alloc1_pct>8?d.alloc1_pct+'%':''}</div>
+        <div style="width:${d.alloc2_pct}%;background:var(--faint);display:flex;align-items:center;justify-content:center;color:#fff">${d.alloc2_pct>8?d.alloc2_pct+'%':''}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:.72rem;color:var(--dim)"><span>${esc(d.ticker1)} ${d.alloc1_pct}%</span><span>${esc(d.ticker2)} ${d.alloc2_pct}%</span></div>
+    </div>`:'';
+
   r.innerHTML=`<div class="res" style="max-width:none">
     <div class="cmp-grid">${col(d.ticker1,d.name1,d.pro1,d.contro1)}${col(d.ticker2,d.name2,d.pro2,d.contro2)}</div>
-    <div class="verdict v-yes" style="margin-top:14px">🏆 ${esc(d.vincitore)}<small>Confidenza ${d.confidenza??'—'}%</small></div>
+    <div class="verdict v-yes" style="margin-top:14px">🏆 ${esc(d.vincitore)}<small>Confidenza ${d.confidenza??'—'}%${d.vantaggio?' · Vantaggio '+esc(d.vantaggio):''}</small></div>
     ${d.motivo?`<div class="prose"><div class="h">Perché</div>${esc(d.motivo)}</div>`:''}
+    ${scorecardHTML}
+    ${sogliaHTML}
+    ${allocHTML}
     <div class="chips"><button class="chip" onclick="openStock('${esc(d.ticker1)}')">${esc(d.ticker1)} →</button><button class="chip" onclick="openStock('${esc(d.ticker2)}')">${esc(d.ticker2)} →</button></div>
     <div class="fnote">Analisi AI · non è consulenza finanziaria</div></div>`;
 }

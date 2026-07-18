@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import time
 from datetime import datetime, timezone
@@ -932,12 +933,19 @@ async def _tg_batch_insights(top: list, emap: dict) -> dict:
     for s in top:
         tk = s["ticker"]; e = emap.get(tk, {})
         pe = e.get("pe_ratio"); pe_s = f"{pe:.1f}" if pe else "N/D"
+        vr = s.get("vol_ratio"); vr_s = f"{vr:.1f}x" if vr else "N/D"
+        up52 = e.get("upside_52w"); up52_s = f"{up52:+.1f}%" if up52 is not None else "N/D"
+        earn = e.get("next_earnings_str") or "N/D"
         rows.append(f"{tk}: ${(s.get('current_price') or 0):.2f}, {(s.get('day_change_pct') or 0):+.1f}%, "
                     f"RSI {(s.get('rsi') or 50):.0f}, score {(s.get('score_10') or 5):.1f}/10, P/E {pe_s}, "
+                    f"volume {vr_s} media, distanza da max 52w {up52_s}, prossimi earnings {earn}, "
                     f"notizie {e.get('news_sentiment_label', 'N/D')}")
-    prompt = ("Per OGNI azione scrivi UNA riga di insight concreto (max 18 parole, italiano) sul perché è "
-              "interessante o rischiosa ORA, considerando prezzo/RSI/notizie. Formato ESATTO 'TICKER: insight', "
-              "una riga per titolo, niente altro.\n\n" + "\n".join(rows))
+    prompt = ("Per OGNI azione scrivi UNA riga di insight (max 18 parole, italiano). Individua il singolo "
+              "fattore dominante — Valutazione, Momentum, News, Tecnica, Qualità, Rischio o Catalizzatore — "
+              "che spiega perché il titolo merita attenzione OGGI, in base ai dati forniti. L'utente vede già "
+              "prezzo/RSI/P/E/score/volume: NON ripeterli, aggiungi un giudizio che li collega (es. 'Possibile "
+              "rimbalzo dopo eccesso di vendite', non 'RSI 68'). Formato ESATTO 'TICKER: insight', una riga per "
+              "titolo, niente altro.\n\n" + "\n".join(rows))
     try:
         resp = await groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile", max_tokens=700,
@@ -3133,10 +3141,10 @@ async def api_prompt_source(type: str = ""):
                 "task": "Titolo {ticker} ({nome}). Prezzo {prezzo}, RSI {rsi}, rischio {rischio}, settimana {var_1sett}%, mese {var_1mese}%, trend {trend}, volatilità {vol}%, sentiment news {sentiment}.\nConviene comprare adesso? Rispondi SOLO con questo formato:\nVERDETTO: COMPRA | ASPETTA | NON COMPRARE\nMOTIVO: [una frase concreta]\n\n(lo stesso prompt viene inviato a 3 modelli diversi — Llama 3.3, GPT-OSS 120B, Qwen3 — che votano indipendentemente)"}
     if ptype == "scan-insight":
         return {"type": ptype, "system": "Analista finanziario conciso e diretto, in italiano.",
-                "task": "Per OGNI azione scrivi UNA riga di insight concreto (max 18 parole, italiano) sul perché è interessante o rischiosa ORA, considerando prezzo/RSI/notizie. Formato ESATTO 'TICKER: insight', una riga per titolo, niente altro.\n\n{TICKER}: ${prezzo}, {var_giorno}%, RSI {rsi}, score {score}/10, P/E {pe}, notizie {sentiment}\n(una riga così per ciascuna delle top 10 azioni dello Scanner di mercato)"}
+                "task": "Per OGNI azione scrivi UNA riga di insight (max 18 parole, italiano). Individua il singolo fattore dominante — Valutazione, Momentum, News, Tecnica, Qualità, Rischio o Catalizzatore — che spiega perché il titolo merita attenzione OGGI, in base ai dati forniti. L'utente vede già prezzo/RSI/P/E/score/volume: NON ripeterli, aggiungi un giudizio che li collega (es. 'Possibile rimbalzo dopo eccesso di vendite', non 'RSI 68'). Formato ESATTO 'TICKER: insight', una riga per titolo, niente altro.\n\n{TICKER}: ${prezzo}, {var_giorno}%, RSI {rsi}, score {score}/10, P/E {pe}, volume {volume_rel} media, distanza da max 52w {upside_52w}, prossimi earnings {earnings}, notizie {sentiment}\n(una riga così per ciascuna delle top 10 azioni dello Scanner di mercato)"}
     if ptype == "compare":
-        return {"type": ptype, "system": "Sei un analista finanziario esperto. Confronta oggettivamente due azioni usando dati fondamentali e tecnici. Sii diretto e dai un vincitore chiaro. Rispondi in italiano.",
-                "task": "Confronta queste due azioni e dimmi quale preferire come investimento.\n\nAZIONE 1:\n{ticker1} ({nome1}) — prezzo, variazione, settore, market cap, P/E forward, EPS, margine, ROE, dividendo\n\nAZIONE 2:\n{ticker2} (stessi dati)\n\nRispondi SOLO con questo formato (in italiano, max 2 righe a sezione):\nPRO_1: [punti di forza di AZIONE 1]\nPRO_2: [punti di forza di AZIONE 2]\nCONTRO_1: [debolezze di AZIONE 1]\nCONTRO_2: [debolezze di AZIONE 2]\nVINCITORE: [solo il ticker vincitore, es: AAPL]\nMOTIVO: [1 frase secca che spiega perché]\nCONFIDENZA: [numero intero da 55 a 92]"}
+        return {"type": ptype, "system": "Sei un analista finanziario esperto. Confronta oggettivamente due azioni come opportunità d'investimento, non solo come aziende. Sii diretto e dai un vincitore chiaro. Rispondi in italiano.",
+                "task": "Confronta questi due titoli come OPPORTUNITÀ DI INVESTIMENTO OGGI, non solo come aziende: conta il rendimento atteso rispetto al PREZZO ATTUALE, non solo la qualità del business (es. un'azienda migliore non è automaticamente il miglior investimento se quota cara).\n\nAZIONE 1:\n{ticker1} ({nome1}) — prezzo, variazione, settore, market cap, P/E forward, EPS, margine, ROE, dividendo, crescita ricavi, crescita EPS, debito/equity, FCF, P/S, EV/EBITDA\n\nAZIONE 2:\n{ticker2} (stessi dati)\n\nRispondi SOLO con questo formato (in italiano):\nPRO_1 / PRO_2 / CONTRO_1 / CONTRO_2: [max 2 righe ciascuno]\nVALUTAZIONE_1/2, CRESCITA_1/2, QUALITA_1/2, RISCHIO_1/2, UPSIDE_1/2: [punteggio 0-10 per azione e fattore]\nVINCITORE: [solo il ticker]\nMOTIVO: [1 frase basata sul rendimento atteso vs prezzo attuale]\nSOGLIA_1 / SOGLIA_2: [prezzo/condizione a cui il giudizio cambierebbe]\nALLOC_1 / ALLOC_2: [split % di un ipotetico investimento di 2.000€, somma 100]\nCONFIDENZA: [numero intero da 55 a 92]\n\n(i punteggi 0-10 vengono sommati dal codice in un totale per titolo, non lasciati al conteggio dell'AI)"}
     return JSONResponse({"error": "tipo non valido"}, status_code=400)
 
 
@@ -5387,6 +5395,12 @@ async def api_compare(body: CompareBody):
                 "div": info.get("dividendYield"),
                 "mcap": info.get("marketCap"),
                 "sector": info.get("sector", "N/D"),
+                "rev_growth": info.get("revenueGrowth"),
+                "eps_growth": info.get("earningsGrowth"),
+                "debt_equity": info.get("debtToEquity"),
+                "fcf": info.get("freeCashflow"),
+                "ps": info.get("priceToSalesTrailing12Months"),
+                "ev_ebitda": info.get("enterpriseToEbitda"),
             }
         except Exception:
             return None
@@ -5399,40 +5413,63 @@ async def api_compare(body: CompareBody):
         return JSONResponse({"error": "Dati non disponibili per uno o entrambi i ticker"}, status_code=404)
 
     def _fmt(d: dict) -> str:
-        pe  = f"{d['pe']:.1f}" if d.get("pe") else "N/D"
-        eps = f"{d['eps']:.2f}" if d.get("eps") else "N/D"
-        mrg = f"{d['margin']*100:.1f}%" if d.get("margin") else "N/D"
-        roe = f"{d['roe']*100:.1f}%" if d.get("roe") else "N/D"
-        div = f"{d['div']*100:.2f}%" if d.get("div") else "N/D"
-        mc  = f"${d['mcap']/1e9:.1f}B" if d.get("mcap") else "N/D"
+        pe   = f"{d['pe']:.1f}" if d.get("pe") else "N/D"
+        eps  = f"{d['eps']:.2f}" if d.get("eps") else "N/D"
+        mrg  = f"{d['margin']*100:.1f}%" if d.get("margin") else "N/D"
+        roe  = f"{d['roe']*100:.1f}%" if d.get("roe") else "N/D"
+        div  = f"{d['div']*100:.2f}%" if d.get("div") else "N/D"
+        mc   = f"${d['mcap']/1e9:.1f}B" if d.get("mcap") else "N/D"
+        revg = f"{d['rev_growth']*100:+.1f}%" if d.get("rev_growth") is not None else "N/D"
+        epsg = f"{d['eps_growth']*100:+.1f}%" if d.get("eps_growth") is not None else "N/D"
+        de   = f"{d['debt_equity']:.0f}%" if d.get("debt_equity") is not None else "N/D"
+        fcf  = f"${d['fcf']/1e9:.2f}B" if d.get("fcf") else "N/D"
+        ps   = f"{d['ps']:.1f}" if d.get("ps") else "N/D"
+        evEb = f"{d['ev_ebitda']:.1f}" if d.get("ev_ebitda") else "N/D"
         return (f"{d['ticker']} ({d['name']}) — €{d['price']}, oggi {d['chg']:+.1f}%\n"
                 f"  Settore: {d['sector']} | Market Cap: {mc}\n"
-                f"  P/E forward: {pe} | EPS: {eps} | Margine: {mrg} | ROE: {roe} | Dividendo: {div}")
+                f"  P/E forward: {pe} | EPS: {eps} | Margine: {mrg} | ROE: {roe} | Dividendo: {div}\n"
+                f"  Crescita ricavi: {revg} | Crescita EPS: {epsg} | Debito/Equity: {de} | FCF: {fcf} | "
+                f"P/S: {ps} | EV/EBITDA: {evEb}")
 
     prompt = (
-        "Confronta queste due azioni e dimmi quale preferire come investimento.\n\n"
+        "Confronta questi due titoli come OPPORTUNITÀ DI INVESTIMENTO OGGI, non solo come aziende. "
+        "Il concetto più importante: un'azienda migliore non è automaticamente il miglior investimento — "
+        "conta il rendimento atteso rispetto al PREZZO ATTUALE. Esempio: Microsoft può essere un'azienda "
+        "migliore di Intel come business, ma Intel potrebbe essere il miglior investimento se quota a forte "
+        "sconto rispetto al suo valore.\n\n"
         f"AZIONE 1:\n{_fmt(d1)}\n\n"
         f"AZIONE 2:\n{_fmt(d2)}\n\n"
-        "Rispondi SOLO con questo formato (in italiano, max 2 righe a sezione):\n"
-        "PRO_1: [punti di forza di AZIONE 1]\n"
-        "PRO_2: [punti di forza di AZIONE 2]\n"
-        "CONTRO_1: [debolezze di AZIONE 1]\n"
-        "CONTRO_2: [debolezze di AZIONE 2]\n"
+        "Rispondi SOLO con questo formato (in italiano):\n\n"
+        "PRO_1: [punti di forza di AZIONE 1, max 2 righe]\n"
+        "PRO_2: [punti di forza di AZIONE 2, max 2 righe]\n"
+        "CONTRO_1: [debolezze di AZIONE 1, max 2 righe]\n"
+        "CONTRO_2: [debolezze di AZIONE 2, max 2 righe]\n\n"
+        "Assegna un punteggio 0-10 a CIASCUNA azione per ogni fattore (10 = migliore; per Rischio, "
+        "10 = rischio più basso):\n"
+        "VALUTAZIONE_1: [0-10] | VALUTAZIONE_2: [0-10]\n"
+        "CRESCITA_1: [0-10] | CRESCITA_2: [0-10]\n"
+        "QUALITA_1: [0-10] | QUALITA_2: [0-10]\n"
+        "RISCHIO_1: [0-10] | RISCHIO_2: [0-10]\n"
+        "UPSIDE_1: [0-10] | UPSIDE_2: [0-10]\n\n"
         "VINCITORE: [solo il ticker vincitore, es: AAPL]\n"
-        "MOTIVO: [1 frase secca che spiega perché]\n"
+        "MOTIVO: [1 frase secca basata sul rendimento atteso rispetto al prezzo attuale, non solo sulla qualità dell'azienda]\n"
+        "SOGLIA_1: [prezzo/condizione sopra o sotto cui AZIONE 1 cambierebbe giudizio, 1 frase breve, es: 'poco interessante sopra $650']\n"
+        "SOGLIA_2: [idem per AZIONE 2]\n"
+        "ALLOC_1: [percentuale 0-100 di un ipotetico investimento di 2.000€ da destinare ad AZIONE 1]\n"
+        "ALLOC_2: [percentuale 0-100 da destinare ad AZIONE 2 — ALLOC_1 e ALLOC_2 devono sommare a 100]\n"
         "CONFIDENZA: [numero intero da 55 a 92]\n"
     )
     try:
         resp = await groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
-            max_tokens=400,
+            max_tokens=700,
             messages=[
-                {"role": "system", "content": "Sei un analista finanziario esperto. Confronta oggettivamente due azioni usando dati fondamentali e tecnici. Sii diretto e dai un vincitore chiaro. Rispondi in italiano."},
+                {"role": "system", "content": "Sei un analista finanziario esperto. Confronta oggettivamente due azioni come opportunità d'investimento, non solo come aziende. Sii diretto e dai un vincitore chiaro. Rispondi in italiano."},
                 {"role": "user", "content": prompt},
             ],
         )
         text = resp.choices[0].message.content.strip()
-        pro1 = pro2 = contro1 = contro2 = vincitore = motivo = ""
+        pro1 = pro2 = contro1 = contro2 = vincitore = motivo = soglia1 = soglia2 = ""
         confidenza = 70
         for line in text.split("\n"):
             l = line.strip()
@@ -5443,11 +5480,44 @@ async def api_compare(body: CompareBody):
             elif lu.startswith("CONTRO_2:"):  contro2   = l[9:].strip()
             elif lu.startswith("VINCITORE:"): vincitore = l[10:].strip().upper()
             elif lu.startswith("MOTIVO:"):    motivo    = l[7:].strip()
+            elif lu.startswith("SOGLIA_1:"):  soglia1   = l[9:].strip()
+            elif lu.startswith("SOGLIA_2:"):  soglia2   = l[9:].strip()
             elif lu.startswith("CONFIDENZA:"):
                 try:
                     confidenza = int("".join(c for c in l[11:] if c.isdigit())[:2] or "70")
                 except Exception:
                     confidenza = 70
+
+        # Scorecard fattori (0-10 ciascuno): estratta con regex, non lasciata al conteggio
+        # dell'AI, così il totale mostrato non può contraddire i punteggi mostrati.
+        _FACTORS = [("VALUTAZIONE", "Valutazione"), ("CRESCITA", "Crescita"),
+                    ("QUALITA", "Qualità"), ("RISCHIO", "Rischio"), ("UPSIDE", "Upside")]
+        scorecard = []
+        for key, label in _FACTORS:
+            m = re.search(rf'{key}_1:\s*(\d+).*?{key}_2:\s*(\d+)', text, re.IGNORECASE)
+            a = max(0, min(10, int(m.group(1)))) if m else None
+            b = max(0, min(10, int(m.group(2)))) if m else None
+            if a is not None and b is not None:
+                scorecard.append({"factor": label, "a": a, "b": b})
+        totale1 = sum(r["a"] for r in scorecard) if scorecard else None
+        totale2 = sum(r["b"] for r in scorecard) if scorecard else None
+        vantaggio = None
+        if totale1 is not None and totale2 is not None:
+            diff = abs(totale1 - totale2)
+            vantaggio = "Leggero" if diff <= 5 else ("Moderato" if diff <= 15 else "Netto")
+
+        # Allocazione 2.000€: normalizzata a somma 100 invece di fidarsi ciecamente dell'AI.
+        alloc1_m = re.search(r'ALLOC_1:\s*(\d+)', text, re.IGNORECASE)
+        alloc2_m = re.search(r'ALLOC_2:\s*(\d+)', text, re.IGNORECASE)
+        alloc1 = max(0, min(100, int(alloc1_m.group(1)))) if alloc1_m else 50
+        alloc2 = max(0, min(100, int(alloc2_m.group(1)))) if alloc2_m else 50
+        tot_alloc = alloc1 + alloc2
+        if tot_alloc > 0:
+            alloc1 = round(alloc1 / tot_alloc * 100)
+            alloc2 = 100 - alloc1
+        else:
+            alloc1 = alloc2 = 50
+
         result = {
             "ticker1": t1, "name1": d1["name"],
             "ticker2": t2, "name2": d2["name"],
@@ -5456,6 +5526,11 @@ async def api_compare(body: CompareBody):
             "vincitore": vincitore or t1,
             "motivo": motivo,
             "confidenza": max(55, min(92, confidenza)),
+            "scorecard": scorecard,
+            "totale1": totale1, "totale2": totale2,
+            "vantaggio": vantaggio,
+            "soglia1": soglia1, "soglia2": soglia2,
+            "alloc1_pct": alloc1, "alloc2_pct": alloc2,
         }
         _store(key, result)
         return result
