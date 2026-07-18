@@ -144,3 +144,16 @@ def test_projection_basis_falls_back_to_invented_7pct_when_no_history():
     rate, label = _projection_basis(cagr_3y=None, cagr_1y=None)
     assert rate == pytest.approx(0.07)
     assert label == "ipotesi 7%/anno (storico insufficiente)"
+
+
+def test_quality_score_10_matches_pre_refactor_formula():
+    """Before/after spot-check: _quality_score_10 (config.SCORING-driven) must return
+    the exact same number the old hardcoded-literal formula gave for the same input."""
+    import pytest
+    from analyzer import _quality_score_10
+
+    rsi, chg, sma_20, price = 30.0, 4.0, 100.0, 105.0
+    # Formula pre-refactor (analyzer.py prima di Item 9), calcolata a mano:
+    # rsi<35 -> +3; chg>3 -> +3; price>sma_20 -> +1  =>  score_raw=7
+    # score_10 = round(min(10, max(0, (7+5)/15*10)), 1) = 8.0
+    assert _quality_score_10(rsi, chg, sma_20, price) == pytest.approx(8.0)

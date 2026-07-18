@@ -262,6 +262,25 @@ def wilder_rsi(close, period: int = 14) -> float:
     return 50.0 if pd.isna(val) else val
 
 
+def _quality_score_10(rsi: float, chg: float, sma_20, price: float) -> float:
+    """Score 0-10 rapido (get_enriched_analysis) da RSI, variazione giornaliera e trend
+    vs SMA20. Soglie in config.SCORING['enriched'] — hand-set, non ricalibrate su backtest."""
+    from config import SCORING
+    s = SCORING["enriched"]
+    score_raw = 0
+    if rsi < s["rsi_oversold_strong"]:        score_raw += s["rsi_oversold_strong_pts"]
+    elif rsi < s["rsi_oversold"]:              score_raw += s["rsi_oversold_pts"]
+    elif rsi > s["rsi_overbought_strong"]:     score_raw += s["rsi_overbought_strong_pts"]
+    elif rsi > s["rsi_overbought"]:            score_raw += s["rsi_overbought_pts"]
+    if chg > s["chg_strong"]:                  score_raw += s["chg_strong_pts"]
+    elif chg > s["chg_mid"]:                   score_raw += s["chg_mid_pts"]
+    elif chg > 0:                              score_raw += s["chg_positive_pts"]
+    elif chg < s["chg_weak"]:                  score_raw += s["chg_weak_pts"]
+    if sma_20 and price > sma_20:
+        score_raw += s["above_sma20_pts"]
+    return round(min(10.0, max(0.0, (score_raw + s["raw_offset"]) / s["raw_range"] * 10)), 1)
+
+
 def format_analysis_message(d: dict) -> str:
     p = d["current_price"]
     chg = d["day_change_pct"]
@@ -533,8 +552,9 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
     Fase 1 — pre-filtro rapido per prezzo (batch 2d): scarta tutto ciò che è sopra max_price.
     Fase 2 — analisi tecnica completa solo per i candidati rimasti.
     Se viene passato un universo esplicito (es. ETF_UNIVERSE) viene usata una sola fase."""
-    from config import EUROPEAN_UNIVERSE, AI_UNIVERSE
+    from config import EUROPEAN_UNIVERSE, AI_UNIVERSE, SCORING
     _AI_SET = set(AI_UNIVERSE)   # lookup O(1)
+    _sc = SCORING["scan"]
 
     if universe is not None:
         # Universo esplicito piccolo (ETF, watchlist…): analisi diretta, una fase
@@ -666,40 +686,40 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
 
                     # 1) QUALITÀ DEL TREND (la spina dorsale dei titoli buoni) — max +4
                     trend_pts = 0
-                    if above_sma20:   trend_pts += 1
-                    if above_sma50:   trend_pts += 1
-                    if uptrend_align: trend_pts += 1
-                    if above_sma20 and above_sma50 and uptrend_align: trend_pts += 1  # trend pulito
+                    if above_sma20:   trend_pts += _sc["trend_component_pts"]
+                    if above_sma50:   trend_pts += _sc["trend_component_pts"]
+                    if uptrend_align: trend_pts += _sc["trend_component_pts"]
+                    if above_sma20 and above_sma50 and uptrend_align: trend_pts += _sc["trend_component_pts"]  # trend pulito
                     score += trend_pts
 
                     # 2) MOMENTUM MULTI-TIMEFRAME (forza costante settimana+mese) — max +4
                     mom_pts = 0
-                    if week_return > 0:    mom_pts += 1
-                    if week_return > 5:    mom_pts += 1
-                    if month_return > 0:   mom_pts += 1
-                    if month_return > 10:  mom_pts += 1
-                    if month_return < -15: mom_pts -= 1   # downtrend forte = penalità
+                    if week_return > _sc["week_return_pos"]:      mom_pts += _sc["week_return_pos_pts"]
+                    if week_return > _sc["week_return_strong"]:   mom_pts += _sc["week_return_strong_pts"]
+                    if month_return > _sc["month_return_pos"]:    mom_pts += _sc["month_return_pos_pts"]
+                    if month_return > _sc["month_return_strong"]: mom_pts += _sc["month_return_strong_pts"]
+                    if month_return < _sc["month_return_weak"]:   mom_pts += _sc["month_return_weak_pts"]   # downtrend forte = penalità
                     score += mom_pts
 
                     # 3) RSI in ZONA SANA (non gli estremi: né ipercomprato né coltello che cade)
                     rsi_pts = 0
-                    if 45 <= rsi <= 65:    rsi_pts = 2     # zona ideale
-                    elif 40 <= rsi < 45:   rsi_pts = 1     # pullback leggero in trend
-                    elif rsi > 75:         rsi_pts = -3    # esteso / ipercomprato
-                    elif rsi > 70:         rsi_pts = -1
-                    elif rsi < 30:         rsi_pts = -2    # falling knife: penalizza, non premiare
+                    if _sc["rsi_ideal_lo"] <= rsi <= _sc["rsi_ideal_hi"]:            rsi_pts = _sc["rsi_ideal_pts"]      # zona ideale
+                    elif _sc["rsi_pullback_lo"] <= rsi < _sc["rsi_pullback_hi"]:     rsi_pts = _sc["rsi_pullback_pts"]   # pullback leggero in trend
+                    elif rsi > _sc["rsi_extended"]:                                  rsi_pts = _sc["rsi_extended_pts"]  # esteso / ipercomprato
+                    elif rsi > _sc["rsi_overbought"]:                                rsi_pts = _sc["rsi_overbought_pts"]
+                    elif rsi < _sc["rsi_falling_knife"]:                             rsi_pts = _sc["rsi_falling_knife_pts"]  # falling knife: penalizza, non premiare
                     score += rsi_pts
 
                     # 4) VOLUME come CONFERMA (solo se il prezzo sale) — modesto
-                    vol_pts = 1 if (vol_ratio > 1.5 and day_change_pct > 0) else 0
+                    vol_pts = _sc["vol_confirm_pts"] if (vol_ratio > _sc["vol_ratio_confirm"] and day_change_pct > 0) else 0
                     score += vol_pts
 
                     # 5) SANITÀ DELLA VOLATILITÀ
-                    if 15 <= volatility <= 50:   score += 1    # volatilità sana
-                    elif volatility > 90:        score -= 2    # territorio pump/junk
-                    elif volatility > 70:        score -= 1
+                    if _sc["volatility_healthy_lo"] <= volatility <= _sc["volatility_healthy_hi"]:  score += _sc["volatility_healthy_pts"]  # volatilità sana
+                    elif volatility > _sc["volatility_junk"]:    score += _sc["volatility_junk_pts"]    # territorio pump/junk
+                    elif volatility > _sc["volatility_high"]:    score += _sc["volatility_high_pts"]
                     # spike parabolico in un giorno = rischio di inseguire il top
-                    if day_change_pct > 9:       score -= 1
+                    if day_change_pct > _sc["parabolic_spike_pct"]:  score += _sc["parabolic_spike_pts"]
 
                     # ── Volatilità anomala: ultimi 5gg vs mese intero ─────────
                     recent_vol = float(returns.iloc[-5:].std() * (252**0.5) * 100) if len(returns) >= 5 else volatility
@@ -726,17 +746,17 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                     else:             bear_sigs += 1
                     if week_return > 0 and month_return > 0: bull_sigs += 1
                     elif week_return < 0 and month_return < 0: bear_sigs += 1
-                    if 45 <= rsi <= 65: bull_sigs += 1
-                    elif rsi > 75 or rsi < 30: bear_sigs += 1
+                    if _sc["rsi_ideal_lo"] <= rsi <= _sc["rsi_ideal_hi"]: bull_sigs += 1
+                    elif rsi > _sc["rsi_extended"] or rsi < _sc["rsi_falling_knife"]: bear_sigs += 1
                     double_signal = "bull" if bull_sigs >= 3 else ("bear" if bear_sigs >= 3 else "")
 
                     # Bonus AI: piccolo boost per aziende AI-focused
                     is_ai = ticker in _AI_SET
-                    if is_ai:
-                        score += 1
+                    ai_bonus_pts = _sc["ai_ticker_bonus_pts"] if is_ai else 0
+                    score += ai_bonus_pts
 
                     # Normalizza (range grezzo ~ -7..+13) → 0-10
-                    score_10 = round(min(10.0, max(0.0, (score + 7) / 20 * 10)), 1)
+                    score_10 = round(min(10.0, max(0.0, (score + _sc["raw_offset"]) / _sc["raw_range"] * 10)), 1)
 
                     # Trade setup
                     daily_vol_pct = volatility / (252 ** 0.5) / 100
@@ -783,6 +803,7 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                             "momentum": mom_pts,
                             "volume": vol_pts,
                             "trend": trend_pts,
+                            "ai_bonus": ai_bonus_pts,
                         },
                         "trade_setup": trade_setup,
                     })
@@ -875,18 +896,7 @@ def get_enriched_analysis(ticker: str) -> dict | None:
     chg = base.get("day_change_pct", 0.0)
     sma_20 = base.get("sma_20")
     price = base.get("current_price", 0.0)
-    score_raw = 0
-    if rsi < 35:      score_raw += 3
-    elif rsi < 45:    score_raw += 2
-    elif rsi > 70:    score_raw -= 3
-    elif rsi > 60:    score_raw -= 1
-    if chg > 3:       score_raw += 3
-    elif chg > 1:     score_raw += 2
-    elif chg > 0:     score_raw += 1
-    elif chg < -3:    score_raw -= 2
-    if sma_20 and price > sma_20:
-        score_raw += 1
-    score_10 = round(min(10.0, max(0.0, (score_raw + 5) / 15 * 10)), 1)
+    score_10 = _quality_score_10(rsi, chg, sma_20, price)
 
     # ── Stima direzionale a 5 giorni: direzione dallo score, ampiezza dalla volatilità ──
     vol = base.get("volatility") or 40.0
