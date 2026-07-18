@@ -1,6 +1,7 @@
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import time
 import re
 
@@ -810,7 +811,7 @@ def get_enriched_analysis(ticker: str) -> dict | None:
     try:
         stock = yf.Ticker(ticker.upper())
         cal = stock.calendar
-        today = datetime.now().date()
+        today = datetime.now(ZoneInfo("America/New_York")).date()  # earnings sono eventi del mercato USA
         future_dates = []
         if isinstance(cal, dict):
             for key in ("Earnings Date", "Earnings Dates"):
