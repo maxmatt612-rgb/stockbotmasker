@@ -1092,6 +1092,16 @@ def _cagr(hist, trading_days: int) -> float | None:
     return ((p1 / p0) ** (1 / years) - 1) * 100
 
 
+def _projection_basis(cagr_3y: float | None, cagr_1y: float | None) -> tuple[float, str]:
+    """Sceglie il tasso annuo usato per le proiezioni multi-anno e ne dichiara la fonte,
+    così un'ipotesi inventata non è mai indistinguibile da uno storico calcolato."""
+    if cagr_3y is not None:
+        return cagr_3y / 100, "CAGR 3 anni"
+    if cagr_1y is not None:
+        return cagr_1y / 100, "CAGR 1 anno"
+    return 7.0 / 100, "ipotesi 7%/anno (storico insufficiente)"
+
+
 def get_longterm_analysis(ticker: str) -> dict | None:
     """Rendimenti storici CAGR, proiezioni scenari e dati fondamentali pluriennali."""
     try:
@@ -1108,7 +1118,7 @@ def get_longterm_analysis(ticker: str) -> dict | None:
         cagr_5y = _cagr(hist, 252 * 5)
 
         # Proiezione scenari a 3 anni
-        base_rate = (cagr_3y or cagr_1y or 7.0) / 100
+        base_rate, projection_basis = _projection_basis(cagr_3y, cagr_1y)
         proj = {}
         for label, mult, years in [
             ("1y_base", 1.0, 1), ("1y_bull", 1.5, 1), ("1y_bear", 0.4, 1),
@@ -1145,6 +1155,7 @@ def get_longterm_analysis(ticker: str) -> dict | None:
             "cagr_3y": round(cagr_3y, 1) if cagr_3y is not None else None,
             "cagr_5y": round(cagr_5y, 1) if cagr_5y is not None else None,
             "projections": proj,
+            "projection_basis": projection_basis,
             "target_mean": target_mean,
             "target_high": target_high,
             "target_low": target_low,

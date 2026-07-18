@@ -117,3 +117,30 @@ def test_should_run_skips_if_already_run_today():
 
     now = datetime(2026, 7, 16, 8, 0)  # giovedì, già girato oggi
     assert should_run(now, time(7, 30), now.date()) is False
+
+
+def test_projection_basis_prefers_3y_cagr():
+    from analyzer import _projection_basis
+    import pytest
+
+    rate, label = _projection_basis(cagr_3y=12.0, cagr_1y=30.0)
+    assert rate == pytest.approx(0.12)
+    assert label == "CAGR 3 anni"
+
+
+def test_projection_basis_falls_back_to_1y_cagr():
+    from analyzer import _projection_basis
+    import pytest
+
+    rate, label = _projection_basis(cagr_3y=None, cagr_1y=8.0)
+    assert rate == pytest.approx(0.08)
+    assert label == "CAGR 1 anno"
+
+
+def test_projection_basis_falls_back_to_invented_7pct_when_no_history():
+    from analyzer import _projection_basis
+    import pytest
+
+    rate, label = _projection_basis(cagr_3y=None, cagr_1y=None)
+    assert rate == pytest.approx(0.07)
+    assert label == "ipotesi 7%/anno (storico insufficiente)"
