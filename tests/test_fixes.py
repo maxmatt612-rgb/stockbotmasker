@@ -85,3 +85,35 @@ def test_wilder_rsi_known_vector():
     # gain/loss per barra = [-,1,1,-1,1,1], regressione contro un valore fisso noto.
     s = pd.Series([10.0, 11.0, 12.0, 11.0, 12.0, 13.0])
     assert wilder_rsi(s, period=3) == pytest.approx(85.18518518518519)
+
+
+def test_should_run_catches_up_after_a_missed_tick():
+    from datetime import datetime, time
+    from web_server import should_run
+
+    now = datetime(2026, 7, 16, 10, 0)  # giovedì, ben oltre le 07:30 schedulate
+    assert should_run(now, time(7, 30), None) is True
+
+
+def test_should_run_false_before_scheduled_time():
+    from datetime import datetime, time
+    from web_server import should_run
+
+    now = datetime(2026, 7, 16, 7, 0)  # giovedì, prima delle 07:30
+    assert should_run(now, time(7, 30), None) is False
+
+
+def test_should_run_skips_weekends():
+    from datetime import datetime, time
+    from web_server import should_run
+
+    now = datetime(2026, 7, 18, 10, 0)  # sabato
+    assert should_run(now, time(7, 30), None) is False
+
+
+def test_should_run_skips_if_already_run_today():
+    from datetime import datetime, time
+    from web_server import should_run
+
+    now = datetime(2026, 7, 16, 8, 0)  # giovedì, già girato oggi
+    assert should_run(now, time(7, 30), now.date()) is False

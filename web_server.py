@@ -53,10 +53,13 @@ async def _startup_load_cache():
                         s['morning_price'] = s.get('current_price')
                 global _morning_data
                 _morning_data = list(data)
-                _store("scan:10", data)
+                mtime = datetime.fromtimestamp(SCAN_FILE.stat().st_mtime, tz=ROME)
+                scan_is_today = mtime.date() == datetime.now(ROME).date()
+                if scan_is_today:
+                    # Solo se il file è davvero di oggi: altrimenti la chiave datata
+                    # etichetterebbe lo scan di ieri come "fresco" per oggi.
+                    _store(_scan_key(10), data)
                 loaded = True
-                mtime = datetime.fromtimestamp(SCAN_FILE.stat().st_mtime, tz=timezone.utc)
-                scan_is_today = mtime.date() == datetime.now(tz=timezone.utc).date()
                 print(f"[startup] Caricati {len(data)} titoli — dati di oggi: {scan_is_today}")
         except Exception as e:
             print(f"[startup] Impossibile caricare last_scan.json: {e}")
@@ -289,6 +292,12 @@ def _cached(key: str, ttl: int):
 
 def _store(key: str, data: Any):
     _cache[key] = {"data": data, "ts": time.monotonic()}
+
+
+def _scan_key(top: int) -> str:
+    """Chiave cache dello scan, datata: senza data un riavvio/redeploy a fine giornata
+    potrebbe servire lo scan di IERI etichettato come fresco fino a 24h dopo."""
+    return f"scan:{top}:{datetime.now(ROME).strftime('%Y-%m-%d')}"
 
 
 # ─── Serializzazione sicura (numpy → Python native) ──────────────────────────
@@ -528,7 +537,7 @@ def _build_pdf(stocks: list, title: str, subtitle: str) -> bytes:
 async def _generate_morning_pdf():
     """Genera il PDF analisi mattutina dai dati bloccati al mattino."""
     global _morning_pdf, _morning_pdf_ts
-    data = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
+    data = _morning_data or ((_cache.get(_scan_key(10)) or {}).get("data") or [])
     if not data:
         print("[pdf] Nessun dato per il PDF mattutino")
         return
@@ -553,7 +562,7 @@ async def _generate_evening_pdf():
     import pandas as pd
 
     # Usa _morning_data (bloccato alle 7:30) se disponibile, altrimenti fallback cache
-    morning_data = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
+    morning_data = _morning_data or ((_cache.get(_scan_key(10)) or {}).get("data") or [])
     if not morning_data:
         print("[pdf] Nessun dato mattutino per il recap serale")
         return
@@ -822,30 +831,47 @@ def _close_history_snapshot_web():
         print(f"[history] errore chiusura: {e}")
 
 
+_last_run: dict = {}  # nome job -> date dell'ultima esecuzione (catch-up scheduler)
+
+
+def should_run(now, scheduled_time, last_run_date) -> bool:
+    """Un job va eseguito ora se: giorno feriale, l'orario schedulato è già passato
+    (o è esattamente ora), e non è già girato oggi. Fa da catch-up: se il tick esatto
+    viene mancato (restart, loop occupato, server addormentato su Render free), il job
+    parte comunque al primo giro utile dello stesso giorno invece di saltarlo in silenzio."""
+    if now.weekday() >= 5:
+        return False
+    if now.time() < scheduled_time:
+        return False
+    return last_run_date != now.date()
+
+
 async def _pdf_scheduler():
-    """Scheduler giornaliero: 07:30 scan, 07:35 PDF mattina + storico, 22:05 recap + chiusura storico."""
+    """Scheduler giornaliero: 07:30 scan, 07:35 PDF mattina + storico, 22:05 recap + chiusura storico.
+    Con catch-up (v. should_run): un tick mancato non salta la giornata."""
+    from datetime import time as _time
     while True:
         now = datetime.now(ROME)
-        h, m = now.hour, now.minute
-        # 07:30 — scan mattutino (dati fissati per la giornata)
-        if h == 7 and m == 30:
-            print("[scheduler] Avvio scan mattutino 07:30")
+        # 07:30 — scan mattutino (dati fissati per la giornata).
+        # Valutato PRIMA del job 07:35 così, in caso di catch-up simultaneo dopo un
+        # riavvio, lo scan viene almeno avviato prima che lo snapshot provi a leggerlo.
+        if should_run(now, _time(7, 30), _last_run.get("scan")):
+            print("[scheduler] Avvio scan mattutino (07:30 o catch-up)")
+            _last_run["scan"] = now.date()
             asyncio.create_task(_refresh_scan_background(10))
-            await asyncio.sleep(60)
-        # 07:35 — PDF analisi mattutina + snapshot storico (solo lun–ven)
-        elif h == 7 and m == 35:
+        # 07:35 — PDF analisi mattutina + snapshot storico
+        if should_run(now, _time(7, 35), _last_run.get("morning")):
+            print("[scheduler] Avvio PDF mattina + snapshot (07:35 o catch-up)")
+            _last_run["morning"] = now.date()
             await _generate_morning_pdf()
-            if now.weekday() < 5:
-                await asyncio.to_thread(_save_history_snapshot_web, _morning_data)
-            await asyncio.sleep(60)
+            await asyncio.to_thread(_save_history_snapshot_web, _morning_data)
         # 22:05 — recap serale + chiusura storico (previsione vs realtà)
-        elif h == 22 and m == 5:
+        if should_run(now, _time(22, 5), _last_run.get("evening")):
+            print("[scheduler] Avvio recap serale + chiusura (22:05 o catch-up)")
+            _last_run["evening"] = now.date()
             await _generate_evening_pdf()
-            if now.weekday() < 5:
-                await asyncio.to_thread(_close_history_snapshot_web)
-            await asyncio.sleep(60)
-        else:
-            await asyncio.sleep(30)
+            await asyncio.to_thread(_close_history_snapshot_web)
+        await asyncio.sleep(30)
 
 
 # ─── Segnale Telegram: top 10 titoli dello scan ──────────────────────────────
@@ -1022,7 +1048,7 @@ async def _refresh_scan_background(top: int):
                 global _morning_data
                 _morning_data = list(display)
                 _save_scan_to_disk(display)
-            _store(f"scan:{top}", display)
+            _store(_scan_key(top), display)
             if top == 10:
                 try:
                     if await _send_top10_rich(display):
@@ -1040,7 +1066,7 @@ async def _refresh_scan_background(top: int):
 
 @app.get("/api/scan")
 async def api_scan(top: int = 10):
-    key = f"scan:{top}"
+    key = _scan_key(top)
     fresh = _cached(key, _SCAN_TTL)
     if fresh is not None:
         return fresh
@@ -1061,7 +1087,7 @@ async def api_scan(top: int = 10):
 async def api_scan_force():
     """Invalida la cache dello scan e forza una nuova scansione in background."""
     # Rimuovi dalla cache così il prossimo /api/scan vede dati stale → refresh
-    _cache.pop("scan:10", None)
+    _cache.pop(_scan_key(10), None)
     if not _scan_in_progress:
         asyncio.create_task(_refresh_scan_background(10))
     return {"ok": True, "scan_in_progress": _scan_in_progress}
@@ -1072,7 +1098,7 @@ async def api_tg_send_top10():
     """Invia SUBITO la top 10 corrente sul bot Telegram (bottone 'Invia su Telegram')."""
     if not (os.getenv("TG_SIGNAL_TOKEN") or os.getenv("BOT_TOKEN")) or not os.getenv("TG_SIGNAL_CHAT"):
         return JSONResponse({"ok": False, "error": "Bot Telegram non configurato (TG_SIGNAL_TOKEN/TG_SIGNAL_CHAT)."}, status_code=503)
-    stocks = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
+    stocks = _morning_data or ((_cache.get(_scan_key(10)) or {}).get("data") or [])
     if not stocks:
         return JSONResponse({"ok": False, "error": "Nessuno scan disponibile: avvia prima 'Analizza ora'."}, status_code=400)
     ok = await _send_top10_rich(stocks, True)
@@ -1140,7 +1166,7 @@ async def api_scan_evening():
     """Stesso set di stock mattutino con PREZZI LIVE — usato sia di giorno che alla sera.
     Restituisce gli stessi titoli in ordine identico, con evening_price (live) e delta_from_morning.
     Cache 60s per non sovraccaricare yfinance (rate limiting)."""
-    morning = _morning_data or ((_cache.get("scan:10") or {}).get("data") or [])
+    morning = _morning_data or ((_cache.get(_scan_key(10)) or {}).get("data") or [])
     if not morning:
         return JSONResponse([], status_code=404)
 
