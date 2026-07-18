@@ -32,18 +32,44 @@ COST_PCT = 0.10
 # Tutte le soglie/punteggi qui sotto sono scelte a mano dall'autore (hand-set, no
 # backtest): non derivano da un'ottimizzazione storica, sono l'onesto default.
 SCORING = {
-    # get_enriched_analysis / format_apr_card ecc. — score 0-10 rapido per singolo titolo
+    # get_enriched_analysis — score 0-10 del singolo titolo (drawer di dettaglio).
+    # Diverso e indipendente dallo score di screening "scan" qui sotto: qui ci sono
+    # dati non disponibili in fase di scan su migliaia di titoli (sentiment, earnings,
+    # P/E), quindi le due formule non possono essere identiche.
     "enriched": {
-        "rsi_oversold_strong": 35, "rsi_oversold_strong_pts": 3,       # hand-set, no backtest
-        "rsi_oversold": 45, "rsi_oversold_pts": 2,                     # hand-set, no backtest
-        "rsi_overbought_strong": 70, "rsi_overbought_strong_pts": -3,  # hand-set, no backtest
-        "rsi_overbought": 60, "rsi_overbought_pts": -1,                # hand-set, no backtest
-        "chg_strong": 3, "chg_strong_pts": 3,                          # hand-set, no backtest
-        "chg_mid": 1, "chg_mid_pts": 2,                                # hand-set, no backtest
-        "chg_positive_pts": 1,                                        # hand-set, no backtest
-        "chg_weak": -3, "chg_weak_pts": -2,                            # hand-set, no backtest
-        "above_sma20_pts": 1,                                         # hand-set, no backtest
-        "raw_offset": 5, "raw_range": 15,                             # normalizzazione a 0-10, hand-set
+        # 1) Trend / rendimento atteso (min -3, max +5)
+        "month_return_pos_pts": 1,                                     # hand-set, no backtest
+        "month_return_strong": 10, "month_return_strong_pts": 1,       # hand-set, no backtest (si somma al precedente)
+        "month_return_weak": -15, "month_return_weak_pts": -1,         # hand-set, no backtest
+        "week_return_pos_pts": 1,                                      # hand-set, no backtest
+        "chg_strong": 3, "chg_strong_pts": 1,                          # hand-set, no backtest
+        "chg_weak": -5, "chg_weak_pts": -1,                            # hand-set, no backtest
+        "above_sma20_pts": 1, "below_sma20_pts": -1,                   # hand-set, no backtest (simmetrico)
+        # 2) Zona RSI (min -2, max +2)
+        "rsi_extended": 75, "rsi_extended_pts": -2,                    # hand-set, no backtest
+        "rsi_overbought": 65, "rsi_overbought_pts": -1,                # hand-set, no backtest
+        "rsi_ideal_lo": 45, "rsi_ideal_pts": 2,                        # hand-set, no backtest
+        "rsi_pullback_lo": 40, "rsi_pullback_pts": 1,                  # hand-set, no backtest
+        "rsi_weak_lo": 30, "rsi_weak_pts": -1,                         # hand-set, no backtest
+        "rsi_falling_knife_pts": -2,                                   # hand-set, no backtest (rsi < rsi_weak_lo)
+        # 3) Rischio / volatilità (min -2, max +1)
+        "volatility_healthy_lo": 15, "volatility_healthy_hi": 50, "volatility_healthy_pts": 1,  # hand-set, no backtest
+        "volatility_junk": 90, "volatility_junk_pts": -2,              # hand-set, no backtest
+        "volatility_high": 70, "volatility_high_pts": -1,              # hand-set, no backtest
+        # 4) Sentiment notizie (min -1, max +1)
+        "sentiment_positive_pts": 1, "sentiment_negative_pts": -1,     # hand-set, no backtest
+        # 5) Distanza earnings — solo rischio, mai un bonus (min -2, max 0)
+        "earnings_today_pts": -2,                                      # hand-set, no backtest
+        "earnings_soon_days": 3, "earnings_soon_pts": -1,               # hand-set, no backtest
+        # 6) Valutazione P/E — mai penalizzato se mancante, es. ETF (min -1, max +1)
+        "pe_cheap": 15, "pe_cheap_pts": 1,                              # hand-set, no backtest
+        "pe_expensive": 40, "pe_expensive_pts": -1,                    # hand-set, no backtest
+        # Normalizzazione: range grezzo confermato [-11, +10] -> 0-10.
+        # Un titolo perfettamente neutro atterra a 11/21*10 ~= 5.24, non esattamente
+        # 5.0: earnings/volatilità sono segnali di solo-rischio per scelta (nessun
+        # bonus sensato per "niente earnings in vista"), quindi il range non è
+        # simmetrico — dichiarato qui invece che nascosto.
+        "raw_offset": 11, "raw_range": 21,
     },
     # scan_cheap_stocks — screening giornaliero dell'universo
     "scan": {

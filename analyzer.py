@@ -262,23 +262,60 @@ def wilder_rsi(close, period: int = 14) -> float:
     return 50.0 if pd.isna(val) else val
 
 
-def _quality_score_10(rsi: float, chg: float, sma_20, price: float) -> float:
-    """Score 0-10 rapido (get_enriched_analysis) da RSI, variazione giornaliera e trend
-    vs SMA20. Soglie in config.SCORING['enriched'] — hand-set, non ricalibrate su backtest."""
+def _quality_score_10(*, rsi: float, chg: float, sma_20, price: float,
+                       week_return, month_return, volatility,
+                       news_sentiment: str, earnings_today: bool,
+                       days_to_earnings, pe_ratio) -> float:
+    """Score 0-10 del singolo titolo (get_enriched_analysis): trend/rendimento atteso,
+    zona RSI, rischio (volatilità), sentiment notizie, distanza earnings, valutazione
+    P/E. Pesi in config.SCORING['enriched'] — hand-set, non ricalibrati su backtest.
+    Indipendente dallo score di screening di scan_cheap_stocks (SCORING['scan'])."""
     from config import SCORING
     s = SCORING["enriched"]
-    score_raw = 0
-    if rsi < s["rsi_oversold_strong"]:        score_raw += s["rsi_oversold_strong_pts"]
-    elif rsi < s["rsi_oversold"]:              score_raw += s["rsi_oversold_pts"]
-    elif rsi > s["rsi_overbought_strong"]:     score_raw += s["rsi_overbought_strong_pts"]
-    elif rsi > s["rsi_overbought"]:            score_raw += s["rsi_overbought_pts"]
-    if chg > s["chg_strong"]:                  score_raw += s["chg_strong_pts"]
-    elif chg > s["chg_mid"]:                   score_raw += s["chg_mid_pts"]
-    elif chg > 0:                              score_raw += s["chg_positive_pts"]
-    elif chg < s["chg_weak"]:                  score_raw += s["chg_weak_pts"]
-    if sma_20 and price > sma_20:
-        score_raw += s["above_sma20_pts"]
-    return round(min(10.0, max(0.0, (score_raw + s["raw_offset"]) / s["raw_range"] * 10)), 1)
+    raw = 0
+
+    # 1) Trend / rendimento atteso
+    if month_return is not None:
+        if month_return > 0:                   raw += s["month_return_pos_pts"]
+        if month_return > s["month_return_strong"]:  raw += s["month_return_strong_pts"]
+        if month_return < s["month_return_weak"]:    raw += s["month_return_weak_pts"]
+    if week_return is not None and week_return > 0:
+        raw += s["week_return_pos_pts"]
+    if chg > s["chg_strong"]:                  raw += s["chg_strong_pts"]
+    elif chg < s["chg_weak"]:                  raw += s["chg_weak_pts"]
+    if sma_20 and price > sma_20:              raw += s["above_sma20_pts"]
+    elif sma_20 and price < sma_20:            raw += s["below_sma20_pts"]
+
+    # 2) Zona RSI
+    if rsi > s["rsi_extended"]:                raw += s["rsi_extended_pts"]
+    elif rsi > s["rsi_overbought"]:            raw += s["rsi_overbought_pts"]
+    elif rsi >= s["rsi_ideal_lo"]:             raw += s["rsi_ideal_pts"]
+    elif rsi >= s["rsi_pullback_lo"]:          raw += s["rsi_pullback_pts"]
+    elif rsi >= s["rsi_weak_lo"]:              raw += s["rsi_weak_pts"]
+    else:                                      raw += s["rsi_falling_knife_pts"]
+
+    # 3) Rischio / volatilità
+    if volatility is not None:
+        if s["volatility_healthy_lo"] <= volatility <= s["volatility_healthy_hi"]:
+            raw += s["volatility_healthy_pts"]
+        elif volatility > s["volatility_junk"]:      raw += s["volatility_junk_pts"]
+        elif volatility > s["volatility_high"]:      raw += s["volatility_high_pts"]
+
+    # 4) Sentiment notizie
+    if news_sentiment == "positive":           raw += s["sentiment_positive_pts"]
+    elif news_sentiment == "negative":         raw += s["sentiment_negative_pts"]
+
+    # 5) Distanza earnings — solo rischio, mai un bonus
+    if earnings_today:                         raw += s["earnings_today_pts"]
+    elif days_to_earnings is not None and 0 < days_to_earnings <= s["earnings_soon_days"]:
+        raw += s["earnings_soon_pts"]
+
+    # 6) Valutazione P/E — mai penalizzato se mancante (es. ETF)
+    if pe_ratio is not None:
+        if pe_ratio < s["pe_cheap"]:           raw += s["pe_cheap_pts"]
+        elif pe_ratio > s["pe_expensive"]:     raw += s["pe_expensive_pts"]
+
+    return round(min(10.0, max(0.0, (raw + s["raw_offset"]) / s["raw_range"] * 10)), 1)
 
 
 def format_analysis_message(d: dict) -> str:
@@ -891,17 +928,30 @@ def get_enriched_analysis(ticker: str) -> dict | None:
     # ── Variazione odierna (già realizzata, non una previsione) ──
     daily_estimate_pct = base["day_change_pct"]
 
-    # ── Score 0-10 basato su RSI, variazione e trend ──
+    # ── Score 0-10: trend, RSI, rischio, sentiment, earnings, valutazione ──
     rsi = base.get("rsi", 50.0)
     chg = base.get("day_change_pct", 0.0)
     sma_20 = base.get("sma_20")
     price = base.get("current_price", 0.0)
-    score_10 = _quality_score_10(rsi, chg, sma_20, price)
+    score_10 = _quality_score_10(
+        rsi=rsi, chg=chg, sma_20=sma_20, price=price,
+        week_return=base.get("week_return"), month_return=base.get("month_return"),
+        volatility=base.get("volatility"), news_sentiment=news_sentiment,
+        earnings_today=earnings_today, days_to_earnings=days_to_earnings,
+        pe_ratio=base.get("pe_ratio"),
+    )
 
     # ── Stima direzionale a 5 giorni: direzione dallo score, ampiezza dalla volatilità ──
+    from config import SCORING as _SCORING
+    _enriched = _SCORING["enriched"]
+    neutral = _enriched["raw_offset"] / _enriched["raw_range"] * 10  # stesso centro di _quality_score_10
     vol = base.get("volatility") or 40.0
     vol_5d = vol * 0.1409                      # ~ deviazione su 5 sedute (annua/√252·√5)
-    conviction = (score_10 - 5.5) / 4.5        # <0 ribassista, >0 rialzista
+    # conviction in [-1, +1] indipendentemente da dove cade "neutral" (non è esattamente 5.0)
+    if score_10 >= neutral:
+        conviction = (score_10 - neutral) / (10 - neutral) if neutral < 10 else 0.0
+    else:
+        conviction = (score_10 - neutral) / neutral if neutral > 0 else 0.0
     estimate_5d_pct = round(max(-15.0, min(15.0, conviction * vol_5d)), 1)
     estimate_5d_price = round(base["current_price"] * (1 + estimate_5d_pct / 100), 2)
 
