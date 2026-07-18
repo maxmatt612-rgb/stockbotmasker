@@ -868,9 +868,8 @@ def get_enriched_analysis(ticker: str) -> dict | None:
     if base.get("week_52_high") and base["current_price"] > 0:
         upside_52w = (base["week_52_high"] - base["current_price"]) / base["current_price"] * 100
 
-    # ── Stima giornaliera = variazione attuale ──
+    # ── Variazione odierna (già realizzata, non una previsione) ──
     daily_estimate_pct = base["day_change_pct"]
-    daily_estimate_price = base["current_price"] * (1 + daily_estimate_pct / 100)
 
     # ── Score 0-10 basato su RSI, variazione e trend ──
     rsi = base.get("rsi", 50.0)
@@ -906,7 +905,6 @@ def get_enriched_analysis(ticker: str) -> dict | None:
         "news_sentiment_label": news_label,
         "upside_52w": upside_52w,
         "daily_estimate_pct": daily_estimate_pct,
-        "daily_estimate_price": daily_estimate_price,
         "estimate_5d_pct": estimate_5d_pct,
         "estimate_5d_price": estimate_5d_price,
         "score_10": score_10,
@@ -927,7 +925,6 @@ def format_apr_card(d: dict, ai: dict) -> str:
     news_line = f"{d.get('news_sentiment_emoji', '⚪')} {d.get('news_sentiment_label', 'Neutre')}"
 
     daily_pct = d.get("daily_estimate_pct", 0.0)
-    daily_price = d.get("daily_estimate_price", d["current_price"])
     daily_sign = "+" if daily_pct >= 0 else ""
 
     upside = d.get("upside_52w", 0.0)
@@ -963,7 +960,7 @@ def format_apr_card(d: dict, ai: dict) -> str:
 
     lines += [
         "",
-        f"📅 <b>Stima oggi:</b> {daily_sign}{daily_pct:.1f}% → ${daily_price:.2f}",
+        f"📊 <b>Oggi finora:</b> {daily_sign}{daily_pct:.1f}%",
         target_line,
         f"{d.get('risk_emoji', '🟡')} <b>Rischio:</b> {d.get('risk_level', 'Medio')} (volatilità {d.get('volatility', 0):.0f}%)",
         f"⭐ <b>Score:</b> {score_10}/10",
@@ -1001,7 +998,6 @@ def format_morning_card(d: dict, ai: dict, rank: int) -> str:
     news_line = f"{d.get('news_sentiment_emoji', '⚪')} {d.get('news_sentiment_label', 'Neutre')}"
 
     daily_pct = d.get("daily_estimate_pct", 0.0)
-    daily_price = d.get("daily_estimate_price", d["current_price"])
     daily_sign = "+" if daily_pct >= 0 else ""
 
     upside = d.get("upside_52w", 0.0)
@@ -1037,7 +1033,7 @@ def format_morning_card(d: dict, ai: dict, rank: int) -> str:
 
     lines += [
         "",
-        f"📅 <b>Stima oggi:</b> {daily_sign}{daily_pct:.1f}% → ${daily_price:.2f}",
+        f"📊 <b>Oggi finora:</b> {daily_sign}{daily_pct:.1f}%",
         target_line,
         f"{d.get('risk_emoji', '🟡')} {d.get('risk_level', 'Medio')}",
         f"⭐ {score_10}/10",
@@ -1064,7 +1060,6 @@ def format_scan_card(d: dict, ai: dict, rank: int) -> str:
         earn_str = "📅 N/D"
 
     daily_pct = d.get("daily_estimate_pct", 0.0)
-    daily_price = d.get("daily_estimate_price", d["current_price"])
     daily_sign = "+" if daily_pct >= 0 else ""
 
     upside = d.get("upside_52w", 0.0)
@@ -1080,7 +1075,7 @@ def format_scan_card(d: dict, ai: dict, rank: int) -> str:
         lines.append(f"🎯 {_h(verdict)}")
     if bullet1:
         lines.append(f"• {_h(bullet1)}")
-    lines.append(f"📅 Stima: {daily_sign}{daily_pct:.1f}% → ${daily_price:.2f} | 📊 {target_str}")
+    lines.append(f"📊 Oggi finora: {daily_sign}{daily_pct:.1f}% | 📊 {target_str}")
     return "\n".join(lines)
 
 
