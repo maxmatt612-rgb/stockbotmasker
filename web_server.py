@@ -771,7 +771,6 @@ def _save_history_snapshot_web(stocks: list):
                 "risk_level": d.get("risk_level", "Medio"),
                 "day_change_pct": round(float(d.get("day_change_pct") or 0), 2),
                 "rsi": round(float(d.get("rsi") or 50), 1),
-                "verdict": "",
             }
             for d in stocks if d.get("ticker")
         ],
@@ -4340,11 +4339,10 @@ async def api_accuracy():
             if pa <= 0 or pc <= 0:
                 continue
             pct = (pc - pa) / pa * 100
-            verdict = (s.get("verdict") or "").upper()
-            # Determina se il segnale era bullish o bearish
-            if score >= 7 or any(k in verdict for k in ("COMPRA", "BUY", "SI", "SÌ")):
+            # Direzione attesa dallo score numerico dello screener (unico segnale disponibile)
+            if score >= 7:
                 expected_up = True
-            elif score <= 4 or any(k in verdict for k in ("VENDI", "SELL", "NO")):
+            elif score <= 4:
                 expected_up = False
             else:
                 continue  # neutro: skip
