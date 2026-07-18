@@ -146,14 +146,82 @@ def test_projection_basis_falls_back_to_invented_7pct_when_no_history():
     assert label == "ipotesi 7%/anno (storico insufficiente)"
 
 
-def test_quality_score_10_matches_pre_refactor_formula():
-    """Before/after spot-check: _quality_score_10 (config.SCORING-driven) must return
-    the exact same number the old hardcoded-literal formula gave for the same input."""
+# ── _quality_score_10 v2: trend, RSI, rischio, sentiment, earnings, valutazione ──
+# NB: sostituisce il vecchio test "matches_pre_refactor_formula" -- la formula è
+# stata intenzionalmente riprogettata (score singolo titolo scoordinato dal resto),
+# quindi il vecchio valore atteso (8.0) non è più valido per costruzione.
+
+_NEUTRAL_KW = dict(
+    rsi=35.0, chg=0.0, sma_20=None, price=0.0,       # rsi in banda "weak" (-1)
+    week_return=None, month_return=None,
+    volatility=40.0,                                  # banda sana (+1), compensa rsi -1 -> raw=0
+    news_sentiment="neutre", earnings_today=False,
+    days_to_earnings=None, pe_ratio=None,
+)
+
+
+def test_quality_score_10_neutral_baseline():
+    from analyzer import _quality_score_10
     import pytest
+    from config import SCORING
+
+    neutral = SCORING["enriched"]["raw_offset"] / SCORING["enriched"]["raw_range"] * 10
+    assert _quality_score_10(**_NEUTRAL_KW) == pytest.approx(round(neutral, 1))
+
+
+def test_quality_score_10_strong_uptrend_scores_high():
     from analyzer import _quality_score_10
 
-    rsi, chg, sma_20, price = 30.0, 4.0, 100.0, 105.0
-    # Formula pre-refactor (analyzer.py prima di Item 9), calcolata a mano:
-    # rsi<35 -> +3; chg>3 -> +3; price>sma_20 -> +1  =>  score_raw=7
-    # score_10 = round(min(10, max(0, (7+5)/15*10)), 1) = 8.0
-    assert _quality_score_10(rsi, chg, sma_20, price) == pytest.approx(8.0)
+    kw = dict(_NEUTRAL_KW, rsi=55.0, chg=4.0, sma_20=100.0, price=110.0,
+              week_return=3.0, month_return=15.0, news_sentiment="positive", pe_ratio=12.0)
+    assert _quality_score_10(**kw) >= 8.0
+
+
+def test_quality_score_10_earnings_today_lowers_an_otherwise_strong_score():
+    from analyzer import _quality_score_10
+
+    base_kw = dict(_NEUTRAL_KW, rsi=55.0, chg=4.0, sma_20=100.0, price=110.0,
+                   week_return=3.0, month_return=15.0, news_sentiment="positive", pe_ratio=12.0)
+    without_earnings = _quality_score_10(**base_kw)
+    with_earnings = _quality_score_10(**dict(base_kw, earnings_today=True, days_to_earnings=0))
+    assert with_earnings < without_earnings
+
+
+def test_quality_score_10_expensive_pe_scores_below_neutral():
+    from analyzer import _quality_score_10
+
+    neutral_score = _quality_score_10(**_NEUTRAL_KW)
+    expensive_pe = _quality_score_10(**dict(_NEUTRAL_KW, pe_ratio=60.0))
+    assert expensive_pe < neutral_score
+
+
+def test_quality_score_10_missing_pe_is_not_penalized():
+    """Un titolo senza P/E disponibile (es. ETF) non deve avere uno score inferiore
+    rispetto a un titolo identico con P/E in fascia neutra (15-40)."""
+    from analyzer import _quality_score_10
+
+    missing_pe = _quality_score_10(**_NEUTRAL_KW)  # pe_ratio=None nel baseline
+    neutral_pe = _quality_score_10(**dict(_NEUTRAL_KW, pe_ratio=25.0))
+    assert missing_pe == neutral_pe
+
+
+def test_estimate_5d_conviction_sign_matches_score_position_vs_neutral():
+    """Ricostruisce la stessa formula di conviction usata in get_enriched_analysis:
+    per uno score sopra il neutro dev'essere positiva, sotto dev'essere negativa --
+    verifica diretta che 'score alto ma stima negativa' (il bug segnalato) non può
+    più accadere per costruzione."""
+    from config import SCORING
+
+    enriched = SCORING["enriched"]
+    neutral = enriched["raw_offset"] / enriched["raw_range"] * 10
+
+    def conviction(score_10):
+        if score_10 >= neutral:
+            return (score_10 - neutral) / (10 - neutral)
+        return (score_10 - neutral) / neutral
+
+    assert conviction(9.0) > 0
+    assert conviction(2.0) < 0
+    assert conviction(neutral) == 0
+    assert -1.0 <= conviction(0.0) <= 1.0
+    assert -1.0 <= conviction(10.0) <= 1.0

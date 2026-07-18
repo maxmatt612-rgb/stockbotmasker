@@ -1052,7 +1052,7 @@ function cardHTML(s,rank){
     <div class="card-nm">${esc(s.name||s.ticker)}</div>
     <div class="card-row"><span class="card-price">${fx(s.current_price,s.currency)}</span><span class="card-chg ${cl}">${fp(ch)}</span></div>
     <div class="card-foot">
-      ${sc!=null?`<span class="score ${scl}">${(+sc).toFixed(1)}</span>`:''}
+      ${sc!=null?`<span class="score ${scl}" title="Punteggio screening (trend, momentum, RSI, volume, volatilità) — diverso dal punteggio del dettaglio titolo">${(+sc).toFixed(1)}</span>`:''}
       <span class="rk">${esc(s.risk_level||'')}</span>
       ${s.rsi!=null?`<span class="rsi">RSI ${(+s.rsi).toFixed(0)}</span>`:''}
       <a class="tv-link" href="${tvUrl(s.ticker)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Apri il grafico su TradingView">📈 TV</a>
@@ -1255,7 +1255,7 @@ async function loadOptions(){
 }
 function goTab(t){const b=$$('.dw-tab').find(x=>x.dataset.t===t);if(b){$$('.dw-tab').forEach(x=>x.classList.toggle('on',x===b));setDwTab(t);}}
 function renderSintesi(){
-  const d=curData||{};const st=(l,v)=>`<div class="stat"><div class="l">${l}</div><div class="v">${v}</div></div>`;
+  const d=curData||{};const st=(l,v,title)=>`<div class="stat"${title?` title="${esc(title)}"`:''}><div class="l">${l}</div><div class="v">${v}</div></div>`;
   $('#dw-body').innerHTML=`
     <div class="chart-card">
       <div class="chart-box" id="dw-chart"><div class="lline" style="padding:34px 0">Caricamento grafico…</div></div>
@@ -1272,7 +1272,7 @@ function renderSintesi(){
       </div>
     </div>
     <div class="stat-grid">
-      ${st('Score',d.score_10!=null?(+d.score_10).toFixed(1)+' / 10':'—')}
+      ${st('Score',d.score_10!=null?(+d.score_10).toFixed(1)+' / 10':'—','Punteggio di questo titolo: RSI, trend, rischio, sentiment notizie, distanza earnings, valutazione P/E — diverso dal punteggio di screening mostrato nelle card')}
       ${st('Stima 5gg',d.estimate_5d_pct!=null?`<span class="${d.estimate_5d_pct>=0?'pos':'neg'}">${d.estimate_5d_pct>=0?'+':''}${d.estimate_5d_pct}%</span>`:'—')}
       ${st('Rischio',(d.risk_emoji||'')+' '+(d.risk_level||'—'))}
       ${st('RSI (14)',d.rsi!=null?(+d.rsi).toFixed(0):'—')}
@@ -1558,7 +1558,7 @@ async function loadCompro(){
 }
 
 // Helper condiviso (fondamentali, Grafico AI, verdetto Compro nel pannello)
-function cell(l,v,cls){return `<div class="cell ${cls||''}"><div class="l">${l}</div><div class="v">${v}</div></div>`;}
+function cell(l,v,cls,title){return `<div class="cell ${cls||''}"${title?` title="${esc(title)}"`:''}><div class="l">${l}</div><div class="v">${v}</div></div>`;}
 
 // ── Verdetto "Compro?" — usato dal tab del pannello titolo (loadCompro) ──
 function shouldHTML(d){
@@ -1569,7 +1569,7 @@ function shouldHTML(d){
     <div class="verdict ${vcls(d.verdict)}">${vico(d.verdict)} ${esc(d.verdict||'ASPETTA')}<small>Confidenza ${d.confidence??'—'}%</small></div>
     <div class="cells">
       ${(d.entry_low!=null&&d.entry_high!=null)?cell("Zona d'ingresso",fx(d.entry_low,d.currency)+' – '+fx(d.entry_high,d.currency),'g'):''}
-      ${d.target!=null?cell('Take profit',fx(d.target,d.currency)+(d.target_pct!=null?` (${d.target_pct>=0?'+':''}${d.target_pct}%)`:''),'g'):''}
+      ${d.target!=null?cell('Take profit',fx(d.target,d.currency)+(d.target_pct!=null?` (${d.target_pct>=0?'+':''}${d.target_pct}%)`:''),'g',"Livello tecnico (resistenza, o +15%/+35% se non c'è resistenza sensata) — indipendente dal punteggio e dal verdetto sopra"):''}
       ${d.stop!=null?cell('Stop-loss',fx(d.stop,d.currency),'r'):''}
       ${d.support!=null?cell('Supporto',fx(d.support,d.currency)):''}
       ${d.resistance!=null?cell('Resistenza',fx(d.resistance,d.currency)):''}
