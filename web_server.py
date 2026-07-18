@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-from analyzer import get_enriched_analysis, scan_cheap_stocks, get_longterm_analysis
+from analyzer import get_enriched_analysis, scan_cheap_stocks, get_longterm_analysis, wilder_rsi
 
 # Carica le variabili dal file .env se presente (utile per l'esecuzione in locale).
 try:
@@ -762,7 +762,7 @@ def _save_history_snapshot_web(stocks: list):
         "date": date_iso,
         "generated_at": datetime.now(ROME).strftime("%Y-%m-%dT%H:%M:%S"),
         "closed": False,
-        "engine_version": 2,  # 2 = price_at_open catturato alla chiusura + costo backtest (v. MASKER_FIX Item 4)
+        "engine_version": 3,  # 2 = price_at_open+costo backtest (Item 4); 3 = RSI Wilder standard (Item 5)
         "stocks": [
             {
                 "ticker": d["ticker"],
@@ -2375,8 +2375,7 @@ async def api_technicals(ticker: str):
             return {"name": label, "value": (None if value is None or (isinstance(value, float) and (value != value)) else round(float(value), 2)), "signal": s}
 
         # RSI(14)
-        d = c.diff(); g = d.clip(lower=0).rolling(14).mean(); l = (-d.clip(upper=0)).rolling(14).mean()
-        rsi = float((100 - 100 / (1 + g / l)).iloc[-1])
+        rsi = wilder_rsi(c)
         osc.append(sig("RSI (14)", rsi, "sell" if rsi > 70 else "buy" if rsi < 30 else "neutral"))
 
         # Stochastic %K(14)

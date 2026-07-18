@@ -64,10 +64,7 @@ def get_full_analysis(ticker: str) -> dict | None:
         sma_20 = float(hist["Close"].rolling(20).mean().iloc[-1])
         sma_50 = float(hist["Close"].rolling(50).mean().iloc[-1]) if len(hist) >= 50 else None
 
-        delta = hist["Close"].diff()
-        gain = delta.clip(lower=0).rolling(14).mean()
-        loss = (-delta.clip(upper=0)).rolling(14).mean()
-        rsi = float((100 - (100 / (1 + gain / loss))).iloc[-1])
+        rsi = wilder_rsi(hist["Close"])
 
         if volatility < 30:
             risk_level, risk_emoji = "Basso", "🟢"
@@ -152,10 +149,7 @@ def get_trading_analysis(ticker: str) -> dict | None:
 
         day_change_pct = ((current_price - prev_close) / prev_close) * 100
 
-        delta = hist["Close"].diff()
-        gain = delta.clip(lower=0).rolling(14).mean()
-        loss = (-delta.clip(upper=0)).rolling(14).mean()
-        rsi = float((100 - (100 / (1 + gain / loss))).iloc[-1])
+        rsi = wilder_rsi(hist["Close"])
 
         ema_12 = hist["Close"].ewm(span=12, adjust=False).mean()
         ema_26 = hist["Close"].ewm(span=26, adjust=False).mean()
@@ -252,6 +246,19 @@ def _ytd_return(hist) -> float:
     prior = hist["Close"][idx.year == cur_year - 1]
     baseline = prior.iloc[-1] if len(prior) else hist["Close"][idx.year == cur_year].iloc[0]
     return ((hist["Close"].iloc[-1] - baseline) / baseline) * 100
+
+
+def wilder_rsi(close, period: int = 14) -> float:
+    """RSI standard (Wilder smoothing) come TradingView/i broker, non una media mobile piatta.
+    Ritorna 50.0 (neutro) se non calcolabile invece di propagare NaN nello scoring."""
+    if close is None or len(close) < period + 1:
+        return 50.0
+    delta = close.diff()
+    avg_gain = delta.clip(lower=0).ewm(alpha=1 / period, adjust=False).mean()
+    avg_loss = (-delta.clip(upper=0)).ewm(alpha=1 / period, adjust=False).mean()
+    rsi = 100 - (100 / (1 + avg_gain / avg_loss))
+    val = float(rsi.iloc[-1])
+    return 50.0 if pd.isna(val) else val
 
 
 def format_analysis_message(d: dict) -> str:
@@ -613,16 +620,7 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                     day_change_pct = ((current_price - prev_close) / prev_close) * 100
 
                     # RSI
-                    if len(close) >= 15:
-                        delta = close.diff()
-                        gain = delta.clip(lower=0).rolling(14).mean()
-                        loss = (-delta.clip(upper=0)).rolling(14).mean()
-                        rs = gain / loss
-                        rsi = float((100 - (100 / (1 + rs))).iloc[-1])
-                        if pd.isna(rsi):
-                            rsi = 50.0
-                    else:
-                        rsi = 50.0
+                    rsi = wilder_rsi(close)
 
                     # Volume ratio + LIQUIDITÀ (filtro qualità: scarta penny/junk illiquidi)
                     vol_ratio = 1.0

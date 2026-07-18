@@ -57,3 +57,31 @@ def test_backtest_excludes_rows_without_price_at_open():
     assert result["total"] == 1
     assert result["by_score"]["high"]["total"] == 1
     assert result["by_score"]["high"]["top3"][0]["ticker"] == "AAA"
+
+
+def test_wilder_rsi_flat_series_is_neutral_50():
+    import pandas as pd
+    from analyzer import wilder_rsi
+
+    flat = pd.Series([100.0] * 20)
+    assert wilder_rsi(flat) == 50.0
+
+
+def test_wilder_rsi_monotonically_rising_series_approaches_100():
+    import pandas as pd
+    import pytest
+    from analyzer import wilder_rsi
+
+    rising = pd.Series([100.0 + i for i in range(20)])
+    assert wilder_rsi(rising) == pytest.approx(100.0)
+
+
+def test_wilder_rsi_known_vector():
+    import pandas as pd
+    import pytest
+    from analyzer import wilder_rsi
+
+    # Vettore corto, calcolato a mano con la stessa formula (ewm alpha=1/period):
+    # gain/loss per barra = [-,1,1,-1,1,1], regressione contro un valore fisso noto.
+    s = pd.Series([10.0, 11.0, 12.0, 11.0, 12.0, 13.0])
+    assert wilder_rsi(s, period=3) == pytest.approx(85.18518518518519)
