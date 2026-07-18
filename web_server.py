@@ -762,6 +762,7 @@ def _save_history_snapshot_web(stocks: list):
         "date": date_iso,
         "generated_at": datetime.now(ROME).strftime("%Y-%m-%dT%H:%M:%S"),
         "closed": False,
+        "engine_version": 2,  # 2 = price_at_open catturato alla chiusura + costo backtest (v. MASKER_FIX Item 4)
         "stocks": [
             {
                 "ticker": d["ticker"],
@@ -799,11 +800,16 @@ def _close_history_snapshot_web():
         return
     for s in snap.get("stocks", []):
         try:
-            pc = round(float(yf.Ticker(s["ticker"]).fast_info.last_price or 0), 4)
+            fi = yf.Ticker(s["ticker"]).fast_info
+            pc = round(float(fi.last_price or 0), 4)
+            po = round(float(fi.open or 0), 4)
         except Exception:
             pc = 0.0
+            po = 0.0
         pa = s.get("price_at_analysis", 0.0)
         s["price_at_close"] = pc
+        if po > 0:
+            s["price_at_open"] = po  # entry raggiungibile: apertura del giorno, non il close del giorno prima
         if pa > 0 and pc > 0:
             s["close_vs_morning_pct"] = round((pc - pa) / pa * 100, 2)
     snap["closed"] = True
@@ -4315,11 +4321,11 @@ async def api_score_history(ticker: str):
 async def api_accuracy():
     """Accuracy storica: quante volte il segnale di Masker ha predetto la direzione corretta."""
     if not HISTORY_FILE.exists():
-        return {"total": 0, "correct": 0, "accuracy_pct": 0, "by_score": {}}
+        return {"total": 0, "correct": 0, "accuracy_pct": 0, "by_score": {}, "by_engine_version": {}}
     try:
         history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
     except Exception:
-        return {"total": 0, "correct": 0, "accuracy_pct": 0, "by_score": {}}
+        return {"total": 0, "correct": 0, "accuracy_pct": 0, "by_score": {}, "by_engine_version": {}}
 
     total = 0
     correct = 0
@@ -4328,16 +4334,20 @@ async def api_accuracy():
         "mid":  {"label": "Score 6–7",  "total": 0, "correct": 0, "pct": 0},
         "low":  {"label": "Score 0–5",  "total": 0, "correct": 0, "pct": 0},
     }
+    by_engine_version: dict = {}
 
     for snap in history.values():
         if not snap.get("closed", False):
             continue
+        ev = snap.get("engine_version", 1)  # snapshot pre-fix, senza il campo, sono v1
         for s in snap.get("stocks", []):
-            pa = s.get("price_at_analysis") or 0.0
+            # v2: entry raggiungibile (apertura). v1 legacy: fallback al vecchio prezzo di analisi.
+            pa = s.get("price_at_open") or s.get("price_at_analysis") or 0.0
             pc = s.get("price_at_close") or 0.0
             score = s.get("score_10") or 5.0
             if pa <= 0 or pc <= 0:
                 continue
+            by_engine_version[str(ev)] = by_engine_version.get(str(ev), 0) + 1
             pct = (pc - pa) / pa * 100
             # Direzione attesa dallo score numerico dello screener (unico segnale disponibile)
             if score >= 7:
@@ -4363,32 +4373,29 @@ async def api_accuracy():
         "correct": correct,
         "accuracy_pct": round(correct / total * 100, 1) if total > 0 else 0,
         "by_score": by_score,
+        "by_engine_version": by_engine_version,
     }
 
 
 # ─── Backtest storico dei segnali ─────────────────────────────────────────────
 
-@app.get("/api/backtest")
-async def api_backtest():
-    """
-    Backtest: per ogni segnale nella history con price_at_close,
-    calcola il ritorno mattina→chiusura, raggruppato per score bucket.
-    Mostra avg return, win rate, best/worst, e portafoglio cumulativo simulato.
-    """
-    key = "backtest:v1"
-    if (c := _cached(key, 1800)) is not None:
-        return c
+_EMPTY_BACKTEST = {"total": 0, "days": 0, "date_from": None, "date_to": None,
+                    "by_score": {}, "portfolio": [], "portfolio_final": 10000.0,
+                    "portfolio_return_pct": 0}
 
-    if not HISTORY_FILE.exists():
-        return {"total": 0, "days": 0, "by_score": {}, "portfolio": []}
 
-    try:
-        history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return {"total": 0, "days": 0, "by_score": {}, "portfolio": []}
+def _compute_backtest(history: dict) -> dict:
+    """
+    Backtest puro (nessuna I/O): per ogni segnale con price_at_open E price_at_close,
+    calcola il ritorno apertura→chiusura (entry raggiungibile) meno il costo round-trip
+    COST_PCT, raggruppato per score bucket. Righe senza price_at_open (storico pre-fix,
+    che usava il close del giorno prima come entry irraggiungibile) sono escluse.
+    """
+    from config import COST_PCT
 
     signals: list = []
     portfolio_days: list = []  # per la curva cumulativa
+    dates_used: list = []
 
     # Ordina le date per simulare in cronologia
     sorted_keys = sorted(history.keys())
@@ -4401,13 +4408,13 @@ async def api_backtest():
         day_high_stocks = []
 
         for s in snap.get("stocks", []):
-            pa = s.get("price_at_analysis") or 0.0
+            pa = s.get("price_at_open") or 0.0  # niente fallback: entry deve essere raggiungibile
             pc = s.get("price_at_close") or 0.0
             score_10 = s.get("score_10") or 0.0
             ticker = s.get("ticker", "")
             if pa <= 0 or pc <= 0 or not ticker:
                 continue
-            ret = (pc - pa) / pa * 100
+            ret = (pc - pa) / pa * 100 - COST_PCT
             signals.append({
                 "ticker": ticker,
                 "date": date_str,
@@ -4417,6 +4424,7 @@ async def api_backtest():
                 "return_pct": round(ret, 2),
                 "win": ret > 0,
             })
+            dates_used.append(date_str)
             if score_10 >= 8:
                 day_high_stocks.append(ret)
 
@@ -4424,6 +4432,9 @@ async def api_backtest():
         if day_high_stocks:
             avg_day = sum(day_high_stocks) / len(day_high_stocks)
             portfolio_days.append({"date": date_str, "daily_return": round(avg_day, 2), "n": len(day_high_stocks)})
+
+    if not signals:
+        return dict(_EMPTY_BACKTEST)
 
     # Calcola valore cumulativo portafoglio ($10k iniziali)
     portfolio_value = 10000.0
@@ -4466,14 +4477,38 @@ async def api_backtest():
             "top3": [{"ticker": s["ticker"], "date": s["date"], "return_pct": s["return_pct"]} for s in top3],
         }
 
-    result = {
+    return {
         "total": len(signals),
         "days": len([k for k, v in history.items() if v.get("closed")]),
+        "date_from": min(dates_used),
+        "date_to": max(dates_used),
         "by_score": by_score,
         "portfolio": portfolio_curve,
         "portfolio_final": round(portfolio_value, 2),
         "portfolio_return_pct": round((portfolio_value - 10000) / 100, 2),
     }
+
+
+@app.get("/api/backtest")
+async def api_backtest():
+    """
+    Backtest: per ogni segnale nella history con price_at_open+price_at_close,
+    calcola il ritorno apertura→chiusura al netto dei costi, raggruppato per score bucket.
+    Mostra avg return, win rate, best/worst, e portafoglio cumulativo simulato.
+    """
+    key = "backtest:v2"
+    if (c := _cached(key, 1800)) is not None:
+        return c
+
+    if not HISTORY_FILE.exists():
+        return dict(_EMPTY_BACKTEST)
+
+    try:
+        history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return dict(_EMPTY_BACKTEST)
+
+    result = _compute_backtest(history)
     _store(key, result)
     return result
 

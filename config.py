@@ -24,6 +24,10 @@ REPORT_HOUR = 7
 REPORT_MINUTE = 30
 ALERT_CHECK_INTERVAL = 300
 
+# Costo round-trip (ingresso+uscita) applicato a ogni trade nel backtest simulato:
+# stima prudente di commissioni+spread, in percento. Nessun broker reale è a costo zero.
+COST_PCT = 0.10
+
 # ~550+ azioni disponibili su Revolut tipicamente sotto i €40 (~$43)
 REVOLUT_UNIVERSE = [
     # ── Crypto Mining ──

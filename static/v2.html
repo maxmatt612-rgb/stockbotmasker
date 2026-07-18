@@ -804,7 +804,7 @@ const I18N_EXACT={
 "Periodo":"Period","1 anno":"1 year","2 anni":"2 years","5 anni":"5 years","Esegui backtest":"Run backtest","Backtest in corso…":"Backtest in progress…",
 "Dati storici insufficienti per questo ticker.":"Not enough historical data for this ticker.","Compra e tieni":"Buy & hold","Operazioni":"Trades","Max perdita":"Max loss","Vincitore":"Winner",
 "Medie SMA":"SMA","Caricamento andamento…":"Loading trend…","Valore del portafoglio · ultimi 6 mesi":"Portfolio value · last 6 months",
-"Simulazione su prezzi storici reali · esclude commissioni e dividendi · i risultati passati non garantiscono quelli futuri":"Simulation on real historical prices · excludes fees and dividends · past results don't guarantee future ones",
+"Simulazione su prezzi storici reali · entry apertura, uscita chiusura, costo 0.10% incluso · esclude dividendi · i risultati passati non garantiscono quelli futuri":"Simulation on real historical prices · entry at open, exit at close, 0.10% cost included · excludes dividends · past results don't guarantee future ones",
 "Buongiorno":"Good morning","Buon pomeriggio":"Good afternoon","Buonasera":"Good evening",
 "Ecco come si muovono i mercati in questo momento.":"Here's how the markets are moving right now.","Caricamento mercati…":"Loading markets…",
 "Giudizio":"Rating","Comprare":"Buy","Comprare (forte)":"Strong buy","Mantenere":"Hold","Vendere":"Sell","Vendere (forte)":"Strong sell","Sottopesare":"Underweight","Sovrappesare":"Overweight",
@@ -841,7 +841,7 @@ const I18N_EXACT={
 "Accuratezza dei segnali":"Signal accuracy","Backtest portafoglio (Score ≥8, equal-weight)":"Portfolio backtest (Score ≥8, equal-weight)",
 "Precisione del bot":"Bot accuracy",
 "In attesa della prima giornata di mercato chiusa · apri il Track record →":"Waiting for the first closed market day · open Track record →",
-"Simulazione su prezzi storici reali · esclude commissioni e dividendi · i risultati passati non garantiscono quelli futuri.":"Simulation on real historical prices · excludes fees and dividends · past results don't guarantee future ones.",
+"Simulazione su prezzi storici reali · entry apertura, uscita chiusura, costo 0.10% incluso · esclude dividendi · i risultati passati non garantiscono quelli futuri.":"Simulation on real historical prices · entry at open, exit at close, 0.10% cost included · excludes dividends · past results don't guarantee future ones.",
 "Storico":"History","I giorni analizzati":"The days analyzed",
 "Rivivi le analisi passate: per ogni giornata vedi i titoli scelti e quanto sono saliti o scesi.":"Relive past analyses: for each day see the picked stocks and how much they rose or fell.",
 "Capitalizz.":"Market cap","Ricavi":"Revenue","Margine netto":"Net margin","Debito/Equity":"Debt/Equity","Dividendo":"Dividend",
@@ -1860,7 +1860,7 @@ async function loadTrackPage(){
       <div style="margin-top:14px">${row(bk.high)}${row(bk.mid)}${row(bk.low)}</div>
     </div>`;
   }
-  html+=`<p style="font-size:.7rem;color:var(--faint);margin-top:14px">Simulazione su prezzi storici reali · esclude commissioni e dividendi · i risultati passati non garantiscono quelli futuri.</p>`;
+  html+=`<p style="font-size:.7rem;color:var(--faint);margin-top:14px">Simulazione su prezzi storici reali · entry apertura, uscita chiusura, costo 0.10% incluso · esclude dividendi · i risultati passati non garantiscono quelli futuri.</p>`;
   box.innerHTML=html;
 }
 
