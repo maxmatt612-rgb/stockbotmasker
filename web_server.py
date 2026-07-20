@@ -1943,15 +1943,27 @@ async def api_best_buy(horizon: str = "short"):
         try:
             oriz = "3-6 mesi" if horizon == "short" else "12-24 mesi"
             win = "6 mesi" if horizon == "short" else "2 anni"
+            fund = await asyncio.to_thread(get_enriched_analysis, pick["ticker"])
+            fund = fund or {}
+            pe = fund.get("pe_ratio")
+            pe_s = f"{pe:.1f}" if pe else "N/D"
+            sector = fund.get("sector") or "N/D"
+            revg = fund.get("revenue_growth")
+            revg_s = f"{revg*100:+.1f}%" if revg is not None else "N/D"
+            epsg = fund.get("eps_growth")
+            epsg_s = f"{epsg*100:+.1f}%" if epsg is not None else "N/D"
             prompt = (
                 f"Descrizione tecnica del titolo {pick['ticker']} per un orizzonte di {oriz}: "
                 f"prezzo ${cur:.2f}, rendimento ultimi {win} {pick['win_ret']:+.0f}%, "
                 f"ultimo mese {pick['month_ret']:+.0f}%, RSI {pick['rsi']:.0f}, trend rialzista sopra la media a 50 giorni.\n"
+                f"Fondamentali: settore {sector}, P/E {pe_s}, crescita ricavi {revg_s}, crescita EPS {epsg_s}.\n"
                 f"Descrivi in 2-3 frasi i PUNTI DI FORZA TECNICI di questo titolo su {oriz} (trend, momentum, dati). "
+                "Pesa la VALUTAZIONE (P/E) insieme alla crescita e al momentum: se il P/E è già molto alto rispetto "
+                "alla crescita, il potenziale di ulteriore rialzo è più limitato — dillo esplicitamente se è il caso. "
                 "È un'analisi informativa, non un consiglio personalizzato. Italiano, diretto, concreto."
             )
             r = await groq_client.chat.completions.create(
-                model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="low",
+                model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="medium",
                 messages=[{"role": "system", "content": AP.BEST_BUY},
                           {"role": "user", "content": prompt}])
             reasoning = r.choices[0].message.content.strip()
@@ -2212,6 +2224,9 @@ def _stock_brief(t, data):
         f"YTD {(data.get('ytd_return') or 0):+.1f}%. "
         f"P/E {v(data.get('pe_ratio'))}, ROE {v(data.get('roe'))}, margine {v(data.get('profit_margin'))}, "
         f"market cap {v(data.get('market_cap'), '{:.0f}')}. "
+        f"Crescita ricavi {v(data.get('revenue_growth') and data['revenue_growth']*100, '{:+.1f}%')}, "
+        f"crescita EPS {v(data.get('eps_growth') and data['eps_growth']*100, '{:+.1f}%')}, "
+        f"P/S {v(data.get('price_to_sales'))}, EV/EBITDA {v(data.get('ev_ebitda'))}. "
         f"Earnings {data.get('next_earnings_str', 'N/D')}, sentiment news {data.get('news_sentiment_label', 'N/D')}."
     )
 
@@ -2242,7 +2257,7 @@ async def api_debate(ticker: str):
               "Formato: esattamente 3 righe, ognuna inizia con '- '. Italiano, nient'altro.")
         try:
             r = await groq_client.chat.completions.create(
-                model="openai/gpt-oss-120b", max_tokens=900, reasoning_effort="low",
+                model="openai/gpt-oss-120b", max_tokens=900, reasoning_effort="medium",
                 messages=[{"role": "system", "content": sysm}, {"role": "user", "content": pr}])
             lines = [l.strip().lstrip("-•*").strip() for l in r.choices[0].message.content.split("\n")]
             return [l for l in lines if len(l) > 3][:3]
@@ -2263,7 +2278,7 @@ async def api_debate(ticker: str):
     winner, verdict, conf, synth = "PAREGGIO", "ASPETTA", 65, ""
     try:
         r = await groq_client.chat.completions.create(
-            model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="low",
+            model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="medium",
             messages=[{"role": "system", "content": AP.JUDGE},
                       {"role": "user", "content": judge_pr}])
         for line in r.choices[0].message.content.split("\n"):
@@ -2667,7 +2682,7 @@ async def api_timing(ticker: str):
     )
     try:
         resp = await groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile", max_tokens=320,
+            model="openai/gpt-oss-120b", max_tokens=700, reasoning_effort="medium",
             messages=[
                 {"role": "system", "content": AP.TIMING},
                 {"role": "user", "content": prompt},
@@ -3404,8 +3419,9 @@ async def api_forecast(ticker: str):
 
     try:
         resp = await groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            max_tokens=300,
+            model="openai/gpt-oss-120b",
+            max_tokens=700,
+            reasoning_effort="medium",
             messages=[
                 {"role": "system", "content": AP.FORECAST},
                 {"role": "user", "content": prompt},
