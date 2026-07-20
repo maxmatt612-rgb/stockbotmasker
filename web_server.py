@@ -948,7 +948,7 @@ async def _tg_batch_insights(top: list, emap: dict) -> dict:
               "titolo, niente altro.\n\n" + "\n".join(rows))
     try:
         resp = await groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile", max_tokens=700,
+            model="openai/gpt-oss-120b", max_tokens=700, reasoning_effort="medium",
             messages=[{"role": "system", "content": "Analista finanziario conciso e diretto, in italiano."},
                       {"role": "user", "content": prompt}])
         for line in resp.choices[0].message.content.strip().split("\n"):
@@ -2047,7 +2047,7 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
                 "MOTIVO: [2 frasi concrete riferite all'orizzonte indicato]\n"
             )
             r = await groq_client.chat.completions.create(
-                model="openai/gpt-oss-120b", max_tokens=1400, reasoning_effort="low",
+                model="openai/gpt-oss-120b", max_tokens=1400, reasoning_effort="medium",
                 messages=[{"role": "system", "content": AP.VERDICT},
                           {"role": "user", "content": prompt}])
             txt = r.choices[0].message.content.strip()
@@ -3227,6 +3227,9 @@ async def api_power_prompt(ticker: str, type: str = ""):
     _FREEFORM.set(True)  # report mostrato as-is → in EN traduci anche titoli/etichette
     messages = [{"role": "system", "content": persona["system"]}, {"role": "user", "content": user}]
     max_tok = 5200 if ptype in ("full", "short") else 3000
+    # Analisi completa e Short sono i report di punta (budget token più alto):
+    # ragionamento più profondo lì; gli altri power prompt restano a un livello medio.
+    effort = "high" if ptype in ("full", "short") else "medium"
     try:
         resp = None
         import re as _re_tpm
@@ -3234,7 +3237,7 @@ async def api_power_prompt(ticker: str, type: str = ""):
             try:
                 resp = await groq_client.chat.completions.create(
                     model="openai/gpt-oss-120b", max_tokens=max_tok,
-                    reasoning_effort="low", messages=messages,
+                    reasoning_effort=effort, messages=messages,
                 )
                 break
             except Exception as tpm_err:
