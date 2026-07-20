@@ -125,6 +125,11 @@ def get_full_analysis(ticker: str) -> dict | None:
             "dividend_yield":info.get("dividendYield"),
             "market_cap":    info.get("marketCap"),
             "roe":           info.get("returnOnEquity"),
+            # Crescita e multipli aggiuntivi — stesso 'info' già scaricato, nessuna chiamata extra
+            "revenue_growth": info.get("revenueGrowth"),
+            "eps_growth":     info.get("earningsGrowth"),
+            "price_to_sales": info.get("priceToSalesTrailing12Months"),
+            "ev_ebitda":      info.get("enterpriseToEbitda"),
         }
     except Exception as e:
         print(f"[analyzer] Errore per {ticker}: {e}")

@@ -2030,14 +2030,37 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
                 extra += f"Rendimento ultimi {win}: {hor_ret:+.0f}%. "
             if pos_range is not None:
                 extra += f"Posizione nel range {win}: {pos_range:.0f}% (0=minimo, 100=massimo). "
+            pe = data.get("pe_ratio")
+            pe_s = f"{pe:.1f}" if pe else "N/D"
+            vol_num = data.get("volatility")
+            vol_s = f"{vol_num:.0f}%" if vol_num is not None else "N/D"
+            up52 = data.get("upside_52w")
+            up52_s = f"{up52:+.1f}%" if up52 is not None else "N/D"
+            week_ret = data.get("week_return")
+            week_ret_s = f"{week_ret:+.1f}%" if week_ret is not None else "N/D"
+            ytd = data.get("ytd_return")
+            ytd_s = f"{ytd:+.1f}%" if ytd is not None else "N/D"
+            score = data.get("score_10")
+            score_s = f"{score:.1f}/10" if score is not None else "N/D"
+            sector = data.get("sector") or "N/D"
+            revg = data.get("revenue_growth")
+            revg_s = f"{revg*100:+.1f}%" if revg is not None else "N/D"
+            epsg = data.get("eps_growth")
+            epsg_s = f"{epsg*100:+.1f}%" if epsg is not None else "N/D"
             prompt = (
                 f"Valuta se comprare {t} ({data.get('name',t)}) con un orizzonte di {oriz}. "
                 f"Giudica il POTENZIALE di crescita su {oriz}, NON i prossimi giorni.\n"
-                f"Prezzo {sym}{cur:.2f}, RSI {data.get('rsi',50):.0f}, rischio {data.get('risk_level','N/D')}, "
-                f"mese {(data.get('month_return') or 0):+.1f}%, "
+                f"Prezzo {sym}{cur:.2f}, RSI {data.get('rsi',50):.0f}, rischio {data.get('risk_level','N/D')} "
+                f"(volatilità {vol_s}), settore {sector}, P/E {pe_s}, crescita ricavi {revg_s}, "
+                f"crescita EPS {epsg_s}, punteggio qualità {score_s}.\n"
+                f"Momentum: settimana {week_ret_s}, mese {(data.get('month_return') or 0):+.1f}%, YTD {ytd_s}, "
+                f"distanza dal massimo 52 settimane {up52_s}.\n"
                 f"supporto {sym}{(support or 0):.2f}, resistenza {sym}{(resistance or 0):.2f}, "
                 f"sentiment {data.get('news_sentiment_label','N/D')}, earnings {data.get('next_earnings_str','N/D')}.\n"
                 f"{extra}\n"
+                "Pesa la VALUTAZIONE (P/E) insieme alla CRESCITA e al momentum: un titolo con ottimo momentum e "
+                "buona crescita ma P/E molto alto sconta già molte buone notizie, quindi il potenziale di "
+                "ulteriore rialzo è più limitato — non basarti solo su RSI e trend recente.\n"
                 "SII DECISO. Se il quadro favorisce un rialzo nell'orizzonte indicato → VERDETTO COMPRA. "
                 "Se è chiaramente sfavorevole → NON COMPRARE. Usa ASPETTA SOLO se i dati sono davvero in equilibrio, "
                 "NON come scappatoia prudente.\n"
@@ -2838,7 +2861,12 @@ async def api_deep_analysis(ticker: str):
         f" | ROE: {_v(data.get('roe'))}\n"
         f"- Margine netto: {_v(data.get('profit_margin'))} | Debito/Equity: {_v(data.get('debt_equity'))}"
         f" | Dividend yield: {_v(data.get('dividend_yield'))}\n"
-        f"- Market cap: {_big(data.get('market_cap'))} | Ricavi: {_big(data.get('revenue'))}\n\n"
+        f"- Market cap: {_big(data.get('market_cap'))} | Ricavi: {_big(data.get('revenue'))}\n"
+        f"- Crescita ricavi: {_v(data.get('revenue_growth') and data['revenue_growth']*100, '{:+.1f}%')}"
+        f" | Crescita EPS: {_v(data.get('eps_growth') and data['eps_growth']*100, '{:+.1f}%')}"
+        f" | P/S: {_v(data.get('price_to_sales'))} | EV/EBITDA: {_v(data.get('ev_ebitda'))}\n\n"
+        "Valuta la CRESCITA insieme alla VALUTAZIONE (P/E, P/S, EV/EBITDA): buona crescita già prezzata in "
+        "multipli elevati ha meno margine di sorpresa positiva rispetto a crescita simile a multipli più bassi.\n\n"
         f"EVENTI E SENTIMENT:\n"
         f"- Prossimi earnings: {data.get('next_earnings_str', 'N/D')} | Sentiment news: {data.get('news_sentiment_label', 'N/D')}\n"
         f"- Notizie recenti (reali):\n{news_str}\n"
