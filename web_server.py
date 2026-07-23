@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from analyzer import get_enriched_analysis, scan_cheap_stocks, get_longterm_analysis, wilder_rsi
+import institutional as INST
 
 # Carica le variabili dal file .env se presente (utile per l'esecuzione in locale).
 try:
@@ -34,6 +35,8 @@ STATIC = Path(__file__).parent / "static"
 HISTORY_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "analysis_history.json"
 SCAN_FILE    = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "last_scan.json"
 WEB_USERS_FILE = Path(__file__).parent / "web_users.json"
+INSTITUTIONAL_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "institutional_13f.json"
+SECTOR_ROTATION_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "sector_rotation.json"
 
 app = FastAPI(title="Stock Bot Dashboard", docs_url=None, redoc_url=None)
 
@@ -64,6 +67,19 @@ async def _startup_load_cache():
                 print(f"[startup] Caricati {len(data)} titoli — dati di oggi: {scan_is_today}")
         except Exception as e:
             print(f"[startup] Impossibile caricare last_scan.json: {e}")
+
+    # Precarica 13F/rotazione settoriale da disco se risalgono a oggi, così il
+    # primo utente della giornata non aspetta un giro completo su SEC/yfinance.
+    for f, cache_key in ((INSTITUTIONAL_FILE, "13f:all"), (SECTOR_ROTATION_FILE, "sector:rotation")):
+        if not f.exists():
+            continue
+        try:
+            mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=ROME)
+            if mtime.date() == datetime.now(ROME).date():
+                _store(cache_key, json.loads(f.read_text(encoding="utf-8")))
+                print(f"[startup] Precaricato {f.name} (dati di oggi)")
+        except Exception as e:
+            print(f"[startup] Impossibile precaricare {f.name}: {e}")
 
     # ── Analisi A RICHIESTA: NON lanciamo nessuno scan in automatico. ──
     # Lo scan parte solo quando l'utente clicca "Analizza ora" (→ chiamata a /api/scan,
@@ -282,6 +298,10 @@ _STOCK_TTL    = 180    # 3 min — analisi singola
 _AI_TTL       = 600    # 10 min — AI (chiamata Groq costosa)
 _FORECAST_TTL = 14400  # 4 h — previsione 7 giorni
 _FX_TTL       = 3600   # 1 h — tasso di cambio EUR/USD
+_13F_TTL      = 86400  # 24h — dati trimestrali (~45gg di ritardo SEC), nessun motivo di rifetch più spesso
+_CONGRESS_TTL = 21600  # 6h — trade del Congresso, poche novità/giorno
+_SECTOR_TTL   = 3600   # 1h — rotazione settoriale, rilevante intraday ma non tick-by-tick
+_UVOL_TTL     = 900    # 15 min — il volume anomalo cambia durante la sessione
 
 
 def _cached(key: str, ttl: int):
@@ -347,6 +367,37 @@ _MOVERS_TICKERS: dict = {
 
 # Flat list per backwards-compat (/api/heatmap rimane funzionante)
 _HEATMAP_TICKERS = [t for tlist in _MOVERS_TICKERS.values() for t in tlist]
+
+
+# ─── Smart money: 13F/rotazione settoriale, cache lunga + persistenza su disco ─
+def _get_13f_holdings() -> dict:
+    """Tutti i filer tracciati (institutional.py), on-demand con TTL 24h.
+    Persiste su disco così un riavvio non forza subito un giro completo su SEC."""
+    key = "13f:all"
+    if (c := _cached(key, _13F_TTL)) is not None:
+        return c
+    data = INST.refresh_all_13f_holdings()
+    if data:
+        _store(key, data)
+        try:
+            INSTITUTIONAL_FILE.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        except Exception as e:
+            print(f"[institutional] Errore salvataggio 13F su disco: {e}")
+    return data
+
+
+def _get_sector_rotation() -> list:
+    key = "sector:rotation"
+    if (c := _cached(key, _SECTOR_TTL)) is not None:
+        return c
+    data = INST.compute_sector_rotation()
+    if data:
+        _store(key, data)
+        try:
+            SECTOR_ROTATION_FILE.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        except Exception as e:
+            print(f"[institutional] Errore salvataggio rotazione settoriale su disco: {e}")
+    return data
 
 _INTRADAY_INTERVALS = {"1m","2m","5m","15m","30m","60m","90m","1h"}
 
@@ -2032,6 +2083,25 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
     if data.get("news_sentiment_label"):
         catalysts.append("📰 Sentiment news: " + data["news_sentiment_label"])
 
+    # Smart money: 13F dei filer tracciati + rotazione settoriale + volume anomalo.
+    # Dati già cachati (nessuna nuova chiamata SEC per singolo ticker dopo il primo giro).
+    holdings13f = await asyncio.to_thread(_get_13f_holdings)
+    sector_rot = await asyncio.to_thread(_get_sector_rotation)
+    uvol = await asyncio.to_thread(INST.compute_unusual_volume, [t])
+    smart = INST.get_smart_money_context(
+        t, data.get("name", t), holdings13f, sector_rot,
+        sector=data.get("sector"), volume_ratio=uvol[0]["volume_ratio"] if uvol else None,
+    )
+    smart_bits = []
+    if smart["institutional"]["holders"]:
+        names = ", ".join(h["filer"] for h in smart["institutional"]["holders"][:4])
+        smart_bits.append(f"detenuto da (13F): {names}")
+    if smart["sector_rotation"]:
+        smart_bits.append(f"settore #{smart['sector_rotation']['rank_1m']}/11 per momentum 1m")
+    if smart["unusual_volume"]["flag"]:
+        smart_bits.append(f"volume oggi {smart['unusual_volume']['ratio']:.1f}x la media")
+    smart_line = "; ".join(smart_bits) if smart_bits else "nessun filer tracciato lo detiene, niente di anomalo"
+
     verdict, conf, reasoning = "ASPETTA", 60, ""
     if groq_client:
         try:
@@ -2069,6 +2139,7 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
                 f"distanza dal massimo 52 settimane {up52_s}.\n"
                 f"supporto {sym}{(support or 0):.2f}, resistenza {sym}{(resistance or 0):.2f}, "
                 f"sentiment {data.get('news_sentiment_label','N/D')}, earnings {data.get('next_earnings_str','N/D')}.\n"
+                f"Smart money: {smart_line}.\n"
                 f"{extra}\n"
                 "Pesa la VALUTAZIONE (P/E) insieme alla CRESCITA e al momentum: un titolo con ottimo momentum e "
                 "buona crescita ma P/E molto alto sconta già molte buone notizie, quindi il potenziale di "
@@ -2318,6 +2389,9 @@ async def api_deep_report(ticker: str):
     if not groq_client:
         return JSONResponse({"error": "AI non disponibile"}, status_code=503)
 
+    holdings13f = await asyncio.to_thread(_get_13f_holdings)
+    sector_rot = await asyncio.to_thread(_get_sector_rotation)
+
     def _ctx():
         import yfinance as yf
         try:
@@ -2327,6 +2401,34 @@ async def api_deep_report(ticker: str):
         g = info.get
         pct = lambda v: f"{v*100:.1f}%" if isinstance(v, (int, float)) else "N/D"
         price = g("currentPrice") or g("regularMarketPrice") or 0
+
+        uvol = INST.compute_unusual_volume([t])
+        vol_ratio = uvol[0]["volume_ratio"] if uvol else None
+        smart = INST.get_smart_money_context(
+            t, g("longName") or g("shortName") or t, holdings13f, sector_rot,
+            sector=g("sector"), volume_ratio=vol_ratio,
+        )
+        holders = smart["institutional"]["holders"]
+        holders_str = (", ".join(f"{h['filer']} (${h['value_usd']/1e9:.1f}B)" for h in holders[:5])
+                       if holders else "nessuno dei filer tracciati (Berkshire, Renaissance, Bridgewater, "
+                       "Citadel, Scion, Tiger Global, Soros, ARK, Pershing Square, NVIDIA, Alphabet)")
+        as_of_13f = _latest_13f_date(holdings13f) or "N/D"
+        sec_rank = smart["sector_rotation"]
+        sector_str = (f"settore {sec_rank['sector']} #{sec_rank['rank_1m']}/11 per momentum 1m "
+                      f"({sec_rank['rel_to_spy_1m']:+.1f}% vs SPY)") if sec_rank else "N/D"
+        uvol_str = f"{vol_ratio:.1f}x la media" if vol_ratio is not None else "N/D"
+
+        try:
+            idf = yf.Ticker(t).insider_transactions
+            insider_rows = [] if idf is None or idf.empty else [
+                f"{str(r.get('Insider',''))[:30]} ({str(r.get('Relationship',''))[:20]}): "
+                f"{r.get('Transaction','')} {int(r.get('Shares',0) or 0):,} az."
+                for _, r in idf.head(5).iterrows()
+            ]
+        except Exception:
+            insider_rows = []
+        insider_str = "; ".join(insider_rows) if insider_rows else "nessuna transazione insider recente nei dati"
+
         return info, (
             f"Titolo: {t} ({g('shortName') or t})\n"
             f"Settore: {g('sector','N/D')} / {g('industry','N/D')}\n"
@@ -2338,6 +2440,10 @@ async def api_deep_report(ticker: str):
             f"Target analisti: media ${g('targetMeanPrice','N/D')} (min ${g('targetLowPrice','N/D')} - max ${g('targetHighPrice','N/D')}), rating {g('recommendationKey','N/D')}, {g('numberOfAnalystOpinions','N/D')} analisti\n"
             f"Ownership: istituzionali {pct(g('heldPercentInstitutions'))}, insider {pct(g('heldPercentInsiders'))}, short float {pct(g('shortPercentOfFloat'))}\n"
             f"Dividendo: {g('dividendYield','N/D')}\n"
+            f"Insider (Form 4 reali, ultime transazioni): {insider_str}\n"
+            f"Smart money — 13F (dati SEC, filing del {as_of_13f}, ~45gg di ritardo per legge): {holders_str}\n"
+            f"Rotazione settoriale: {sector_str}\n"
+            f"Volume oggi: {uvol_str}\n"
             f"Business: {(g('longBusinessSummary') or '')[:600]}\n"
         )
 
@@ -2355,9 +2461,12 @@ async def api_deep_report(ticker: str):
         "FINANCIALS|/20: [ricavi, margini, cash flow, diluizione — punteggio su 20]\n"
         "GROWTH|/20: [mercato (TAM), catalizzatori futuri, scenari — punteggio su 20]\n"
         "VALUATION|/15: [multipli, è caro o economico, setup d'ingresso — punteggio su 15]\n"
-        "INSIDER: [attività insider: acquisti, pattern di vendita, ownership]\n"
-        "SMART_MONEY|/20: [istituzionali, validazione strategica/governativa — punteggio su 20]\n"
-        "POLITICAL: [trade del Congresso, venti di policy a favore/contro]\n"
+        "INSIDER: [usa SOLO le transazioni insider fornite sopra; se non ce ne sono dillo esplicitamente]\n"
+        "SMART_MONEY|/20: [usa SOLO i dati 13F forniti sopra — quali fondi tracciati detengono il titolo "
+        "e per quanto; se nessun fondo tracciato lo detiene, dillo esplicitamente e assegna un punteggio "
+        "neutro, NON inventare — punteggio su 20]\n"
+        "POLITICAL: [trade del Congresso — dato non ancora disponibile in questa versione: dillo "
+        "esplicitamente, NON inventare trade o nomi di politici]\n"
         "ALTERNATIVES: [confronto con i concorrenti/peer del settore]\n"
         "RISK: [3 rischi principali, ognuno con severità ALTA/MEDIA/BASSA]\n"
         "FINAL_SCORE|/100: [punteggio composito su 100 + decisione finale COMPRA o EVITA]\n"
@@ -3677,6 +3786,99 @@ async def api_market_movers():
     data = await asyncio.to_thread(_get)
     _store(key, data)
     return _clean(data)
+
+
+# ─── Smart Money: 13F istituzionali/hedge fund, rotazione settoriale, volume ──
+@app.get("/api/smart-money/filers")
+async def api_smart_money_filers():
+    """Filer 13F tracciati (hedge fund + Google/Alphabet + NVIDIA), top 10
+    posizioni ciascuno. Dati trimestrali SEC, ~45gg di ritardo per legge."""
+    holdings = await asyncio.to_thread(_get_13f_holdings)
+    out = []
+    for cik, entry in holdings.items():
+        out.append({
+            "cik": cik,
+            "filer": entry.get("filer"),
+            "filed_date": entry.get("filed_date"),
+            "top_holdings": entry.get("holdings", [])[:10],
+            "total_positions": len(entry.get("holdings", [])),
+        })
+    out.sort(key=lambda f: f["filer"] or "")
+    return _clean(out)
+
+
+@app.get("/api/smart-money/filers/{cik}")
+async def api_smart_money_filer_detail(cik: str):
+    """Elenco completo delle posizioni di un singolo filer tracciato."""
+    holdings = await asyncio.to_thread(_get_13f_holdings)
+    entry = holdings.get(cik)
+    if not entry:
+        return JSONResponse({"error": "Filer non trovato o dati non ancora disponibili"}, status_code=404)
+    return _clean({"cik": cik, **entry})
+
+
+@app.get("/api/smart-money/sector-rotation")
+async def api_smart_money_sector_rotation():
+    """Rotazione settoriale: performance relativa a SPY dei 11 ETF settoriali SPDR."""
+    data = await asyncio.to_thread(_get_sector_rotation)
+    return _clean(data)
+
+
+@app.get("/api/smart-money/unusual-volume")
+async def api_smart_money_unusual_volume():
+    """Titoli con volume anomalo oggi, dall'universo di /api/market/movers. Cache 15 min."""
+    key = "smart:unusual-volume"
+    if (c := _cached(key, _UVOL_TTL)) is not None:
+        return c
+    data = await asyncio.to_thread(INST.compute_unusual_volume, _HEATMAP_TICKERS)
+    _store(key, data)
+    return _clean(data)
+
+
+@app.get("/api/smart-money/congress")
+async def api_smart_money_congress():
+    """Trade recenti del Congresso — fase 2, non ancora disponibile finché la
+    API key FMP non è confermata funzionante sul piano gratuito."""
+    trades = await asyncio.to_thread(INST.fetch_congress_trades_recent)
+    return {"available": bool(trades), "trades": trades or []}
+
+
+@app.get("/api/stock/{ticker}/smart-money")
+async def api_stock_smart_money(ticker: str):
+    """Cross-reference per un singolo titolo: quali filer tracciati lo detengono,
+    posizione nella rotazione settoriale, volume anomalo, trade del Congresso."""
+    t = ticker.upper()
+    key = f"smart:{t}"
+    if (c := _cached(key, _UVOL_TTL)) is not None:
+        return c
+
+    def _company_and_sector():
+        import yfinance as yf
+        try:
+            info = yf.Ticker(t).info or {}
+        except Exception:
+            info = {}
+        return info.get("longName") or info.get("shortName") or t, info.get("sector")
+
+    name, sector = await asyncio.to_thread(_company_and_sector)
+    holdings = await asyncio.to_thread(_get_13f_holdings)
+    rotation = await asyncio.to_thread(_get_sector_rotation)
+    uvol = await asyncio.to_thread(INST.compute_unusual_volume, [t])
+    ratio = uvol[0]["volume_ratio"] if uvol else None
+    congress = await asyncio.to_thread(INST.fetch_congress_trades_recent)
+    matched_congress = INST.match_ticker_congress_trades(t, congress)
+
+    ctx = INST.get_smart_money_context(t, name, holdings, rotation, sector=sector,
+                                        volume_ratio=ratio, congress_trades=matched_congress)
+    result = {"ticker": t, "as_of_13f": _latest_13f_date(holdings), **ctx}
+    result = _clean(result)
+    _store(key, result)
+    return result
+
+
+def _latest_13f_date(holdings: dict) -> Optional[str]:
+    dates = [e.get("filed_date") for e in holdings.values() if e.get("filed_date")]
+    return max(dates) if dates else None
 
 
 @app.get("/api/search")

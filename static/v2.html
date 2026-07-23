@@ -518,6 +518,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
   <button class="tab" data-v="track"><span class="ti">🎯</span>Track record</button>
   <button class="tab" data-v="briefing"><span class="ti">▦</span>Briefing</button>
   <button class="tab" data-v="radar"><span class="ti">◎</span>Radar VIP</button>
+  <button class="tab" data-v="smart"><span class="ti">🏛</span>Smart Money</button>
 </aside>
 
 <main class="wrap">
@@ -668,6 +669,31 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
       <button class="btn" style="margin-top:16px;width:100%" onclick="runCompare()">Confronta</button>
     </div>
     <div id="cmp-res" style="margin-top:18px"></div>
+  </section>
+
+  <section data-view="smart" hidden>
+    <div class="lead"><div><div class="eyebrow">Smart Money</div><h2>Chi possiede cosa, dove va il denaro</h2>
+      <p>Holding 13F di hedge fund tracciati (più i portafogli propri di Alphabet e NVIDIA), rotazione settoriale e volume anomalo. I dati 13F sono trimestrali per legge SEC, con ~45 giorni di ritardo — mai in tempo reale.</p></div></div>
+
+    <div class="panel" style="margin-bottom:18px">
+      <h3 style="margin:0 0 12px">Fondi tracciati (13F)</h3>
+      <div id="sm-filers"><div class="lline">Caricamento…</div></div>
+    </div>
+
+    <div class="panel" style="margin-bottom:18px">
+      <h3 style="margin:0 0 12px">Rotazione settoriale <span style="font-weight:400;color:var(--dim);font-size:.8rem">(1 settimana / 1 mese / 3 mesi, vs S&amp;P 500)</span></h3>
+      <div id="sm-sectors"><div class="lline">Caricamento…</div></div>
+    </div>
+
+    <div class="panel" style="margin-bottom:18px">
+      <h3 style="margin:0 0 12px">Volume anomalo oggi</h3>
+      <div id="sm-uvol" class="grid"><div class="lline">Caricamento…</div></div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin:0 0 12px">Trade del Congresso</h3>
+      <div id="sm-congress"><div class="empty"><span class="ic">○</span><h3>Non ancora disponibile</h3><p>In arrivo — stiamo verificando una fonte dati affidabile.</p></div></div>
+    </div>
   </section>
 
 
@@ -950,6 +976,7 @@ $('#nav').addEventListener('click',e=>{const b=e.target.closest('.tab');if(!b)re
   if(!_loaded[v]){_loaded[v]=true;
     if(v==='briefing')loadBriefing();
     if(v==='radar')loadRadar();
+    if(v==='smart')loadSmart();
   }
 });
 
@@ -1055,6 +1082,7 @@ function cardHTML(s,rank){
       ${sc!=null?`<span class="score ${scl}" title="Punteggio screening (trend, momentum, RSI, volume, volatilità) — diverso dal punteggio del dettaglio titolo">${(+sc).toFixed(1)}</span>`:''}
       <span class="rk">${esc(s.risk_level||'')}</span>
       ${s.rsi!=null?`<span class="rsi">RSI ${(+s.rsi).toFixed(0)}</span>`:''}
+      ${s.volume_ratio!=null?`<span class="rsi" title="Volume di oggi rispetto alla media">Vol ${(+s.volume_ratio).toFixed(1)}x</span>`:''}
       <a class="tv-link" href="${tvUrl(s.ticker)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Apri il grafico su TradingView">📈 TV</a>
     </div></div>`;
 }
@@ -1706,6 +1734,54 @@ async function explainNews(i){
   const d=await J('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'Spiega in parole molto semplici, in 2 frasi e per un principiante, questa notizia di borsa: "'+it.title+'"',history:[]})});
   const reply=(d&&(d.reply||d.response||d.answer))||'Spiegazione non disponibile.';
   box.innerHTML='<div class="rad-exp">'+esc(reply)+'</div>';
+}
+
+// ── Smart Money ──
+async function loadSmart(){
+  loadSmartFilers();
+  loadSmartSectors();
+  loadSmartUvol();
+}
+async function loadSmartFilers(){
+  const box=$('#sm-filers');
+  const d=await J('/api/smart-money/filers');
+  const arr=Array.isArray(d)?d:[];
+  if(!arr.length){box.innerHTML='<div class="empty"><span class="ic">○</span><h3>Dati non disponibili</h3><p>Riprova tra poco — il primo caricamento dei filing SEC può richiedere qualche secondo.</p></div>';return;}
+  box.innerHTML=arr.map(f=>{
+    const rows=(f.top_holdings||[]).slice(0,6).map(h=>
+      `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line)">
+        <span>${esc(h.issuer_name)}</span><span class="mono" style="color:var(--dim)">$${(h.value_usd/1e9).toFixed(1)}B</span></div>`
+    ).join('');
+    return `<div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <b>${esc(f.filer)}</b>
+        <span style="font-size:.78rem;color:var(--dim)">${f.total_positions} posizioni · filing ${esc(f.filed_date||'—')}</span>
+      </div>
+      <div style="margin-top:6px">${rows||'<span style="color:var(--dim)">Nessuna posizione</span>'}</div>
+    </div>`;
+  }).join('');
+}
+async function loadSmartSectors(){
+  const box=$('#sm-sectors');
+  const d=await J('/api/smart-money/sector-rotation');
+  const arr=Array.isArray(d)?d:[];
+  if(!arr.length){box.innerHTML='<div class="lline">Dati non disponibili.</div>';return;}
+  box.innerHTML='<div style="display:flex;flex-direction:column;gap:6px">'+arr.map(s=>{
+    const rel=s.rel_to_spy_1m, cl=(rel??0)>=0?'pos':'neg';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <span style="min-width:26px;color:var(--dim)">#${s.rank_1m}</span>
+      <span style="flex:1"><b>${esc(s.sector)}</b> <span style="color:var(--dim);font-size:.8rem">${esc(s.etf)}</span></span>
+      <span class="mono">${fp(s.perf_1w)}</span><span class="mono">${fp(s.perf_1m)}</span><span class="mono">${fp(s.perf_3m)}</span>
+      <span class="mono ${cl}" title="Relativo a SPY, 1 mese">${fp(rel)}</span>
+    </div>`;
+  }).join('')+'</div>';
+}
+async function loadSmartUvol(){
+  const box=$('#sm-uvol');
+  const d=await J('/api/smart-money/unusual-volume');
+  const arr=Array.isArray(d)?d:[];
+  if(!arr.length){box.innerHTML='<div class="lline">Nessun volume anomalo rilevato ora.</div>';return;}
+  box.innerHTML=arr.slice(0,20).map(s=>cardHTML(s)).join('');
 }
 
 // ── Confronto ──
