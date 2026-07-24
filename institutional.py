@@ -42,7 +42,12 @@ SECTOR_ETFS = {
     "XLB": "Materials", "XLU": "Utilities", "XLRE": "Real Estate", "XLC": "Communication Services",
 }
 
-FMP_API_KEY = os.getenv("FMP_API_KEY")
+def _fmp_api_key():
+    """Letta ad ogni chiamata, non una costante a livello di modulo: web_server.py
+    importa institutional PRIMA di chiamare load_dotenv() (l'import sta in cima
+    al file, load_dotenv() qualche riga sotto) — una costante valutata all'import
+    catturerebbe sempre None anche con la chiave presente nel .env."""
+    return os.getenv("FMP_API_KEY")
 
 
 # ─── HTTP helper (stesso stile di web_server.py: urllib.request inline, no requests) ──
@@ -328,19 +333,62 @@ def compute_unusual_volume(tickers: list, threshold: float = 2.0) -> list:
     return out
 
 
-# ─── Congress trading — fase 2, bloccato su conferma del piano free FMP ────────
-def fetch_congress_trades_recent():
-    """None finché FMP_API_KEY non è impostata E non è confermato che il piano
-    free serva davvero /stable/senate-latest e /stable/house-latest (le due
-    fonti storicamente gratis — Senate/House Stock Watcher — sono entrambe morte,
-    verificato live: senatestockwatcher.com non risolve più in DNS, housestockwatcher
-    da 403 dall'inizio 2026)."""
-    if not FMP_API_KEY:
+# ─── Congress trading — via Financial Modeling Prep (piano free) ───────────────
+# Verificato dal vivo: /stable/senate-latest e /stable/house-latest funzionano
+# sul piano gratuito (200, dati reali). Il parametro 'symbol' viene IGNORATO da
+# questi endpoint (ritorna comunque la lista intera) e paginazione/limit sono
+# a pagamento (402) — quindi si prende il "latest" così com'è (~100 trade a
+# camera, qualche mese di copertura) e si filtra per ticker lato client.
+# Gli endpoint dedicati per-simbolo (/stable/senate-trading, /stable/house-trading)
+# danno 404 sul piano free — non usarli.
+def _fmp_get(path: str):
+    key = _fmp_api_key()
+    if not key:
         return None
-    # TODO fase 2: chiamare /stable/senate-latest + /stable/house-latest su
-    # financialmodelingprep.com e verificare dal vivo se il piano free li serve
-    # davvero prima di considerare questa funzione completa.
-    return None
+    url = f"https://financialmodelingprep.com/stable/{path}"
+    sep = "&" if "?" in path else "?"
+    try:
+        data = json.loads(_sec_get(f"{url}{sep}apikey={key}", timeout=15))
+        return data if isinstance(data, list) else None
+    except Exception as e:
+        print(f"[institutional] FMP {path} fallito: {e}")
+        return None
+
+
+def _normalize_congress_rows(rows: list, chamber: str) -> list:
+    """Righe grezze FMP → schema interno. Separata dall'I/O così è testabile
+    senza rete. Esclude opzioni/municipal bond: non sono 'azioni' per il
+    cross-reference per ticker."""
+    out = []
+    for r in rows or []:
+        sym = (r.get("symbol") or "").strip()
+        asset_type = (r.get("assetType") or "").strip()
+        if not sym or asset_type in ("Stock Option", "Municipal Security"):
+            continue
+        out.append({
+            "ticker": sym.upper(),
+            "chamber": chamber,
+            "politician": f"{r.get('firstName','')} {r.get('lastName','')}".strip() or r.get("office", "N/D"),
+            "transaction_date": r.get("transactionDate"),
+            "disclosure_date": r.get("disclosureDate"),
+            "type": r.get("type"),
+            "amount": r.get("amount"),
+            "asset": r.get("assetDescription"),
+        })
+    return out
+
+
+def fetch_congress_trades_recent():
+    """Trade recenti di Senato+Camera, formato normalizzato. None se la chiave
+    manca o entrambe le chiamate falliscono."""
+    if not _fmp_api_key():
+        return None
+    senate = _fmp_get("senate-latest") or []
+    house = _fmp_get("house-latest") or []
+    if not senate and not house:
+        return None
+
+    return _normalize_congress_rows(senate, "Senato") + _normalize_congress_rows(house, "Camera")
 
 
 def match_ticker_congress_trades(ticker: str, all_trades) -> list:

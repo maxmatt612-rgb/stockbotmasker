@@ -37,6 +37,7 @@ SCAN_FILE    = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "last_s
 WEB_USERS_FILE = Path(__file__).parent / "web_users.json"
 INSTITUTIONAL_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "institutional_13f.json"
 SECTOR_ROTATION_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "sector_rotation.json"
+CONGRESS_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "congress_trades.json"
 
 app = FastAPI(title="Stock Bot Dashboard", docs_url=None, redoc_url=None)
 
@@ -70,7 +71,8 @@ async def _startup_load_cache():
 
     # Precarica 13F/rotazione settoriale da disco se risalgono a oggi, così il
     # primo utente della giornata non aspetta un giro completo su SEC/yfinance.
-    for f, cache_key in ((INSTITUTIONAL_FILE, "13f:all"), (SECTOR_ROTATION_FILE, "sector:rotation")):
+    for f, cache_key in ((INSTITUTIONAL_FILE, "13f:all"), (SECTOR_ROTATION_FILE, "sector:rotation"),
+                         (CONGRESS_FILE, "congress:all")):
         if not f.exists():
             continue
         try:
@@ -398,6 +400,22 @@ def _get_sector_rotation() -> list:
         except Exception as e:
             print(f"[institutional] Errore salvataggio rotazione settoriale su disco: {e}")
     return data
+
+def _get_congress_trades() -> list:
+    """Trade recenti di Senato+Camera (institutional.py, via FMP), TTL 6h.
+    None/[] se FMP_API_KEY non è impostata."""
+    key = "congress:all"
+    if (c := _cached(key, _CONGRESS_TTL)) is not None:
+        return c
+    data = INST.fetch_congress_trades_recent() or []
+    _store(key, data)
+    if data:
+        try:
+            CONGRESS_FILE.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        except Exception as e:
+            print(f"[institutional] Errore salvataggio congress trades su disco: {e}")
+    return data
+
 
 _INTRADAY_INTERVALS = {"1m","2m","5m","15m","30m","60m","90m","1h"}
 
@@ -2088,9 +2106,12 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
     holdings13f = await asyncio.to_thread(_get_13f_holdings)
     sector_rot = await asyncio.to_thread(_get_sector_rotation)
     uvol = await asyncio.to_thread(INST.compute_unusual_volume, [t])
+    congress = await asyncio.to_thread(_get_congress_trades)
+    matched_congress = INST.match_ticker_congress_trades(t, congress)
     smart = INST.get_smart_money_context(
         t, data.get("name", t), holdings13f, sector_rot,
         sector=data.get("sector"), volume_ratio=uvol[0]["volume_ratio"] if uvol else None,
+        congress_trades=matched_congress,
     )
     smart_bits = []
     if smart["institutional"]["holders"]:
@@ -2100,6 +2121,9 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
         smart_bits.append(f"settore #{smart['sector_rotation']['rank_1m']}/11 per momentum 1m")
     if smart["unusual_volume"]["flag"]:
         smart_bits.append(f"volume oggi {smart['unusual_volume']['ratio']:.1f}x la media")
+    if smart["congress"]["available"]:
+        pol = smart["congress"]["trades"][0]
+        smart_bits.append(f"Congresso: {pol['politician']} ({pol['chamber']}) {pol['type']} {pol['transaction_date']}")
     smart_line = "; ".join(smart_bits) if smart_bits else "nessun filer tracciato lo detiene, niente di anomalo"
 
     verdict, conf, reasoning = "ASPETTA", 60, ""
@@ -2391,6 +2415,8 @@ async def api_deep_report(ticker: str):
 
     holdings13f = await asyncio.to_thread(_get_13f_holdings)
     sector_rot = await asyncio.to_thread(_get_sector_rotation)
+    congress_all = await asyncio.to_thread(_get_congress_trades)
+    matched_congress = INST.match_ticker_congress_trades(t, congress_all)
 
     def _ctx():
         import yfinance as yf
@@ -2406,7 +2432,7 @@ async def api_deep_report(ticker: str):
         vol_ratio = uvol[0]["volume_ratio"] if uvol else None
         smart = INST.get_smart_money_context(
             t, g("longName") or g("shortName") or t, holdings13f, sector_rot,
-            sector=g("sector"), volume_ratio=vol_ratio,
+            sector=g("sector"), volume_ratio=vol_ratio, congress_trades=matched_congress,
         )
         holders = smart["institutional"]["holders"]
         holders_str = (", ".join(f"{h['filer']} (${h['value_usd']/1e9:.1f}B)" for h in holders[:5])
@@ -2417,6 +2443,13 @@ async def api_deep_report(ticker: str):
         sector_str = (f"settore {sec_rank['sector']} #{sec_rank['rank_1m']}/11 per momentum 1m "
                       f"({sec_rank['rel_to_spy_1m']:+.1f}% vs SPY)") if sec_rank else "N/D"
         uvol_str = f"{vol_ratio:.1f}x la media" if vol_ratio is not None else "N/D"
+        if smart["congress"]["available"]:
+            political_str = "; ".join(
+                f"{tr['politician']} ({tr['chamber']}): {tr['type']} il {tr['transaction_date']} ({tr['amount']})"
+                for tr in smart["congress"]["trades"][:5]
+            )
+        else:
+            political_str = "nessun trade recente nei dati disponibili (copertura limitata agli ultimi mesi)"
 
         try:
             idf = yf.Ticker(t).insider_transactions
@@ -2444,6 +2477,7 @@ async def api_deep_report(ticker: str):
             f"Smart money — 13F (dati SEC, filing del {as_of_13f}, ~45gg di ritardo per legge): {holders_str}\n"
             f"Rotazione settoriale: {sector_str}\n"
             f"Volume oggi: {uvol_str}\n"
+            f"Trade del Congresso (dati reali, copertura ultimi mesi): {political_str}\n"
             f"Business: {(g('longBusinessSummary') or '')[:600]}\n"
         )
 
@@ -2465,8 +2499,8 @@ async def api_deep_report(ticker: str):
         "SMART_MONEY|/20: [usa SOLO i dati 13F forniti sopra — quali fondi tracciati detengono il titolo "
         "e per quanto; se nessun fondo tracciato lo detiene, dillo esplicitamente e assegna un punteggio "
         "neutro, NON inventare — punteggio su 20]\n"
-        "POLITICAL: [trade del Congresso — dato non ancora disponibile in questa versione: dillo "
-        "esplicitamente, NON inventare trade o nomi di politici]\n"
+        "POLITICAL: [usa SOLO i trade del Congresso forniti sopra — chi, quando, che tipo; se non ce ne "
+        "sono nei dati forniti dillo esplicitamente, NON inventare trade o nomi di politici]\n"
         "ALTERNATIVES: [confronto con i concorrenti/peer del settore]\n"
         "RISK: [3 rischi principali, ognuno con severità ALTA/MEDIA/BASSA]\n"
         "FINAL_SCORE|/100: [punteggio composito su 100 + decisione finale COMPRA o EVITA]\n"
@@ -3837,10 +3871,11 @@ async def api_smart_money_unusual_volume():
 
 @app.get("/api/smart-money/congress")
 async def api_smart_money_congress():
-    """Trade recenti del Congresso — fase 2, non ancora disponibile finché la
-    API key FMP non è confermata funzionante sul piano gratuito."""
-    trades = await asyncio.to_thread(INST.fetch_congress_trades_recent)
-    return {"available": bool(trades), "trades": trades or []}
+    """Trade recenti di Senato+Camera via FMP (piano gratuito). Copertura limitata
+    agli ultimi ~100 trade a camera (paginazione/filtri sono a pagamento su FMP);
+    {"available": false} se FMP_API_KEY non è impostata."""
+    trades = await asyncio.to_thread(_get_congress_trades)
+    return {"available": bool(trades), "trades": trades}
 
 
 @app.get("/api/stock/{ticker}/smart-money")
@@ -3865,7 +3900,7 @@ async def api_stock_smart_money(ticker: str):
     rotation = await asyncio.to_thread(_get_sector_rotation)
     uvol = await asyncio.to_thread(INST.compute_unusual_volume, [t])
     ratio = uvol[0]["volume_ratio"] if uvol else None
-    congress = await asyncio.to_thread(INST.fetch_congress_trades_recent)
+    congress = await asyncio.to_thread(_get_congress_trades)
     matched_congress = INST.match_ticker_congress_trades(t, congress)
 
     ctx = INST.get_smart_money_context(t, name, holdings, rotation, sector=sector,

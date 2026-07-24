@@ -1741,6 +1741,7 @@ async function loadSmart(){
   loadSmartFilers();
   loadSmartSectors();
   loadSmartUvol();
+  loadSmartCongress();
 }
 async function loadSmartFilers(){
   const box=$('#sm-filers');
@@ -1782,6 +1783,24 @@ async function loadSmartUvol(){
   const arr=Array.isArray(d)?d:[];
   if(!arr.length){box.innerHTML='<div class="lline">Nessun volume anomalo rilevato ora.</div>';return;}
   box.innerHTML=arr.slice(0,20).map(s=>cardHTML(s)).join('');
+}
+async function loadSmartCongress(){
+  const box=$('#sm-congress');
+  const d=await J('/api/smart-money/congress');
+  const trades=(d&&d.available&&Array.isArray(d.trades))?d.trades:[];
+  if(!trades.length){
+    box.innerHTML='<div class="empty"><span class="ic">○</span><h3>Non ancora disponibile</h3><p>In arrivo — stiamo verificando una fonte dati affidabile.</p></div>';
+    return;
+  }
+  box.innerHTML='<div style="display:flex;flex-direction:column;gap:6px">'+trades.slice(0,40).map(tr=>{
+    const cl=(tr.type||'').toLowerCase().includes('sale')?'neg':'pos';
+    return `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)">
+      <span style="flex:1"><span class="card-tk" style="cursor:pointer;font-size:.95rem" onclick="openStock('${esc(tr.ticker)}')">${esc(tr.ticker)}</span>
+        <span style="color:var(--dim);font-size:.82rem"> · ${esc(tr.politician||'')} (${esc(tr.chamber||'')})</span></span>
+      <span class="mono ${cl}" style="font-size:.85rem">${esc(tr.type||'')}</span>
+      <span style="color:var(--dim);font-size:.78rem;white-space:nowrap">${esc(tr.transaction_date||'')}</span>
+    </div>`;
+  }).join('')+'</div>';
 }
 
 // ── Confronto ──

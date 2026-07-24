@@ -160,3 +160,61 @@ def test_get_smart_money_context_shape_with_no_data():
     assert ctx["sector_rotation"] is None
     assert ctx["unusual_volume"]["flag"] is False
     assert ctx["congress"]["available"] is False
+
+
+# ─── Congress trading (FMP) ─────────────────────────────────────────────────
+FMP_SAMPLE_ROWS = [
+    {"symbol": "AAPL", "assetType": "Stock", "firstName": "Dan", "lastName": "Crenshaw",
+     "office": "Dan Crenshaw", "transactionDate": "2026-06-01", "disclosureDate": "2026-07-17",
+     "type": "Sale", "amount": "$1,001 - $15,000", "assetDescription": "Apple Inc"},
+    {"symbol": "FMCC", "assetType": "Municipal Security", "firstName": "Debbie", "lastName": "Dingell",
+     "office": "Debbie Dingell", "transactionDate": "2026-07-14", "disclosureDate": "2026-07-23",
+     "type": "Purchase", "amount": "$15,001 - $50,000", "assetDescription": "Federal Home Loan Mortgage Corp"},
+    {"symbol": "TSLA", "assetType": "Stock Option", "firstName": "Some", "lastName": "Trader",
+     "office": "Some Trader", "transactionDate": "2026-06-10", "disclosureDate": "2026-07-01",
+     "type": "Purchase", "amount": "$50,001 - $100,000", "assetDescription": "Tesla Inc Option"},
+    {"symbol": "", "assetType": "Stock", "firstName": "No", "lastName": "Symbol",
+     "transactionDate": "2026-06-10", "disclosureDate": "2026-07-01", "type": "Sale",
+     "amount": "$1,001 - $15,000", "assetDescription": "Unknown"},
+]
+
+
+def test_normalize_congress_rows_filters_options_and_municipal_bonds():
+    from institutional import _normalize_congress_rows
+
+    rows = _normalize_congress_rows(FMP_SAMPLE_ROWS, "Senato")
+    tickers = {r["ticker"] for r in rows}
+    assert tickers == {"AAPL"}  # FMCC (municipal), TSLA (option), '' (no symbol) esclusi
+
+
+def test_normalize_congress_rows_maps_fields():
+    from institutional import _normalize_congress_rows
+
+    rows = _normalize_congress_rows(FMP_SAMPLE_ROWS[:1], "Camera")
+    r = rows[0]
+    assert r == {
+        "ticker": "AAPL", "chamber": "Camera", "politician": "Dan Crenshaw",
+        "transaction_date": "2026-06-01", "disclosure_date": "2026-07-17",
+        "type": "Sale", "amount": "$1,001 - $15,000", "asset": "Apple Inc",
+    }
+
+
+def test_normalize_congress_rows_empty_input():
+    from institutional import _normalize_congress_rows
+
+    assert _normalize_congress_rows([], "Senato") == []
+    assert _normalize_congress_rows(None, "Senato") == []
+
+
+def test_match_ticker_congress_trades_filters_by_ticker():
+    from institutional import match_ticker_congress_trades
+
+    trades = [
+        {"ticker": "AAPL", "politician": "A"},
+        {"ticker": "MSFT", "politician": "B"},
+        {"ticker": "aapl", "politician": "C"},  # case-insensitive
+    ]
+    matched = match_ticker_congress_trades("AAPL", trades)
+    assert [m["politician"] for m in matched] == ["A", "C"]
+    assert match_ticker_congress_trades("AAPL", None) == []
+    assert match_ticker_congress_trades("AAPL", []) == []
