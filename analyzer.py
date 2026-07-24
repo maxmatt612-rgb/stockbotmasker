@@ -524,16 +524,23 @@ def _sign(v: float) -> str:
 _US_UNIVERSE_CACHE: list | None = None
 _US_UNIVERSE_TS: float = 0.0
 _US_UNIVERSE_TTL = 86400  # 24 h
+_US_UNIVERSE_FALLBACK_TTL = 1800  # 30 min: se il download SEC/NASDAQ fallisce e si
+# ripiega su REVOLUT_UNIVERSE (~750 ticker vs i ~6000+ del feed reale), NON va
+# trattato come "fresco" per 24h intere — altrimenti un'interruzione di rete
+# transitoria blocca lo scan su un universo molto più piccolo per un giorno intero
+# prima di riprovare il feed vero.
+_US_UNIVERSE_IS_FALLBACK: bool = False
 
 
 def _get_full_us_universe() -> list:
     """Scarica tutti i ticker azionari NASDAQ+NYSE in tempo reale (cache in RAM 24h).
     Fonte: ftp.nasdaqtrader.com — file pubblici, aggiornati ogni sera.
     Esclude automaticamente: ETF, warrant, preferred share, test issue, simboli speciali."""
-    global _US_UNIVERSE_CACHE, _US_UNIVERSE_TS
-    import urllib.request, io, csv
+    global _US_UNIVERSE_CACHE, _US_UNIVERSE_TS, _US_UNIVERSE_IS_FALLBACK
+    import urllib.request, io, csv, concurrent.futures
 
-    if _US_UNIVERSE_CACHE and (time.time() - _US_UNIVERSE_TS) < _US_UNIVERSE_TTL:
+    ttl = _US_UNIVERSE_FALLBACK_TTL if _US_UNIVERSE_IS_FALLBACK else _US_UNIVERSE_TTL
+    if _US_UNIVERSE_CACHE and (time.time() - _US_UNIVERSE_TS) < ttl:
         return _US_UNIVERSE_CACHE
 
     tickers: list[str] = []
@@ -544,10 +551,29 @@ def _get_full_us_universe() -> list:
     # Solo simboli puri: 1-5 lettere, opzionalmente .X per classe (es. BRK.B)
     _VALID = re.compile(r'^[A-Z]{1,5}(\.[A-Z])?$')
 
+    def _fetch(url: str) -> str:
+        with urllib.request.urlopen(url, timeout=15) as resp:
+            return resp.read().decode("utf-8")
+
     for url in _URLS:
         try:
-            with urllib.request.urlopen(url, timeout=15) as resp:
-                content = resp.read().decode("utf-8")
+            # timeout=15 su urlopen() da solo NON basta su questa macchina: verificato
+            # dal vivo un blocco di ~50 minuti nonostante il timeout esplicito (stesso
+            # pattern di rete instabile già visto con httpx/Telegram in questa sessione
+            # — probabile hang in fase di risoluzione DNS, che il timeout del socket non
+            # sempre copre). Deadline dura via thread separato: se non risponde entro
+            # 20s si passa oltre comunque.
+            # ATTENZIONE: NON usare "with ThreadPoolExecutor() as ex" qui — l'__exit__
+            # del context manager chiama shutdown(wait=True), che aspetta comunque il
+            # thread bloccato e vanifica il timeout (verificato dal vivo: senza questo,
+            # .result(timeout=20) solleva l'eccezione ma poi il blocco 'with' si blocca
+            # comunque in uscita). shutdown(wait=False) esplicito: il thread appeso resta
+            # in background (leak accettato, delimitato) ma non blocca la chiamata.
+            ex = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            try:
+                content = ex.submit(_fetch, url).result(timeout=20)
+            finally:
+                ex.shutdown(wait=False)
             reader = csv.DictReader(io.StringIO(content), delimiter="|")
             for row in reader:
                 sym = (row.get("Symbol") or row.get("ACT Symbol") or "").strip()
@@ -566,12 +592,16 @@ def _get_full_us_universe() -> list:
     if tickers:
         _US_UNIVERSE_CACHE = tickers
         _US_UNIVERSE_TS = time.time()
+        _US_UNIVERSE_IS_FALLBACK = False
         print(f"[universe] {len(tickers)} ticker US scaricati (NASDAQ+NYSE+AMEX)")
     else:
-        print("[universe] Download fallito — fallback lista statica da config")
         from config import REVOLUT_UNIVERSE
+        print(f"[universe] ATTENZIONE: download NASDAQ/NYSE fallito — fallback a "
+              f"REVOLUT_UNIVERSE ({len(REVOLUT_UNIVERSE)} ticker, molto più piccolo "
+              f"del feed reale). Riprovo il feed vero tra {_US_UNIVERSE_FALLBACK_TTL//60} min.")
         _US_UNIVERSE_CACHE = REVOLUT_UNIVERSE
         _US_UNIVERSE_TS = time.time()
+        _US_UNIVERSE_IS_FALLBACK = True
 
     return _US_UNIVERSE_CACHE
 
@@ -587,6 +617,21 @@ def _ticker_currency(ticker: str) -> str:
     if "." in ticker:
         return _CURRENCY_BY_SUFFIX.get(ticker.rsplit(".", 1)[-1].upper(), "USD")
     return "USD"
+
+
+def _scan_rsi_points(rsi: float, sc: dict) -> int:
+    """Punteggio RSI per lo screening di massa (scan_cheap_stocks). Catena completa,
+    senza buchi: senza le due bande 'grigie' (rsi_upper_gray/rsi_lower_gray), un RSI
+    appena fuori dalla zona ideale/pullback (es. 68 o 35) non ricadeva in nessun elif
+    e restava a 0 senza che fosse una scelta di design — bug trovato e corretto."""
+    if sc["rsi_ideal_lo"] <= rsi <= sc["rsi_ideal_hi"]:      return sc["rsi_ideal_pts"]        # zona ideale
+    if sc["rsi_pullback_lo"] <= rsi < sc["rsi_pullback_hi"]: return sc["rsi_pullback_pts"]     # pullback leggero in trend
+    if rsi > sc["rsi_extended"]:                             return sc["rsi_extended_pts"]     # esteso / ipercomprato
+    if rsi > sc["rsi_overbought"]:                           return sc["rsi_overbought_pts"]
+    if rsi > sc["rsi_ideal_hi"]:                             return sc["rsi_upper_gray_pts"]   # es. 65 < rsi <= 70
+    if rsi < sc["rsi_falling_knife"]:                        return sc["rsi_falling_knife_pts"]  # falling knife: penalizza, non premiare
+    if rsi < sc["rsi_pullback_lo"]:                           return sc["rsi_lower_gray_pts"]  # es. 30 <= rsi < 40
+    return 0  # rsi NaN: ogni confronto sopra è False, punteggio neutro invece di un crash
 
 
 def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, universe: list = None) -> list:
@@ -744,12 +789,7 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                     score += mom_pts
 
                     # 3) RSI in ZONA SANA (non gli estremi: né ipercomprato né coltello che cade)
-                    rsi_pts = 0
-                    if _sc["rsi_ideal_lo"] <= rsi <= _sc["rsi_ideal_hi"]:            rsi_pts = _sc["rsi_ideal_pts"]      # zona ideale
-                    elif _sc["rsi_pullback_lo"] <= rsi < _sc["rsi_pullback_hi"]:     rsi_pts = _sc["rsi_pullback_pts"]   # pullback leggero in trend
-                    elif rsi > _sc["rsi_extended"]:                                  rsi_pts = _sc["rsi_extended_pts"]  # esteso / ipercomprato
-                    elif rsi > _sc["rsi_overbought"]:                                rsi_pts = _sc["rsi_overbought_pts"]
-                    elif rsi < _sc["rsi_falling_knife"]:                             rsi_pts = _sc["rsi_falling_knife_pts"]  # falling knife: penalizza, non premiare
+                    rsi_pts = _scan_rsi_points(rsi, _sc)
                     score += rsi_pts
 
                     # 4) VOLUME come CONFERMA (solo se il prezzo sale) — modesto
@@ -769,6 +809,7 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
 
                     # ── Giorno della settimana: rendimento medio Mon-Fri ──────
                     dow_ret: dict[int, list] = {0:[], 1:[], 2:[], 3:[], 4:[]}
+                    dow_fail = 0
                     for i in range(1, len(close)):
                         try:
                             d = close.index[i].weekday()
@@ -776,7 +817,12 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                             if 0 <= d <= 4 and not pd.isna(r):
                                 dow_ret[d].append(r)
                         except Exception:
-                            pass
+                            dow_fail += 1
+                    if dow_fail:
+                        # loggato UNA volta per ticker (non per giorno): questo loop gira
+                        # ~85 volte per ticker, un print per iterazione rischierebbe di
+                        # inondare i log se il problema fosse sistemico (es. indice non datetime)
+                        print(f"[scan_p2] {ticker}: {dow_fail} giorni saltati nel calcolo dow_ret")
                     dow_avg = {d: round(sum(v)/len(v), 2) if v else 0.0 for d, v in dow_ret.items()}
 
                     # ── Doppio segnale (basato su qualità del trend) ──────────
@@ -849,7 +895,12 @@ def scan_cheap_stocks(max_price: float = 200.0, top_n: int | None = None, univer
                         },
                         "trade_setup": trade_setup,
                     })
-                except Exception:
+                except Exception as e:
+                    # loggato (prima era silenzioso): un singolo ticker rotto in un
+                    # chunk di 50 non deve sparire senza traccia come faceva finora,
+                    # a differenza del fallimento dell'intero chunk qui sotto che era
+                    # già loggato.
+                    print(f"[scan_p2] {ticker}: scartato per errore: {e}")
                     continue
         except Exception as e:
             print(f"[scan_p2] Errore chunk: {e}")

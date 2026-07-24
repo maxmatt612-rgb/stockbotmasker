@@ -84,6 +84,11 @@ SCORING = {
         "rsi_extended": 75, "rsi_extended_pts": -3,                    # hand-set, no backtest
         "rsi_overbought": 70, "rsi_overbought_pts": -1,                # hand-set, no backtest
         "rsi_falling_knife": 30, "rsi_falling_knife_pts": -2,          # hand-set, no backtest
+        # Le due bande sopra non coprono (rsi_ideal_hi, rsi_overbought] né
+        # [rsi_falling_knife, rsi_pullback_lo): senza queste, un RSI 68 o 35
+        # non prendeva né bonus né penalità (bug, non design — vedi analyzer.py).
+        "rsi_upper_gray_pts": -1,                                       # hand-set, no backtest
+        "rsi_lower_gray_pts": -1,                                       # hand-set, no backtest
         "vol_ratio_confirm": 1.5, "vol_confirm_pts": 1,                # hand-set, no backtest
         "volatility_healthy_lo": 15, "volatility_healthy_hi": 50, "volatility_healthy_pts": 1,  # hand-set, no backtest
         "volatility_junk": 90, "volatility_junk_pts": -2,              # hand-set, no backtest
@@ -484,7 +489,7 @@ REVOLUT_PREMIUM = [
     "XYL",    # Xylem Inc.
     # ── Crypto / Alternative ──
     "MSTR",   # MicroStrategy (Bitcoin proxy, molto volatile)
-    "MARA",   # già in lista, skip
+    # MARA non ripetuto qui: è già in REVOLUT_UNIVERSE (sezione crypto mining sopra).
 ]
 
 # Universo completo = US base + $60-100 + $100-200 + AI + Europa

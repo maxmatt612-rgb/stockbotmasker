@@ -83,13 +83,15 @@ async def _startup_load_cache():
         except Exception as e:
             print(f"[startup] Impossibile precaricare {f.name}: {e}")
 
-    # ── Analisi A RICHIESTA: NON lanciamo nessuno scan in automatico. ──
-    # Lo scan parte solo quando l'utente clicca "Analizza ora" (→ chiamata a /api/scan,
-    # che avvia _refresh_scan_background su richiesta). Nessun task di background all'avvio.
+    # ── Nessuno scan lanciato QUI, all'avvio. ──
+    # Lo scan parte quando l'utente clicca "Analizza ora" (→ /api/scan, che avvia
+    # _refresh_scan_background su richiesta) OPPURE da solo alle 07:30 nei giorni
+    # feriali via lo scheduler avviato subito sotto (_pdf_scheduler) — NON è quindi
+    # "mai automatico": è solo che l'avvio del processo in sé non ne innesca uno.
     if loaded:
-        print(f"[startup] Caricati dati salvati. Analisi on-demand: nessuno scan automatico.")
+        print(f"[startup] Caricati dati salvati. Prossimo scan: su richiesta o alle 07:30.")
     else:
-        print("[startup] Analisi on-demand: nessuno scan automatico, in attesa di richiesta.")
+        print("[startup] Nessun dato salvato. Prossimo scan: su richiesta o alle 07:30.")
 
     # Avvia lo scheduler giornaliero: 07:35 salva lo snapshot, 22:05 lo chiude.
     # Cosí lo storico (accuracy/backtest/track record) si accumula da solo,
@@ -288,6 +290,8 @@ def _write_users(d: dict):
 # ─── Cache semplice in memoria ────────────────────────────────────────────────
 _cache: dict[str, dict] = {}
 _scan_in_progress: bool = False          # evita scan concorrenti
+_scan_started_at: float = 0.0            # monotonic ts: rileva uno scan bloccato (watchdog)
+_SCAN_WATCHDOG_SEC = 900                 # 15 min: uno scan reale su ~6000 ticker non dovrebbe superarlo
 _morning_data: list = []                 # dati scan mattutino — bloccati per la giornata
 
 # ─── PDF report in memoria ────────────────────────────────────────────────────
@@ -1100,14 +1104,31 @@ async def _send_top10_rich(stocks: list, force: bool = False) -> bool:
     return ok
 
 
+def _scan_slot_busy() -> bool:
+    """True se uno scan è davvero in corso. Se _scan_in_progress è rimasto a True
+    per più di _SCAN_WATCHDOG_SEC (es. scan_cheap_stocks bloccato su una yf.download
+    di rete senza timeout), lo considera bloccato e libera lo slot invece di
+    impedire per sempre ogni scan futuro fino al riavvio del processo."""
+    global _scan_in_progress
+    if not _scan_in_progress:
+        return False
+    if time.monotonic() - _scan_started_at > _SCAN_WATCHDOG_SEC:
+        print(f"[scan_bg] Watchdog: scan bloccato da oltre {_SCAN_WATCHDOG_SEC}s, libero lo slot")
+        _scan_in_progress = False
+        return False
+    return True
+
+
 async def _refresh_scan_background(top: int):
     """Aggiorna il scan in background senza bloccare la risposta.
-    Scansiona sempre top 100 per avere un pool completo per lo screening;
-    il display mostra solo i primi `top` (default 10)."""
-    global _scan_in_progress
-    if _scan_in_progress:
+    Scansiona SEMPRE l'intero universo filtrato (nessun cap fisso a 100 — scan_cheap_stocks
+    con top_n=None restituisce tutti i candidati che passano i filtri prezzo/liquidità,
+    tipicamente qualche centinaio su ~6000 ticker); il display mostra solo i primi `top`."""
+    global _scan_in_progress, _scan_started_at
+    if _scan_slot_busy():
         return  # già in corso, skip
     _scan_in_progress = True
+    _scan_started_at = time.monotonic()
     try:
         # Analizza TUTTO l'universo (6000+): top_n=None → restituisce tutti i candidati
         print(f"[scan_bg] Avvio scan universo completo, display={top}…")
@@ -1154,7 +1175,7 @@ async def api_scan(top: int = 10):
         return stale["data"]
     # Nessun dato in cache: assicuriamoci che il background task sia avviato
     # (potrebbe non essersi avviato se il startup event ha avuto problemi).
-    if not _scan_in_progress:
+    if not _scan_slot_busy():
         asyncio.create_task(_refresh_scan_background(top))
     # Rispondi subito: il frontend mostra "in avvio" e riprova ogni 10s
     return JSONResponse([], status_code=202)
@@ -1165,7 +1186,7 @@ async def api_scan_force():
     """Invalida la cache dello scan e forza una nuova scansione in background."""
     # Rimuovi dalla cache così il prossimo /api/scan vede dati stale → refresh
     _cache.pop(_scan_key(10), None)
-    if not _scan_in_progress:
+    if not _scan_slot_busy():
         asyncio.create_task(_refresh_scan_background(10))
     return {"ok": True, "scan_in_progress": _scan_in_progress}
 
@@ -1194,9 +1215,13 @@ async def api_scan_screen(
     ai_only: bool = False,
     risk: str = "",
 ):
-    """Filtra il pool mattutino (top 100) con i parametri specificati.
+    """Filtra il pool completo dell'ultimo scan (nessun cap fisso — vedi
+    _refresh_scan_background) con i parametri specificati.
     Restituisce fino a 30 titoli che soddisfano tutti i criteri."""
-    full = (_cache.get("scan:full") or {}).get("data") or []
+    # _cached() e non _cache.get() diretto: "scan:full" deve scadere come ogni altra
+    # cache, altrimenti dopo un weekend/riavvio mancato questo endpoint continuerebbe
+    # a servire il pool di giorni prima senza alcun segnale di staleness.
+    full = _cached("scan:full", _SCAN_TTL) or []
     if not full:
         # Pool non ancora pronto (scan in corso)
         return JSONResponse([], status_code=202)
@@ -1257,8 +1282,11 @@ async def api_scan_evening():
     try:
         import yfinance as yf
         import pandas as pd
+        # auto_adjust=True: coerente con scan_cheap_stocks e _generate_evening_pdf,
+        # che usano entrambi prezzi aggiustati — con False qui, un titolo che stacca
+        # un dividendo/split tra mattina e sera avrebbe un delta_from_morning falsato.
         raw = await asyncio.to_thread(
-            lambda: yf.download(tickers, period="1d", progress=False, auto_adjust=False)
+            lambda: yf.download(tickers, period="1d", progress=False, auto_adjust=True)
         )
         if not raw.empty:
             if isinstance(raw.columns, pd.MultiIndex):
