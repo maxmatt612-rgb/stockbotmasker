@@ -3901,9 +3901,16 @@ async def api_smart_money_unusual_volume():
 async def api_smart_money_congress():
     """Trade recenti di Senato+Camera via FMP (piano gratuito). Copertura limitata
     agli ultimi ~100 trade a camera (paginazione/filtri sono a pagamento su FMP);
-    {"available": false} se FMP_API_KEY non è impostata."""
+    {"available": false} se FMP_API_KEY non è impostata.
+    "trades": feed diversificato (round-robin, max 3 a testa) per la vista
+    'attività recente' — senza, una singola disclosure bulk di una persona sola
+    riempie tutto il feed (visto dal vivo: 96 trade su 200 di un solo senatore).
+    "politicians": TUTTI i trade raggruppati per politico, non troncati — per la
+    lista cliccabile 'vedi tutti i trade di X'."""
     trades = await asyncio.to_thread(_get_congress_trades)
-    return {"available": bool(trades), "trades": trades}
+    diversified = INST.diversify_congress_feed(trades) if trades else trades
+    politicians = INST.group_congress_by_politician(trades) if trades else []
+    return {"available": bool(trades), "trades": diversified, "politicians": politicians}
 
 
 @app.get("/api/stock/{ticker}/smart-money")

@@ -218,3 +218,70 @@ def test_match_ticker_congress_trades_filters_by_ticker():
     assert [m["politician"] for m in matched] == ["A", "C"]
     assert match_ticker_congress_trades("AAPL", None) == []
     assert match_ticker_congress_trades("AAPL", []) == []
+
+
+def _congress_trade(politician, date, ticker="XYZ"):
+    return {"ticker": ticker, "politician": politician, "chamber": "Senato",
+            "transaction_date": date, "type": "Purchase", "amount": "$1,001 - $15,000"}
+
+
+def test_diversify_congress_feed_spreads_across_politicians():
+    """Regressione diretta del bug segnalato dall'utente: un politico con una
+    disclosure bulk (es. 96 trade su 200 totali, osservato dal vivo) non deve
+    monopolizzare il feed — ogni politico deve comparire prima che qualcuno
+    ne mostri un secondo."""
+    from institutional import diversify_congress_feed
+
+    trades = [_congress_trade("Bulk Filer", f"2026-03-{d:02d}") for d in range(1, 21)]  # 20 trade
+    trades += [_congress_trade("Someone Else", "2026-06-01")]  # 1 solo trade, ma più recente
+    trades += [_congress_trade("Third Person", "2026-05-01")]
+
+    out = diversify_congress_feed(trades, max_per_politician=3, limit=40)
+    politicians_in_output = {t["politician"] for t in out}
+    assert politicians_in_output == {"Bulk Filer", "Someone Else", "Third Person"}
+    # nessuno supera il tetto per persona
+    from collections import Counter
+    counts = Counter(t["politician"] for t in out)
+    assert counts["Bulk Filer"] == 3
+    assert counts["Someone Else"] == 1  # ne aveva solo 1
+    # il primo elemento in assoluto e' il trade piu' recente del politico con
+    # attivita' piu' fresca (round 0 ordinato per recency tra politici)
+    assert out[0]["politician"] == "Someone Else"
+
+
+def test_diversify_congress_feed_respects_limit():
+    from institutional import diversify_congress_feed
+
+    trades = [_congress_trade(f"Politician {i}", "2026-06-01") for i in range(50)]
+    out = diversify_congress_feed(trades, max_per_politician=3, limit=10)
+    assert len(out) == 10
+
+
+def test_diversify_congress_feed_empty():
+    from institutional import diversify_congress_feed
+
+    assert diversify_congress_feed([]) == []
+    assert diversify_congress_feed(None) == []
+
+
+def test_group_congress_by_politician_sorts_by_count_and_recency():
+    from institutional import group_congress_by_politician
+
+    trades = (
+        [_congress_trade("Bulk Filer", f"2026-03-{d:02d}") for d in range(1, 21)]  # 20 trade
+        + [_congress_trade("Someone Else", "2026-06-01")]  # 1 trade
+    )
+    groups = group_congress_by_politician(trades)
+    assert [g["politician"] for g in groups] == ["Bulk Filer", "Someone Else"]  # per count desc
+    bulk = groups[0]
+    assert bulk["trade_count"] == 20
+    assert bulk["last_trade_date"] == "2026-03-20"  # il piu' recente del gruppo
+    assert bulk["trades"][0]["transaction_date"] == "2026-03-20"
+    assert len(bulk["trades"]) == 20  # NON troncato, a differenza di diversify_congress_feed
+
+
+def test_group_congress_by_politician_empty():
+    from institutional import group_congress_by_politician
+
+    assert group_congress_by_politician([]) == []
+    assert group_congress_by_politician(None) == []

@@ -391,10 +391,64 @@ def fetch_congress_trades_recent():
     return _normalize_congress_rows(senate, "Senato") + _normalize_congress_rows(house, "Camera")
 
 
+def diversify_congress_feed(trades: list, max_per_politician: int = 3, limit: int = 40) -> list:
+    """Il feed 'ultimi trade del Congresso' perde senso se una singola disclosure
+    bulk di un politico (decine di trade nello stesso filing — capita spesso, es.
+    Alan Armstrong con 96 trade su un totale di 200 osservato dal vivo) riempie da
+    sola tutti gli slot mostrati. Round-robin per politico: prima il trade più
+    recente di OGNI politico, poi il secondo di ognuno, ecc. (fino a
+    max_per_politician), così il feed mostra varietà invece di una sola persona."""
+    from collections import defaultdict
+
+    by_politician = defaultdict(list)
+    for tr in trades or []:
+        by_politician[tr.get("politician") or "?"].append(tr)
+    for lst in by_politician.values():
+        lst.sort(key=lambda t: t.get("transaction_date") or "", reverse=True)
+    # politici ordinati per il trade più recente in assoluto, così chi ha attività
+    # più fresca appare prima nel round-robin
+    politicians = sorted(by_politician, key=lambda p: by_politician[p][0].get("transaction_date") or "", reverse=True)
+
+    out = []
+    for round_idx in range(max_per_politician):
+        for p in politicians:
+            if len(out) >= limit:
+                return out
+            if len(by_politician[p]) > round_idx:
+                out.append(by_politician[p][round_idx])
+    return out
+
+
 def match_ticker_congress_trades(ticker: str, all_trades) -> list:
     if not all_trades:
         return []
     return [tr for tr in all_trades if (tr.get("ticker") or "").upper() == ticker.upper()]
+
+
+def group_congress_by_politician(trades: list) -> list:
+    """Tutti i trade raggruppati per politico (non troncato, non diversificato —
+    a differenza di diversify_congress_feed che serve per il feed 'attività
+    recente', questo serve per la lista cliccabile 'vedi tutti i trade di X').
+    Ogni gruppo ha i trade ordinati dal più recente, ed è ordinato per numero di
+    trade decrescente."""
+    from collections import defaultdict
+
+    by_politician = defaultdict(list)
+    for tr in trades or []:
+        by_politician[tr.get("politician") or "?"].append(tr)
+    groups = []
+    for politician, lst in by_politician.items():
+        lst.sort(key=lambda t: t.get("transaction_date") or "", reverse=True)
+        chamber = lst[0].get("chamber") if lst else None
+        groups.append({
+            "politician": politician,
+            "chamber": chamber,
+            "trade_count": len(lst),
+            "last_trade_date": lst[0].get("transaction_date") if lst else None,
+            "trades": lst,
+        })
+    groups.sort(key=lambda g: g["trade_count"], reverse=True)
+    return groups
 
 
 # ─── Aggregatore per-ticker: nessuna nuova chiamata esterna, solo cross-reference

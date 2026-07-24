@@ -381,6 +381,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
 .mini-btn{background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:7px;
   padding:7px 12px;font-size:.74rem;font-weight:500;cursor:pointer;transition:.15s}
 .mini-btn:hover{background:var(--surface-3);border-color:var(--border-2)}
+.mini-btn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--text)}
 /* Watchlist + alert: card lista */
 .wl-row{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);
   border-radius:10px;padding:12px 15px;margin-bottom:9px;cursor:pointer;transition:.15s}
@@ -690,9 +691,16 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
       <div id="sm-uvol" class="grid"><div class="lline">Caricamento…</div></div>
     </div>
 
-    <div class="panel">
-      <h3 style="margin:0 0 12px">Trade del Congresso</h3>
+    <div class="panel" style="margin-bottom:18px">
+      <h3 style="margin:0 0 12px">Trade del Congresso — attività recente</h3>
       <div id="sm-congress"><div class="empty"><span class="ic">○</span><h3>Non ancora disponibile</h3><p>In arrivo — stiamo verificando una fonte dati affidabile.</p></div></div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin:0 0 4px">Trade del Congresso — per politico</h3>
+      <p style="margin:0 0 12px;color:var(--dim);font-size:.82rem">Clicca un nome per vedere tutti i suoi trade.</p>
+      <div id="sm-congress-politicians"></div>
+      <div id="sm-congress-politician-detail" style="margin-top:14px"></div>
     </div>
   </section>
 
@@ -1784,23 +1792,49 @@ async function loadSmartUvol(){
   if(!arr.length){box.innerHTML='<div class="lline">Nessun volume anomalo rilevato ora.</div>';return;}
   box.innerHTML=arr.slice(0,20).map(s=>cardHTML(s)).join('');
 }
+function congressTradeRowHTML(tr){
+  const cl=(tr.type||'').toLowerCase().includes('sale')?'neg':'pos';
+  return `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)">
+    <span style="flex:1"><span class="card-tk" style="cursor:pointer;font-size:.95rem" onclick="openStock('${esc(tr.ticker)}')">${esc(tr.ticker)}</span>
+      <span style="color:var(--dim);font-size:.82rem"> · ${esc(tr.politician||'')} (${esc(tr.chamber||'')})</span></span>
+    <span class="mono ${cl}" style="font-size:.85rem">${esc(tr.type||'')}</span>
+    <span style="color:var(--dim);font-size:.78rem;white-space:nowrap">${esc(tr.transaction_date||'')}</span>
+  </div>`;
+}
 async function loadSmartCongress(){
   const box=$('#sm-congress');
+  const listBox=$('#sm-congress-politicians');
+  const detailBox=$('#sm-congress-politician-detail');
   const d=await J('/api/smart-money/congress');
   const trades=(d&&d.available&&Array.isArray(d.trades))?d.trades:[];
+  const politicians=(d&&d.available&&Array.isArray(d.politicians))?d.politicians:[];
   if(!trades.length){
     box.innerHTML='<div class="empty"><span class="ic">○</span><h3>Non ancora disponibile</h3><p>In arrivo — stiamo verificando una fonte dati affidabile.</p></div>';
+    listBox.innerHTML='';
+    detailBox.innerHTML='';
     return;
   }
-  box.innerHTML='<div style="display:flex;flex-direction:column;gap:6px">'+trades.slice(0,40).map(tr=>{
-    const cl=(tr.type||'').toLowerCase().includes('sale')?'neg':'pos';
-    return `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)">
-      <span style="flex:1"><span class="card-tk" style="cursor:pointer;font-size:.95rem" onclick="openStock('${esc(tr.ticker)}')">${esc(tr.ticker)}</span>
-        <span style="color:var(--dim);font-size:.82rem"> · ${esc(tr.politician||'')} (${esc(tr.chamber||'')})</span></span>
-      <span class="mono ${cl}" style="font-size:.85rem">${esc(tr.type||'')}</span>
-      <span style="color:var(--dim);font-size:.78rem;white-space:nowrap">${esc(tr.transaction_date||'')}</span>
+  box.innerHTML='<div style="display:flex;flex-direction:column;gap:6px">'+trades.map(congressTradeRowHTML).join('')+'</div>';
+
+  window._congressPoliticians=politicians;
+  listBox.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px">'+politicians.map((p,i)=>
+    `<button class="mini-btn" id="sm-pol-${i}" onclick="showPoliticianTrades(${i})">
+      ${esc(p.politician)} <span style="opacity:.65">· ${esc(p.chamber||'')} · ${p.trade_count}</span>
+    </button>`
+  ).join('')+'</div>';
+  detailBox.innerHTML='';
+}
+function showPoliticianTrades(i){
+  const politicians=window._congressPoliticians||[];
+  const p=politicians[i];
+  const detailBox=$('#sm-congress-politician-detail');
+  if(!p){detailBox.innerHTML='';return;}
+  $$('.mini-btn[id^="sm-pol-"]').forEach(b=>b.classList.remove('on'));
+  const btn=$('#sm-pol-'+i); if(btn) btn.classList.add('on');
+  detailBox.innerHTML=`<h4 style="margin:0 0 8px">${esc(p.politician)} — ${p.trade_count} trade (${esc(p.chamber||'')})</h4>
+    <div style="display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto">
+      ${(p.trades||[]).map(congressTradeRowHTML).join('')}
     </div>`;
-  }).join('')+'</div>';
 }
 
 // ── Confronto ──
