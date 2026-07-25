@@ -425,13 +425,25 @@ def match_ticker_congress_trades(ticker: str, all_trades) -> list:
     return [tr for tr in all_trades if (tr.get("ticker") or "").upper() == ticker.upper()]
 
 
+def trade_direction(trade_type: str) -> str:
+    """Normalizza il campo 'type' di FMP ('Purchase'/'Sale'/'Exchange', verificato
+    dal vivo — 'Exchange' non è né acquisto né vendita, es. concambio in un'OPA)."""
+    t = (trade_type or "").lower()
+    if "purchase" in t:
+        return "buy"
+    if "sale" in t:
+        return "sell"
+    return "other"
+
+
 def group_congress_by_politician(trades: list) -> list:
     """Tutti i trade raggruppati per politico (non troncato, non diversificato —
     a differenza di diversify_congress_feed che serve per il feed 'attività
     recente', questo serve per la lista cliccabile 'vedi tutti i trade di X').
-    Ogni gruppo ha i trade ordinati dal più recente, ed è ordinato per data
-    dell'ultimo trade decrescente (chi ha operato più di recente per primo —
-    NON per numero totale di trade, che premierebbe solo le disclosure bulk)."""
+    Ogni gruppo ha i trade ordinati dal più recente, con conteggio acquisti/vendite,
+    ed è ordinato per data dell'ultimo trade decrescente (chi ha operato più di
+    recente per primo — NON per numero totale di trade, che premierebbe solo le
+    disclosure bulk)."""
     from collections import defaultdict
 
     by_politician = defaultdict(list)
@@ -441,10 +453,13 @@ def group_congress_by_politician(trades: list) -> list:
     for politician, lst in by_politician.items():
         lst.sort(key=lambda t: t.get("transaction_date") or "", reverse=True)
         chamber = lst[0].get("chamber") if lst else None
+        directions = [trade_direction(t.get("type")) for t in lst]
         groups.append({
             "politician": politician,
             "chamber": chamber,
             "trade_count": len(lst),
+            "buy_count": directions.count("buy"),
+            "sell_count": directions.count("sell"),
             "last_trade_date": lst[0].get("transaction_date") if lst else None,
             "trades": lst,
         })

@@ -220,9 +220,23 @@ def test_match_ticker_congress_trades_filters_by_ticker():
     assert match_ticker_congress_trades("AAPL", []) == []
 
 
-def _congress_trade(politician, date, ticker="XYZ"):
+def _congress_trade(politician, date, ticker="XYZ", trade_type="Purchase"):
     return {"ticker": ticker, "politician": politician, "chamber": "Senato",
-            "transaction_date": date, "type": "Purchase", "amount": "$1,001 - $15,000"}
+            "transaction_date": date, "type": trade_type, "amount": "$1,001 - $15,000"}
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ("Purchase", "buy"),
+    ("Sale", "sell"),
+    ("Sale (Full)", "sell"),
+    ("Exchange", "other"),
+    ("", "other"),
+    (None, "other"),
+])
+def test_trade_direction_classifies_fmp_types(raw, expected):
+    from institutional import trade_direction
+
+    assert trade_direction(raw) == expected
 
 
 def test_diversify_congress_feed_spreads_across_politicians():
@@ -281,6 +295,21 @@ def test_group_congress_by_politician_sorts_by_most_recent_activity():
     assert bulk["last_trade_date"] == "2026-03-20"  # il piu' recente del gruppo
     assert bulk["trades"][0]["transaction_date"] == "2026-03-20"
     assert len(bulk["trades"]) == 20  # NON troncato, a differenza di diversify_congress_feed
+
+
+def test_group_congress_by_politician_counts_buy_and_sell():
+    from institutional import group_congress_by_politician
+
+    trades = [
+        _congress_trade("X", "2026-01-01", trade_type="Purchase"),
+        _congress_trade("X", "2026-01-02", trade_type="Purchase"),
+        _congress_trade("X", "2026-01-03", trade_type="Sale"),
+        _congress_trade("X", "2026-01-04", trade_type="Exchange"),
+    ]
+    g = group_congress_by_politician(trades)[0]
+    assert g["buy_count"] == 2
+    assert g["sell_count"] == 1
+    assert g["trade_count"] == 4  # include anche l'Exchange, non classificato ne' buy ne' sell
 
 
 def test_group_congress_by_politician_empty():

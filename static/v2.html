@@ -1818,9 +1818,11 @@ async function loadSmartCongress(){
 
   window._congressPoliticians=politicians;
   window._tickerSectors=null; // null = non ancora caricati (in corso in background)
+  window._congressDirFilter='all';
   listBox.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px">'+politicians.map((p,i)=>
     `<button class="mini-btn" id="sm-pol-${i}" onclick="showPoliticianTrades(${i})">
       ${esc(p.politician)} <span style="opacity:.65">· ${esc(p.chamber||'')} · ${p.trade_count}</span>
+      <span class="pos" style="margin-left:5px">↑${p.buy_count}</span> <span class="neg">↓${p.sell_count}</span>
     </button>`
   ).join('')+'</div>';
   detailBox.innerHTML='';
@@ -1832,6 +1834,12 @@ async function loadCongressSectors(){
   // se un politico e' gia' aperto, ri-renderizza ora che i settori sono pronti
   const openBtn=$$('.mini-btn[id^="sm-pol-"]').find(b=>b.classList.contains('on'));
   if(openBtn) showPoliticianTrades(+openBtn.id.replace('sm-pol-',''));
+}
+function tradeDirection(type){
+  const t=(type||'').toLowerCase();
+  if(t.includes('purchase'))return'buy';
+  if(t.includes('sale'))return'sell';
+  return'other';
 }
 function groupTradesBySector(trades,sectorMap){
   const by={};
@@ -1846,6 +1854,11 @@ function groupTradesBySector(trades,sectorMap){
   groups.sort((a,b)=>(b.last_trade_date||'').localeCompare(a.last_trade_date||''));
   return groups;
 }
+function setCongressDirFilter(dir){
+  window._congressDirFilter=dir;
+  const openBtn=$$('.mini-btn[id^="sm-pol-"]').find(b=>b.classList.contains('on'));
+  if(openBtn) showPoliticianTrades(+openBtn.id.replace('sm-pol-',''));
+}
 function showPoliticianTrades(i){
   const politicians=window._congressPoliticians||[];
   const p=politicians[i];
@@ -1853,16 +1866,28 @@ function showPoliticianTrades(i){
   if(!p){detailBox.innerHTML='';return;}
   $$('.mini-btn[id^="sm-pol-"]').forEach(b=>b.classList.remove('on'));
   const btn=$('#sm-pol-'+i); if(btn) btn.classList.add('on');
-  const header=`<h4 style="margin:0 0 8px">${esc(p.politician)} — ${p.trade_count} trade (${esc(p.chamber||'')})</h4>`;
+  const filter=window._congressDirFilter||'all';
+  const allTrades=p.trades||[];
+  const shown=filter==='all'?allTrades:allTrades.filter(tr=>tradeDirection(tr.type)===filter);
+  const header=`<h4 style="margin:0 0 8px">${esc(p.politician)} — ${p.trade_count} trade (${esc(p.chamber||'')})</h4>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button class="mini-btn${filter==='all'?' on':''}" onclick="setCongressDirFilter('all')">Tutti (${p.trade_count})</button>
+      <button class="mini-btn${filter==='buy'?' on':''}" onclick="setCongressDirFilter('buy')">🟢 Acquisti (${p.buy_count})</button>
+      <button class="mini-btn${filter==='sell'?' on':''}" onclick="setCongressDirFilter('sell')">🔴 Vendite (${p.sell_count})</button>
+    </div>`;
+  if(!shown.length){
+    detailBox.innerHTML=header+'<div class="lline">Nessun trade in questa categoria.</div>';
+    return;
+  }
   if(!window._tickerSectors){
     // settori non ancora pronti (prima volta puo' richiedere un po'): lista piatta,
     // si ri-renderizza da sola raggruppata appena loadCongressSectors() finisce
     detailBox.innerHTML=header+`<div style="display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto">
-      ${(p.trades||[]).map(congressTradeRowHTML).join('')}
+      ${shown.map(congressTradeRowHTML).join('')}
     </div><p style="color:var(--dim);font-size:.78rem;margin-top:8px">Raggruppamento per settore in caricamento…</p>`;
     return;
   }
-  const groups=groupTradesBySector(p.trades||[],window._tickerSectors);
+  const groups=groupTradesBySector(shown,window._tickerSectors);
   detailBox.innerHTML=header+`<div style="display:flex;flex-direction:column;gap:14px;max-height:500px;overflow-y:auto">
     ${groups.map(g=>`<div>
         <div style="font-weight:600;font-size:.86rem;margin-bottom:4px">${esc(g.sector)} <span style="color:var(--dim);font-weight:400">(${g.trade_count})</span></div>
