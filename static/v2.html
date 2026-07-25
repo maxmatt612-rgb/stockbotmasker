@@ -226,6 +226,8 @@ select.inp option{background:var(--surface-2);color:var(--text)}
   transform:translateX(100%);transition:transform .3s cubic-bezier(.2,.9,.3,1);display:flex;flex-direction:column;box-shadow:-24px 0 60px rgba(0,0,0,.5)}
 .drawer.open{transform:none}
 .dw-top{padding:17px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.dw-logo{width:44px;height:44px;border-radius:10px;object-fit:contain;background:#fff;
+  border:1px solid var(--border);padding:5px;flex-shrink:0}
 .dw-tk{font-family:var(--mono);font-size:1.45rem;font-weight:600}
 .dw-nm{font-size:.71rem;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);margin-top:2px}
 .dw-px{font-family:var(--mono);font-size:1.55rem;font-weight:500;margin-top:7px}
@@ -710,10 +712,13 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
 <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
 <aside class="drawer" id="drawer">
   <div class="dw-top">
-    <div>
-      <div class="dw-tk" id="dw-tk">—</div>
-      <div class="dw-nm" id="dw-nm">—</div>
-      <div class="dw-px" id="dw-px">—</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <img id="dw-logo" class="dw-logo" alt="" style="display:none">
+      <div>
+        <div class="dw-tk" id="dw-tk">—</div>
+        <div class="dw-nm" id="dw-nm">—</div>
+        <div class="dw-px" id="dw-px">—</div>
+      </div>
     </div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
       <a class="tv-link" id="dw-tv" href="#" target="_blank" rel="noopener" title="Apri il grafico su TradingView">📈 TradingView</a>
@@ -1115,6 +1120,13 @@ async function openStock(tk){
   $('#scrim').classList.add('open'); $('#drawer').classList.add('open');
   $('#dw-tk').textContent=tk; $('#dw-nm').textContent='Caricamento…'; $('#dw-px').textContent='…';
   $('#dw-tv').href=tvUrl(tk);
+  // Logo aziendale: niente chiave richiesta, ma non tutti i ticker (soprattutto
+  // quelli europei minori) ce l'hanno — onerror nasconde l'img invece di un'icona rotta
+  const logoEl=$('#dw-logo');
+  logoEl.style.display='none';
+  logoEl.onerror=()=>{logoEl.style.display='none';};
+  logoEl.onload=()=>{logoEl.style.display='';};
+  logoEl.src=`https://images.financialmodelingprep.com/symbol/${encodeURIComponent(tk)}.png`;
   $$('.dw-tab').forEach((t,i)=>t.classList.toggle('on',i===0)); $('#dw-tabs').dataset.cur='sintesi';
   $('#dw-body').innerHTML='<div class="lline">Caricamento dati…</div>';
   const d=await J('/api/stock/'+tk);
