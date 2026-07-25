@@ -429,8 +429,9 @@ def group_congress_by_politician(trades: list) -> list:
     """Tutti i trade raggruppati per politico (non troncato, non diversificato —
     a differenza di diversify_congress_feed che serve per il feed 'attività
     recente', questo serve per la lista cliccabile 'vedi tutti i trade di X').
-    Ogni gruppo ha i trade ordinati dal più recente, ed è ordinato per numero di
-    trade decrescente."""
+    Ogni gruppo ha i trade ordinati dal più recente, ed è ordinato per data
+    dell'ultimo trade decrescente (chi ha operato più di recente per primo —
+    NON per numero totale di trade, che premierebbe solo le disclosure bulk)."""
     from collections import defaultdict
 
     by_politician = defaultdict(list)
@@ -447,7 +448,51 @@ def group_congress_by_politician(trades: list) -> list:
             "last_trade_date": lst[0].get("transaction_date") if lst else None,
             "trades": lst,
         })
-    groups.sort(key=lambda g: g["trade_count"], reverse=True)
+    groups.sort(key=lambda g: g["last_trade_date"] or "", reverse=True)
+    return groups
+
+
+def get_ticker_sectors(tickers: list) -> dict:
+    """{ticker: settore} via yfinance .info — NON esiste un modo batch per il
+    settore (a differenza di prezzo/volume via yf.download): una chiamata di rete
+    per ticker. Va sempre usata con cache lunga a monte (il settore di un'azienda
+    cambia di rado) — il caching vive in web_server.py, questa funzione fa solo
+    il fetch grezzo. Un ticker che fallisce (delisted, ADR OTC senza dati, ecc.)
+    viene omesso dal risultato, non mappato a un valore fittizio."""
+    import yfinance as yf
+
+    out = {}
+    for t in dict.fromkeys(tickers):  # dedup mantenendo ordine
+        try:
+            info = yf.Ticker(t).info or {}
+            sector = info.get("sector")
+            if sector:
+                out[t] = sector
+        except Exception as e:
+            print(f"[institutional] settore non trovato per {t}: {e}")
+    return out
+
+
+def group_trades_by_sector(trades: list, sector_by_ticker: dict) -> list:
+    """Trade di UN politico raggruppati per settore (usato nella vista di
+    dettaglio politico). Ogni gruppo ordinato per data più recente; i gruppi
+    stessi ordinati per data del trade più recente nel gruppo."""
+    from collections import defaultdict
+
+    by_sector = defaultdict(list)
+    for tr in trades or []:
+        sector = (sector_by_ticker or {}).get(tr.get("ticker"), "Settore sconosciuto")
+        by_sector[sector].append(tr)
+    groups = []
+    for sector, lst in by_sector.items():
+        lst.sort(key=lambda t: t.get("transaction_date") or "", reverse=True)
+        groups.append({
+            "sector": sector,
+            "trade_count": len(lst),
+            "last_trade_date": lst[0].get("transaction_date") if lst else None,
+            "trades": lst,
+        })
+    groups.sort(key=lambda g: g["last_trade_date"] or "", reverse=True)
     return groups
 
 

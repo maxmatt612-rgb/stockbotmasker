@@ -38,6 +38,7 @@ WEB_USERS_FILE = Path(__file__).parent / "web_users.json"
 INSTITUTIONAL_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "institutional_13f.json"
 SECTOR_ROTATION_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "sector_rotation.json"
 CONGRESS_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "congress_trades.json"
+TICKER_SECTORS_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "ticker_sectors.json"
 
 app = FastAPI(title="Stock Bot Dashboard", docs_url=None, redoc_url=None)
 
@@ -82,6 +83,17 @@ async def _startup_load_cache():
                 print(f"[startup] Precaricato {f.name} (dati di oggi)")
         except Exception as e:
             print(f"[startup] Impossibile precaricare {f.name}: {e}")
+
+    # I settori ticker cambiano di rado (TTL 7gg, non "oggi"): precarica se il
+    # file non è più vecchio del TTL, non solo se è di oggi.
+    if TICKER_SECTORS_FILE.exists():
+        try:
+            mtime = datetime.fromtimestamp(TICKER_SECTORS_FILE.stat().st_mtime, tz=ROME)
+            if (datetime.now(ROME) - mtime).total_seconds() < _TICKER_SECTOR_TTL:
+                _store("ticker:sectors", json.loads(TICKER_SECTORS_FILE.read_text(encoding="utf-8")))
+                print(f"[startup] Precaricato {TICKER_SECTORS_FILE.name}")
+        except Exception as e:
+            print(f"[startup] Impossibile precaricare {TICKER_SECTORS_FILE.name}: {e}")
 
     # ── Nessuno scan lanciato QUI, all'avvio. ──
     # Lo scan parte quando l'utente clicca "Analizza ora" (→ /api/scan, che avvia
@@ -306,6 +318,9 @@ _FORECAST_TTL = 14400  # 4 h — previsione 7 giorni
 _FX_TTL       = 3600   # 1 h — tasso di cambio EUR/USD
 _13F_TTL      = 86400  # 24h — dati trimestrali (~45gg di ritardo SEC), nessun motivo di rifetch più spesso
 _CONGRESS_TTL = 21600  # 6h — trade del Congresso, poche novità/giorno
+_TICKER_SECTOR_TTL = 604800  # 7 giorni — il settore di un'azienda cambia di rado,
+# a differenza del prezzo; e il lookup NON è batchabile come yf.download (una
+# chiamata di rete per ticker), quindi vale la pena cachare a lungo.
 _SECTOR_TTL   = 3600   # 1h — rotazione settoriale, rilevante intraday ma non tick-by-tick
 _UVOL_TTL     = 900    # 15 min — il volume anomalo cambia durante la sessione
 
@@ -419,6 +434,24 @@ def _get_congress_trades() -> list:
         except Exception as e:
             print(f"[institutional] Errore salvataggio congress trades su disco: {e}")
     return data
+
+
+def _get_ticker_sectors(tickers: list) -> dict:
+    """Mappa ticker→settore, accumulata nel tempo: i ticker già noti non vengono
+    rifetchati (nessun batch possibile per il settore, una chiamata di rete a
+    ticker — vedi institutional.get_ticker_sectors), solo quelli nuovi."""
+    key = "ticker:sectors"
+    known = _cached(key, _TICKER_SECTOR_TTL) or {}
+    missing = [t for t in dict.fromkeys(tickers) if t not in known]
+    if missing:
+        fresh = INST.get_ticker_sectors(missing)
+        known = {**known, **fresh}
+        _store(key, known)
+        try:
+            TICKER_SECTORS_FILE.write_text(json.dumps(known, ensure_ascii=False), encoding="utf-8")
+        except Exception as e:
+            print(f"[institutional] Errore salvataggio settori ticker su disco: {e}")
+    return known
 
 
 _INTRADAY_INTERVALS = {"1m","2m","5m","15m","30m","60m","90m","1h"}
@@ -3911,6 +3944,22 @@ async def api_smart_money_congress():
     diversified = INST.diversify_congress_feed(trades) if trades else trades
     politicians = INST.group_congress_by_politician(trades) if trades else []
     return {"available": bool(trades), "trades": diversified, "politicians": politicians}
+
+
+@app.get("/api/smart-money/congress/sectors")
+async def api_smart_money_congress_sectors():
+    """Mappa ticker→settore per tutti i ticker presenti nel feed Congress
+    corrente — usata dal frontend per raggruppare per settore i trade di un
+    singolo politico. Endpoint separato (non incluso in /congress) perché il
+    primo calcolo può essere lento: una chiamata yfinance per ticker (~163 nel
+    dataset attuale), nessun batch possibile per il settore. Cache 7gg,
+    accumulata: i ticker già noti non vengono rifetchati."""
+    trades = await asyncio.to_thread(_get_congress_trades)
+    if not trades:
+        return {}
+    tickers = list(dict.fromkeys(tr["ticker"] for tr in trades))
+    sectors = await asyncio.to_thread(_get_ticker_sectors, tickers)
+    return sectors
 
 
 @app.get("/api/stock/{ticker}/smart-money")

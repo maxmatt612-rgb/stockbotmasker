@@ -264,16 +264,19 @@ def test_diversify_congress_feed_empty():
     assert diversify_congress_feed(None) == []
 
 
-def test_group_congress_by_politician_sorts_by_count_and_recency():
+def test_group_congress_by_politician_sorts_by_most_recent_activity():
+    """Ordinamento per data dell'ultimo trade, NON per numero totale di trade —
+    altrimenti chi ha una singola disclosure bulk vecchia batterebbe sempre chi ha
+    operato di recente ma con pochi trade, che è l'informazione più utile."""
     from institutional import group_congress_by_politician
 
     trades = (
-        [_congress_trade("Bulk Filer", f"2026-03-{d:02d}") for d in range(1, 21)]  # 20 trade
-        + [_congress_trade("Someone Else", "2026-06-01")]  # 1 trade
+        [_congress_trade("Bulk Filer", f"2026-03-{d:02d}") for d in range(1, 21)]  # 20 trade, il più recente 2026-03-20
+        + [_congress_trade("Someone Else", "2026-06-01")]  # 1 solo trade, ma più recente
     )
     groups = group_congress_by_politician(trades)
-    assert [g["politician"] for g in groups] == ["Bulk Filer", "Someone Else"]  # per count desc
-    bulk = groups[0]
+    assert [g["politician"] for g in groups] == ["Someone Else", "Bulk Filer"]  # per data desc, non per count
+    bulk = groups[1]
     assert bulk["trade_count"] == 20
     assert bulk["last_trade_date"] == "2026-03-20"  # il piu' recente del gruppo
     assert bulk["trades"][0]["transaction_date"] == "2026-03-20"
@@ -285,3 +288,35 @@ def test_group_congress_by_politician_empty():
 
     assert group_congress_by_politician([]) == []
     assert group_congress_by_politician(None) == []
+
+
+def test_group_trades_by_sector_groups_and_sorts_by_recency():
+    from institutional import group_trades_by_sector
+
+    trades = [
+        _congress_trade("X", "2026-01-01", ticker="AAPL"),
+        _congress_trade("X", "2026-05-01", ticker="MSFT"),
+        _congress_trade("X", "2026-03-01", ticker="JPM"),
+    ]
+    sector_map = {"AAPL": "Technology", "MSFT": "Technology", "JPM": "Financials"}
+    groups = group_trades_by_sector(trades, sector_map)
+    assert [g["sector"] for g in groups] == ["Technology", "Financials"]  # MSFT (05-01) piu' recente di JPM (03-01)
+    tech = groups[0]
+    assert tech["trade_count"] == 2
+    assert tech["last_trade_date"] == "2026-05-01"
+    assert [t["ticker"] for t in tech["trades"]] == ["MSFT", "AAPL"]  # ordinati per data desc dentro il gruppo
+
+
+def test_group_trades_by_sector_unknown_ticker_falls_back():
+    from institutional import group_trades_by_sector
+
+    trades = [_congress_trade("X", "2026-01-01", ticker="ZZZZ")]
+    groups = group_trades_by_sector(trades, {})
+    assert groups[0]["sector"] == "Settore sconosciuto"
+
+
+def test_group_trades_by_sector_empty():
+    from institutional import group_trades_by_sector
+
+    assert group_trades_by_sector([], {}) == []
+    assert group_trades_by_sector(None, {}) == []
