@@ -150,16 +150,26 @@ _AI_PROVIDER = os.getenv("AI_PROVIDER", "groq").lower()
 _TAB_TIER = {
     "peers": "groq", "why_today": "groq", "market_sentiment": "groq",
     "radar": "groq", "watchlist": "groq", "confessionale": "groq",
-    "market_bestbuy": "haiku", "should_buy": "haiku", "consensus": "haiku",
-    "debate": "haiku", "timing": "haiku", "chat": "haiku", "telegram": "haiku",
+    "consensus_groq": "groq",  # 2 dei 4 voti del consenso restano su Groq (gratis)
+    "market_bestbuy": "haiku", "should_buy": "haiku",
+    "debate": "haiku", "timing": "haiku", "chat": "haiku",
     "portfolio": "haiku", "chartai": "haiku",
     "analisi": "sonnet", "deepreport": "sonnet", "short": "sonnet",
     "prompt": "sonnet", "compare": "sonnet", "briefing": "sonnet",
+    "consensus_sonnet": "sonnet",
+    "consensus_opus": "opus",
+    "telegram": "opus",  # insight scanner/Telegram: 1 sola chiamata batch su 10 titoli, costo trascurabile anche su Opus
 }
 _TIER_MODEL = {
     "haiku": os.getenv("CLAUDE_MODEL_HAIKU", "claude-haiku-4-5"),
     "sonnet": os.getenv("CLAUDE_MODEL_SONNET", "claude-sonnet-5"),
+    "opus": os.getenv("CLAUDE_MODEL_OPUS", "claude-opus-5"),
 }
+# Tag il cui punto di chiamata originale passa un "model" nativo Claude (non un
+# nome Groq valido) — es. le voci Opus/Sonnet del consenso multi-modello. Per
+# questi, il fallback automatico su Groq non ha senso (Groq non riconoscerebbe
+# "claude-opus-5" come modello) e va saltato.
+_NO_GROQ_FALLBACK = {"consensus_opus", "consensus_sonnet"}
 
 
 def _claude_model_for_tab(tab):
@@ -232,11 +242,21 @@ if groq_client is not None:
                                 thinking={"type": "disabled"})
             if system_text:
                 call_kwargs["system"] = system_text + _fmt_note
-            if kwargs.get("temperature") is not None:
-                call_kwargs["temperature"] = kwargs["temperature"]
+            # NB: niente temperature qui — Claude Opus 5 / Sonnet 5 la rifiutano
+            # con 400 ("temperature is deprecated for this model"); i prompt
+            # esistenti non dipendono da un valore preciso, quindi si omette
+            # sempre invece di provare a capire quali modelli la accettano.
             try:
                 resp = await _anthropic_client.messages.create(**call_kwargs)
             except Exception as e:
+                if tab in _NO_GROQ_FALLBACK:
+                    # Il "model" originale della chiamata (es. "claude-opus-5") non
+                    # è un modello Groq valido: ripiegare su Groq fallirebbe di
+                    # nuovo con un errore diverso e più confuso. Meglio lasciare che
+                    # il chiamante gestisca il fallimento (es. un voto mancante nel
+                    # consenso) invece di mascherarlo con un secondo errore.
+                    print(f"[claude:{tab}] chiamata fallita, nessun fallback Groq disponibile per questo tag: {e}")
+                    raise
                 print(f"[claude:{tab}] chiamata fallita, ripiego su Groq: {e}")
                 return await _orig_groq_create_raw(*args, **kwargs)
             text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
@@ -2391,9 +2411,10 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
 
 # ─── Consenso multi-AI: 3 modelli (Meta / OpenAI / Alibaba) votano sul titolo ──
 _CONSENSUS_MODELS = [
-    ("Llama 3.3 70B", "llama-3.3-70b-versatile", {}),
-    ("GPT-OSS 120B", "openai/gpt-oss-120b", {"reasoning_effort": "low"}),
-    ("Qwen3 32B", "qwen/qwen3-32b", {"reasoning_effort": "none"}),
+    ("Claude Opus 5", "claude-opus-5", {"_tab": "consensus_opus"}),
+    ("Claude Sonnet 5", "claude-sonnet-5", {"_tab": "consensus_sonnet"}),
+    ("GPT-OSS 120B", "openai/gpt-oss-120b", {"reasoning_effort": "low", "_tab": "consensus_groq"}),
+    ("Qwen3 32B", "qwen/qwen3-32b", {"reasoning_effort": "none", "_tab": "consensus_groq"}),
 ]
 
 
@@ -2443,7 +2464,7 @@ async def api_consensus(ticker: str):
     async def _ask(name, model, extra):
         try:
             r = await groq_client.chat.completions.create(
-                model=model, max_tokens=256, temperature=0.3, _tab="consensus",
+                model=model, max_tokens=256, temperature=0.3,
                 messages=[{"role": "system", "content": "Trader esperto che dà un verdetto netto e conciso in italiano."},
                           {"role": "user", "content": prompt}],
                 **extra)

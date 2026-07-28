@@ -1737,10 +1737,10 @@ async function loadCons(){
     `<div class="modrow"><span class="nm">${esc(m.name)}</span><span class="vd ${vcls(m.verdict)==='v-yes'?'pos':vcls(m.verdict)==='v-no'?'neg':''}">${vico(m.verdict)} ${esc(m.verdict)}</span>${m.reason?`<div class="rs">${esc(m.reason)}</div>`:''}</div>`
     :`<div class="modrow"><span class="nm">${esc(m.name)}</span><span class="vd" style="color:var(--faint)">— n/d</span></div>`).join('');
   b.innerHTML=`<div class="res" style="max-width:none">
-    ${rkick('Consenso · 3 modelli '+aiTag,'consensus')}
-    <div class="verdict ${vcls(d.consensus)}">${vico(d.consensus)} ${d.agree}/${d.total||3} · ${esc(d.consensus||'ASPETTA')}</div>
+    ${rkick('Consenso · 4 modelli '+aiTag,'consensus')}
+    <div class="verdict ${vcls(d.consensus)}">${vico(d.consensus)} ${d.agree}/${d.total||4} · ${esc(d.consensus||'ASPETTA')}</div>
     <div class="prose">${rows}</div>
-    <div class="fnote">Llama 3.3 (Meta) · GPT-OSS 120B (OpenAI) · Qwen3 (Alibaba) · via Groq</div></div>`;
+    <div class="fnote">Claude Opus 5 · Claude Sonnet 5 · GPT-OSS 120B (OpenAI, via Groq) · Qwen3 (Alibaba, via Groq)</div></div>`;
   injectPeers('#dw-body',curTk,()=>$('#dw-tabs').dataset.cur==='consenso');
 }
 async function loadDebate(){
