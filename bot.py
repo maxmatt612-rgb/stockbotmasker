@@ -3,7 +3,6 @@ import asyncio
 import json
 import logging
 import os
-from datetime import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -1560,10 +1559,11 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_callback))
 
     jq = app.job_queue
-    # Analisi mattutina lun–ven alle 7:30
-    jq.run_daily(job_daily_report, time=time(hour=7, minute=30, tzinfo=ROME), days=(0, 1, 2, 3, 4))
-    # Recap serale lun–ven alle 22:00
-    jq.run_daily(job_evening_report, time=time(hour=22, minute=0, tzinfo=ROME), days=(0, 1, 2, 3, 4))
+    # Analisi mattutina e recap serale automatici: disattivati qui, ora unica fonte
+    # è web_server.py (_pdf_scheduler → _send_top10_rich / _send_evening_recap),
+    # che ha già tutti i dati arricchiti (RSI/settore/entry-target-stop/ecc.) ed
+    # evita due messaggi diversi ogni giorno sullo stesso canale.
+    # job_daily_report / job_evening_report restano definiti sopra ma non schedulati.
     # Notizie portafoglio ogni 4 ore
     jq.run_repeating(job_news_portafoglio, interval=14400, first=60)
 

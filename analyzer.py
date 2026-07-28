@@ -42,6 +42,7 @@ def get_full_analysis(ticker: str) -> dict | None:
         prev_close = float(closes.iloc[-2]) if len(closes) >= 2 else current_price
         y_high = float(hist["High"].max())
         y_low = float(hist["Low"].min())
+        resistance_40d = float(hist["High"].tail(40).max())  # livello di breakout: massimo delle ultime 40 sedute
         try:
             if fast is not None:
                 if fast.last_price:      current_price = float(fast.last_price)
@@ -101,6 +102,7 @@ def get_full_analysis(ticker: str) -> dict | None:
             "day_change_pct": day_change_pct,
             "week_52_high": y_high,
             "week_52_low": y_low,
+            "resistance_40d": resistance_40d,
             "volatility": volatility,
             "risk_level": risk_level,
             "risk_emoji": risk_emoji,
@@ -1011,6 +1013,14 @@ def get_enriched_analysis(ticker: str) -> dict | None:
     estimate_5d_pct = round(max(-15.0, min(15.0, conviction * vol_5d)), 1)
     estimate_5d_price = round(base["current_price"] * (1 + estimate_5d_pct / 100), 2)
 
+    # ── Stesse formula, orizzonti più lunghi: vol * √(giorni/252) ──
+    vol_15d = vol * 0.2440                     # √(15/252)
+    vol_30d = vol * 0.3450                     # √(30/252)
+    estimate_15d_pct = round(max(-25.0, min(25.0, conviction * vol_15d)), 1)
+    estimate_15d_price = round(base["current_price"] * (1 + estimate_15d_pct / 100), 2)
+    estimate_30d_pct = round(max(-35.0, min(35.0, conviction * vol_30d)), 1)
+    estimate_30d_price = round(base["current_price"] * (1 + estimate_30d_pct / 100), 2)
+
     base.update({
         "earnings_today": earnings_today,
         "next_earnings_str": next_earnings_str,
@@ -1022,6 +1032,10 @@ def get_enriched_analysis(ticker: str) -> dict | None:
         "daily_estimate_pct": daily_estimate_pct,
         "estimate_5d_pct": estimate_5d_pct,
         "estimate_5d_price": estimate_5d_price,
+        "estimate_15d_pct": estimate_15d_pct,
+        "estimate_15d_price": estimate_15d_price,
+        "estimate_30d_pct": estimate_30d_pct,
+        "estimate_30d_price": estimate_30d_price,
         "score_10": score_10,
     })
     return base

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 from zoneinfo import ZoneInfo
 
-# Fuso orario di riferimento: così lo scheduler (07:35/22:05) funziona identico
+# Fuso orario di riferimento: così lo scheduler (07:00/22:05) funziona identico
 # sul PC italiano E su un server cloud (che gira in UTC).
 ROME = ZoneInfo("Europe/Rome")
 
@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 from analyzer import get_enriched_analysis, scan_cheap_stocks, get_longterm_analysis, wilder_rsi
 import institutional as INST
+from config import SCORING
 
 # Carica le variabili dal file .env se presente (utile per l'esecuzione in locale).
 try:
@@ -97,19 +98,19 @@ async def _startup_load_cache():
 
     # ── Nessuno scan lanciato QUI, all'avvio. ──
     # Lo scan parte quando l'utente clicca "Analizza ora" (→ /api/scan, che avvia
-    # _refresh_scan_background su richiesta) OPPURE da solo alle 07:30 nei giorni
+    # _refresh_scan_background su richiesta) OPPURE da solo alle 07:00 nei giorni
     # feriali via lo scheduler avviato subito sotto (_pdf_scheduler) — NON è quindi
     # "mai automatico": è solo che l'avvio del processo in sé non ne innesca uno.
     if loaded:
-        print(f"[startup] Caricati dati salvati. Prossimo scan: su richiesta o alle 07:30.")
+        print(f"[startup] Caricati dati salvati. Prossimo scan: su richiesta o alle 07:00.")
     else:
-        print("[startup] Nessun dato salvato. Prossimo scan: su richiesta o alle 07:30.")
+        print("[startup] Nessun dato salvato. Prossimo scan: su richiesta o alle 07:00.")
 
-    # Avvia lo scheduler giornaliero: 07:35 salva lo snapshot, 22:05 lo chiude.
-    # Cosí lo storico (accuracy/backtest/track record) si accumula da solo,
-    # basta tenere il server acceso sul PC. Nessun bot Telegram necessario.
+    # Avvia lo scheduler giornaliero: 07:00 scan+Telegram, 07:05 salva lo snapshot,
+    # 22:05 recap+Telegram e chiude lo snapshot. Così lo storico (accuracy/backtest/
+    # track record) si accumula da solo, basta tenere il server acceso sul PC.
     asyncio.create_task(_pdf_scheduler())
-    print("[startup] Scheduler storico avviato (07:35 salva, 22:05 chiude — lun-ven).")
+    print("[startup] Scheduler avviato (07:00 scan+invio, 07:05 salva, 22:05 recap+invio+chiude — lun-ven).")
 
 
 async def _warm_influence():
@@ -159,6 +160,7 @@ _TAB_TIER = {
     "consensus_sonnet": "sonnet",
     "consensus_opus": "opus",
     "telegram": "opus",  # insight scanner/Telegram: 1 sola chiamata batch su 10 titoli, costo trascurabile anche su Opus
+    "telegram_evening": "opus",  # recap serale: stessa logica, 1 chiamata batch su 10 titoli
 }
 _TIER_MODEL = {
     "haiku": os.getenv("CLAUDE_MODEL_HAIKU", "claude-haiku-4-5"),
@@ -790,16 +792,18 @@ async def _generate_morning_pdf():
 
 
 async def _generate_evening_pdf():
-    """Genera il PDF recap serale: confronta prezzi mattino vs chiusura USA."""
+    """Genera il PDF recap serale: confronta prezzi mattino vs chiusura USA.
+    Ritorna la lista arricchita (ordinata per delta_pct decrescente), riusata anche
+    dal recap Telegram serale — nessun secondo fetch dei prezzi di chiusura."""
     global _evening_pdf, _evening_pdf_ts
     import yfinance as yf
     import pandas as pd
 
-    # Usa _morning_data (bloccato alle 7:30) se disponibile, altrimenti fallback cache
+    # Usa _morning_data (bloccato alle 7:00) se disponibile, altrimenti fallback cache
     morning_data = _morning_data or ((_cache.get(_scan_key(10)) or {}).get("data") or [])
     if not morning_data:
         print("[pdf] Nessun dato mattutino per il recap serale")
-        return
+        return []
 
     # Fetch prezzi di chiusura per tutti i ticker del mattino
     tickers = [s["ticker"] for s in morning_data]
@@ -843,6 +847,7 @@ async def _generate_evening_pdf():
         print(f"[pdf] PDF serale generato ({len(pdf_bytes)//1024} KB)")
     except Exception as e:
         print(f"[pdf] Errore generazione PDF serale: {e}")
+    return enriched
 
 
 def _build_evening_pdf(stocks: list, title: str, subtitle: str) -> bytes:
@@ -1081,35 +1086,39 @@ def should_run(now, scheduled_time, last_run_date) -> bool:
 
 
 async def _pdf_scheduler():
-    """Scheduler giornaliero: 07:30 scan, 07:35 PDF mattina + storico, 22:05 recap + chiusura storico.
+    """Scheduler giornaliero: 07:00 scan + invio Telegram, 07:05 PDF mattina + storico,
+    22:05 PDF/recap serale + invio Telegram + chiusura storico.
     Con catch-up (v. should_run): un tick mancato non salta la giornata."""
     from datetime import time as _time
     while True:
         now = datetime.now(ROME)
-        # 07:30 — scan mattutino (dati fissati per la giornata).
-        # Valutato PRIMA del job 07:35 così, in caso di catch-up simultaneo dopo un
+        # 07:00 — scan mattutino (dati fissati per la giornata) + invio Telegram arricchito.
+        # Valutato PRIMA del job 07:05 così, in caso di catch-up simultaneo dopo un
         # riavvio, lo scan viene almeno avviato prima che lo snapshot provi a leggerlo.
-        if should_run(now, _time(7, 30), _last_run.get("scan")):
-            print("[scheduler] Avvio scan mattutino (07:30 o catch-up)")
+        if should_run(now, _time(7, 0), _last_run.get("scan")):
+            print("[scheduler] Avvio scan mattutino (07:00 o catch-up)")
             _last_run["scan"] = now.date()
             asyncio.create_task(_refresh_scan_background(10))
-        # 07:35 — PDF analisi mattutina + snapshot storico
-        if should_run(now, _time(7, 35), _last_run.get("morning")):
-            print("[scheduler] Avvio PDF mattina + snapshot (07:35 o catch-up)")
+        # 07:05 — PDF analisi mattutina + snapshot storico
+        if should_run(now, _time(7, 5), _last_run.get("morning")):
+            print("[scheduler] Avvio PDF mattina + snapshot (07:05 o catch-up)")
             _last_run["morning"] = now.date()
             await _generate_morning_pdf()
             await asyncio.to_thread(_save_history_snapshot_web, _morning_data)
-        # 22:05 — recap serale + chiusura storico (previsione vs realtà)
+        # 22:05 — recap serale (PDF + Telegram) + chiusura storico (previsione vs realtà)
         if should_run(now, _time(22, 5), _last_run.get("evening")):
             print("[scheduler] Avvio recap serale + chiusura (22:05 o catch-up)")
             _last_run["evening"] = now.date()
-            await _generate_evening_pdf()
+            ranked = await _generate_evening_pdf()
+            if await _send_evening_recap(ranked):
+                print("[scheduler] Recap serale inviato su Telegram")
             await asyncio.to_thread(_close_history_snapshot_web)
         await asyncio.sleep(30)
 
 
 # ─── Segnale Telegram: top 10 titoli dello scan ──────────────────────────────
 _last_tg_signal_date: str = ""
+_last_tg_evening_date: str = ""
 
 
 def _tg_send(text: str) -> bool:
@@ -1141,8 +1150,11 @@ _TG_SEP = "\n━━━━━━━━━━\n"  # ━━━━━━━━━━
 
 
 def _tg_send_chunks(msg: str) -> bool:
-    """Invia il messaggio spezzandolo se supera il limite Telegram (4096)."""
-    LIMIT = 3800
+    """Invia il messaggio in UN solo invio se rientra nel limite Telegram (4096);
+    lo spezzetta solo come rete di sicurezza per i casi limite (ticker/testo AI
+    più lunghi del solito) — il formato mattutino è pensato per stare sotto questa
+    soglia con 10 titoli."""
+    LIMIT = 4000
     if len(msg) <= LIMIT:
         return _tg_send(msg)
     ok, buf = True, ""
@@ -1158,10 +1170,12 @@ def _tg_send_chunks(msg: str) -> bool:
 
 
 async def _tg_batch_insights(top: list, emap: dict) -> dict:
-    """UNA chiamata Groq: una riga di insight concreto per ciascun titolo."""
+    """UNA chiamata Groq/Claude: insight + frase di settore per ciascun titolo.
+    Ritorna {ticker: {"insight": str, "settore": str}}."""
     out: dict = {}
     if not groq_client:
         return out
+    sector_rot = await asyncio.to_thread(_get_sector_rotation)
     rows = []
     for s in top:
         tk = s["ticker"]; e = emap.get(tk, {})
@@ -1169,30 +1183,61 @@ async def _tg_batch_insights(top: list, emap: dict) -> dict:
         vr = s.get("vol_ratio"); vr_s = f"{vr:.1f}x" if vr else "N/D"
         up52 = e.get("upside_52w"); up52_s = f"{up52:+.1f}%" if up52 is not None else "N/D"
         earn = e.get("next_earnings_str") or "N/D"
+        sector = e.get("sector") or "N/D"
+        srot = next((r for r in (sector_rot or []) if r.get("sector") == sector), None)
+        sect_s = (f"{sector} (#{srot['rank_1m']}/11 per momentum 1m, {srot['perf_1m']:+.1f}% 1m vs SPY)"
+                   if srot else sector)
         rows.append(f"{tk}: ${(s.get('current_price') or 0):.2f}, {(s.get('day_change_pct') or 0):+.1f}%, "
                     f"RSI {(s.get('rsi') or 50):.0f}, score {(s.get('score_10') or 5):.1f}/10, P/E {pe_s}, "
                     f"volume {vr_s} media, distanza da max 52w {up52_s}, prossimi earnings {earn}, "
-                    f"notizie {e.get('news_sentiment_label', 'N/D')}")
-    prompt = ("Per OGNI azione scrivi UNA riga di insight (max 18 parole, italiano). Individua il singolo "
-              "fattore dominante — Valutazione, Momentum, News, Tecnica, Qualità, Rischio o Catalizzatore — "
-              "che spiega perché il titolo merita attenzione OGGI, in base ai dati forniti. L'utente vede già "
-              "prezzo/RSI/P/E/score/volume: NON ripeterli, aggiungi un giudizio che li collega (es. 'Possibile "
-              "rimbalzo dopo eccesso di vendite', non 'RSI 68'). Formato ESATTO 'TICKER: insight', una riga per "
-              "titolo, niente altro.\n\n" + "\n".join(rows))
+                    f"notizie {e.get('news_sentiment_label', 'N/D')}, settore {sect_s}")
+    prompt = ("Per OGNI azione scrivi ESATTAMENTE due righe, MOLTO concise (il messaggio deve stare in un "
+              "solo messaggio Telegram con 10 titoli, ogni parola in più conta):\n"
+              "1) 'TICKER: insight' — UNA riga (max 12 parole, italiano), il singolo fattore dominante — "
+              "Valutazione, Momentum, News, Tecnica, Qualità, Rischio o Catalizzatore — che spiega perché il "
+              "titolo merita attenzione OGGI. L'utente vede già prezzo/RSI/P/E/score/volume: NON ripeterli, "
+              "aggiungi un giudizio che li collega (es. 'Possibile rimbalzo dopo eccesso di vendite', non "
+              "'RSI 68').\n"
+              "2) 'TICKER_SETTORE: frase' — UNA riga (max 14 parole, italiano) su come sta andando il settore "
+              "del titolo ORA e come potrebbe andare, basata SOLO sui dati di rotazione settoriale forniti "
+              "(non inventare numeri).\n"
+              "Nessun'altra riga, nessuna intestazione.\n\n" + "\n".join(rows))
     try:
         resp = await groq_client.chat.completions.create(
-            model="openai/gpt-oss-120b", max_tokens=700, reasoning_effort="medium", _tab="telegram",
+            model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="medium", _tab="telegram",
             messages=[{"role": "system", "content": "Analista finanziario conciso e diretto, in italiano."},
                       {"role": "user", "content": prompt}])
         for line in resp.choices[0].message.content.strip().split("\n"):
-            if ":" in line:
-                tk, ins = line.split(":", 1)
-                tk = tk.strip().lstrip("0123456789.-) ").upper()
-                if tk and ins.strip():
-                    out[tk] = ins.strip()
+            if ":" not in line:
+                continue
+            tk, val = line.split(":", 1)
+            tk = tk.strip().upper()
+            val = val.strip()
+            if not val:
+                continue
+            if tk.endswith("_SETTORE"):
+                out.setdefault(tk[:-len("_SETTORE")], {})["settore"] = val
+            else:
+                tk = tk.lstrip("0123456789.-) ")
+                out.setdefault(tk, {})["insight"] = val
     except Exception as e:
         print(f"[tg] insight batch: {e}")
     return out
+
+
+def _dot(ok: bool) -> str:
+    return "\U0001F7E2" if ok else "\U0001F534"  # 🟢 / 🔴
+
+
+def _rsi_dot(rsi: float) -> str:
+    _sc = SCORING["enriched"]
+    return _dot(_sc["rsi_weak_lo"] <= rsi < _sc["rsi_extended"])
+
+
+def _pe_dot(pe) -> str:
+    if pe is None:
+        return _dot(True)  # niente dato (es. ETF) — non penalizzare
+    return _dot(0 < pe <= SCORING["enriched"]["pe_expensive"])
 
 
 def _format_top10_rich(top: list, emap: dict, insights: dict) -> str:
@@ -1211,24 +1256,32 @@ def _format_top10_rich(top: list, emap: dict, insights: dict) -> str:
         earn = e.get("next_earnings_str") or "N/D"
         parts = [f"\U0001F4CA <b>{tk}</b>  —  ${px:.2f}  ({chg:+.1f}%)",
                  f"\U0001F3AF Voto AI: {sc:.0f}/10"]
-        est = e.get("estimate_5d_pct")
-        if est is not None:
-            parts.append(f"\U0001F52E Stima 5gg: {est:+.1f}%")
-        ins = insights.get(tk)
-        if ins:
-            parts.append(f"\U0001F4A1 {ins}")
-        parts.append(f"\U0001F535 Entry: ${entry*0.985:.2f} – ${entry*1.015:.2f}")
+        est5, est15, est30 = e.get("estimate_5d_pct"), e.get("estimate_15d_pct"), e.get("estimate_30d_pct")
+        if est5 is not None:
+            est_line = f"\U0001F52E Stima 5gg: {est5:+.1f}%"
+            if est15 is not None:
+                est_line += f" · 15gg: {est15:+.1f}%"
+            if est30 is not None:
+                est_line += f" · 30gg: {est30:+.1f}%"
+            parts.append(est_line)
+        entry_line = f"\U0001F535 Entry ${entry*0.985:.2f}-${entry*1.015:.2f}"
         if target:
-            parts.append(f"\U0001F3AF Take profit: ${target:.2f}")
+            entry_line += f" · \U0001F3AF TP ${target:.2f}"
         if stop:
-            parts.append(f"⛔️ Stop loss: ${stop:.2f}")
-        parts.append(f"\U0001F4C8 RSI {rsi:.0f} · P/E {pe_s}")
-        parts.append(f"\U0001F4C5 Earnings: {earn}")
-        ns = (e.get("news_sentiment") or "").lower()
-        if "posit" in ns:
-            parts.append("\U0001F4F0 Notizie: positive \U0001F7E2")
-        elif "negat" in ns:
-            parts.append("\U0001F4F0 Notizie: negative \U0001F534")
+            entry_line += f" · ⛔️ SL ${stop:.2f}"
+        parts.append(entry_line)
+        ns_emoji = e.get("news_sentiment_emoji") or "⚪"
+        parts.append(f"\U0001F4C8 RSI {rsi:.0f} {_rsi_dot(rsi)} · P/E {pe_s} {_pe_dot(pe)} · News {ns_emoji}")
+        breakout = e.get("resistance_40d")
+        earn_line = f"\U0001F4C5 {earn}"
+        if breakout:
+            earn_line += f" · \U0001F680 Breakout ${breakout:.2f}"
+        parts.append(earn_line)
+        ins = insights.get(tk, {})
+        if ins.get("insight"):
+            parts.append(f"\U0001F4A1 {ins['insight']}")
+        if ins.get("settore"):
+            parts.append(f"\U0001F3ED {ins['settore']}")
         blocks.append("\n".join(parts))
     blocks.append("<i>Solo a scopo informativo — non è consulenza finanziaria</i>")
     return _TG_SEP.join(blocks)
@@ -1261,6 +1314,70 @@ async def _send_top10_rich(stocks: list, force: bool = False) -> bool:
     ok = await asyncio.to_thread(_tg_send_chunks, msg)
     if ok:
         _last_tg_signal_date = today
+    return ok
+
+
+async def _tg_evening_insights(ranked: list) -> dict:
+    """UNA chiamata batch: spiega il movimento di OGGI (non 'perché comprarlo')
+    per ciascuno dei titoli del recap serale. Ritorna {ticker: spiegazione}."""
+    out: dict = {}
+    if not groq_client:
+        return out
+    rows = [f"{s['ticker']}: {s.get('delta_pct', 0):+.1f}% oggi (da ${s.get('current_price', 0):.2f} mattina "
+            f"a ${s.get('evening_price', 0):.2f} chiusura), RSI {s.get('rsi', 50):.0f}, "
+            f"notizie {s.get('news_sentiment_label', 'N/D')}" for s in ranked]
+    prompt = ("Per OGNI azione spiega in UNA riga (max 18 parole, italiano) perché si è mossa così OGGI — "
+              "in base a variazione, RSI e sentiment notizie forniti. Formato ESATTO 'TICKER: spiegazione', "
+              "una riga per titolo, niente altro.\n\n" + "\n".join(rows))
+    try:
+        resp = await groq_client.chat.completions.create(
+            model="openai/gpt-oss-120b", max_tokens=700, reasoning_effort="medium", _tab="telegram_evening",
+            messages=[{"role": "system", "content": "Analista finanziario conciso e diretto, in italiano."},
+                      {"role": "user", "content": prompt}])
+        for line in resp.choices[0].message.content.strip().split("\n"):
+            if ":" in line:
+                tk, val = line.split(":", 1)
+                tk = tk.strip().lstrip("0123456789.-) ").upper()
+                if tk and val.strip():
+                    out[tk] = val.strip()
+    except Exception as e:
+        print(f"[tg] evening insight batch: {e}")
+    return out
+
+
+def _format_evening_recap(ranked: list, why: dict) -> str:
+    blocks = [f"\U0001F319 <b>MASKER — Recap serale</b>  ({datetime.now(ROME).strftime('%d/%m %H:%M')}) "
+              f"— dal migliore al peggiore"]
+    for i, s in enumerate(ranked, 1):
+        tk = s["ticker"]
+        delta = s.get("delta_pct", 0) or 0
+        medal = "\U0001F3C6" if i == 1 else ("\U0001F4A9" if i == len(ranked) else f"{i}.")
+        parts = [f"{medal} <b>{tk}</b> {_dot(delta >= 0)} —  ${s.get('evening_price', 0):.2f}  ({delta:+.1f}%)"]
+        expl = why.get(tk)
+        if expl:
+            parts.append(f"\U0001F4A1 {expl}")
+        blocks.append("\n".join(parts))
+    blocks.append("<i>Solo a scopo informativo — non è consulenza finanziaria</i>")
+    return _TG_SEP.join(blocks)
+
+
+async def _send_evening_recap(ranked: list, force: bool = False) -> bool:
+    """Invia il recap serale (10 titoli dal migliore al peggiore + spiegazione del
+    movimento) su Telegram. Max 1 volta al giorno salvo force."""
+    global _last_tg_evening_date
+    if not ranked:
+        return False
+    if not (os.getenv("TG_SIGNAL_TOKEN") or os.getenv("BOT_TOKEN")) or not os.getenv("TG_SIGNAL_CHAT"):
+        return False
+    today = datetime.now(ROME).strftime("%Y-%m-%d")
+    if not force and _last_tg_evening_date == today:
+        return False
+    top = ranked[:10]
+    why = await _tg_evening_insights(top)
+    msg = _format_evening_recap(top, why)
+    ok = await asyncio.to_thread(_tg_send_chunks, msg)
+    if ok:
+        _last_tg_evening_date = today
     return ok
 
 
@@ -1361,6 +1478,18 @@ async def api_tg_send_top10():
         return JSONResponse({"ok": False, "error": "Nessuno scan disponibile: avvia prima 'Analizza ora'."}, status_code=400)
     ok = await _send_top10_rich(stocks, True)
     return {"ok": ok, "sent": len(stocks[:10]) if ok else 0}
+
+
+@app.post("/api/telegram/send-evening-recap")
+async def api_tg_send_evening_recap():
+    """Invia SUBITO il recap serale (ricalcola i prezzi di chiusura) sul bot Telegram."""
+    if not (os.getenv("TG_SIGNAL_TOKEN") or os.getenv("BOT_TOKEN")) or not os.getenv("TG_SIGNAL_CHAT"):
+        return JSONResponse({"ok": False, "error": "Bot Telegram non configurato (TG_SIGNAL_TOKEN/TG_SIGNAL_CHAT)."}, status_code=503)
+    ranked = await _generate_evening_pdf()
+    if not ranked:
+        return JSONResponse({"ok": False, "error": "Nessuno scan mattutino disponibile per il recap."}, status_code=400)
+    ok = await _send_evening_recap(ranked, True)
+    return {"ok": ok, "sent": len(ranked[:10]) if ok else 0}
 
 
 @app.get("/api/scan/screen")
