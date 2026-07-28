@@ -1351,12 +1351,17 @@ def _format_evening_recap(ranked: list, why: dict) -> str:
     for i, s in enumerate(ranked, 1):
         tk = s["ticker"]
         delta = s.get("delta_pct", 0) or 0
-        medal = "\U0001F3C6" if i == 1 else ("\U0001F4A9" if i == len(ranked) else f"{i}.")
-        parts = [f"{medal} <b>{tk}</b> {_dot(delta >= 0)} —  ${s.get('evening_price', 0):.2f}  ({delta:+.1f}%)"]
+        move_emoji = "\U0001F4C8" if delta >= 0 else "\U0001F4C9"  # 📈 / 📉
+        medal = "\U0001F3C6" if i == 1 else f"{i}."
+        parts = [f"{medal} <b>{tk}</b> {move_emoji} —  ${s.get('evening_price', 0):.2f}  ({delta:+.1f}%)"]
         expl = why.get(tk)
         if expl:
             parts.append(f"\U0001F4A1 {expl}")
         blocks.append("\n".join(parts))
+    if ranked:
+        best, worst = ranked[0], ranked[-1]
+        blocks.append(f"\U0001F3C6 Migliore: {best['ticker']} {best.get('delta_pct', 0):+.2f}%\n"
+                       f"\U0001F494 Peggiore: {worst['ticker']} {worst.get('delta_pct', 0):+.2f}%")
     blocks.append("<i>Solo a scopo informativo — non è consulenza finanziaria</i>")
     return _TG_SEP.join(blocks)
 
