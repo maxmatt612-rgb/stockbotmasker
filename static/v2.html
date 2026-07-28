@@ -130,17 +130,38 @@ header.top{position:sticky;top:0;z-index:50;background:var(--header-bg);backdrop
 .side-indicator.on{opacity:1}
 main.wrap{margin:0 0 0 72px;max-width:none;padding:0 30px 110px}
 footer.foot{margin-left:72px}
+
+/* ── Bottom nav + sheet "Altro" (solo telefono/tablet stretto, v. media query sotto) ── */
+.nav-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40}
+.bottom-nav{display:none;position:fixed;left:0;right:0;bottom:0;height:60px;z-index:42;
+  background:var(--surface);border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(0,0,0,.18)}
+.bn-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  min-height:48px;color:var(--dim);transition:color .15s}
+.bn-btn .ti{width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;color:var(--faint)}
+.bn-btn .ti svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.bn-btn .bn-lbl{font-size:.6rem;font-weight:600}
+.bn-btn.active{color:var(--text)}
+.bn-btn.active .ti{color:var(--accent)}
+
 @media(max-width:820px){
   .side-indicator{display:none}
-  .side{position:sticky;top:95px;left:auto;right:auto;bottom:auto;width:auto;flex-direction:row;align-items:stretch;
-    overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid var(--border);padding:6px 10px;gap:3px}
-  .side-sec{display:none}
-  .side .tab{width:auto;justify-content:flex-start;white-space:nowrap;padding:9px 13px}
+  .side{position:fixed;top:auto;left:0;right:0;bottom:60px;width:auto;max-height:70vh;
+    flex-direction:column;align-items:stretch;overflow-y:auto;overflow-x:hidden;
+    border-right:none;border-top:1px solid var(--border);border-radius:16px 16px 0 0;
+    padding:10px 8px 14px;gap:2px;box-shadow:var(--shadow-lg);
+    transform:translateY(110%);transition:transform .25s cubic-bezier(.2,.85,.3,1)}
+  .side.open{transform:translateY(0)}
+  .side-sec{display:block;width:auto;height:auto;background:none;margin:12px 10px 6px;padding:0;
+    font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);line-height:1.2;overflow:visible}
+  .side-sec:first-child{margin-top:2px}
+  .side .tab{width:auto;justify-content:flex-start;white-space:nowrap;padding:12px 14px;min-height:44px;gap:12px}
   .side .tab.active::before{display:none}
   .side .tab .tl{position:static;opacity:1;pointer-events:auto;transform:none;background:none;border:none;
-    box-shadow:none;padding:0;margin-left:0;color:inherit;font-size:inherit;font-weight:inherit;white-space:nowrap}
-  main.wrap{margin-left:0;max-width:100%;padding:0 18px 100px}
+    box-shadow:none;padding:0;margin-left:0;color:inherit;font-size:.88rem;font-weight:500;white-space:nowrap}
+  main.wrap{margin-left:0;max-width:100%;padding:0 18px 90px}
   footer.foot{margin-left:0}
+  .bottom-nav{display:flex}
+  .nav-backdrop.open{display:block}
 }
 
 /* ── Lead ── */
@@ -423,6 +444,16 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
   .tf-row{grid-template-columns:1fr}
   .search{width:auto;flex:1}
   .brand .nm span{display:none}
+  /* Card più leggibili: ticker/prezzo grandi, metriche secondarie compattate su una riga sola attenuata */
+  .card-tk{font-size:1.32rem}
+  .card-price{font-size:1.22rem}
+  .card-nm{max-width:none}
+  .card-foot{flex-wrap:wrap;gap:6px;font-size:.66rem;opacity:.85}
+  .card .rsi,.card .rsi+.tv-link{margin-left:0}
+  .tv-link{margin-left:auto!important;padding:2px 6px}
+  /* Righe-lista dense (watchlist, cronologia track record, smart money): tap target più comodo */
+  .wl-row{padding:14px 15px;gap:10px}
+  .wl-row .tk{font-size:1.05rem}
 }
 
 /* ── Nuove feature ─────────────────────────────────────────────── */
@@ -605,6 +636,14 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
   <button class="tab" data-v="radar"><span class="ti"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 12 18 7.5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></span><span class="tl">Radar VIP</span></button>
   <button class="tab" data-v="smart"><span class="ti"><svg viewBox="0 0 24 24"><path d="M3 9.5 12 4l9 5.5M4.5 9.5v9M19.5 9.5v9M9 9.5v9M15 9.5v9M3 20h18"/></svg></span><span class="tl">Smart Money</span></button>
 </aside>
+<div class="nav-backdrop" id="navBackdrop"></div>
+
+<nav class="bottom-nav" id="bottomNav">
+  <button class="bn-btn active" data-v="market" title="Mercato"><span class="ti"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.3"/><rect x="14" y="3" width="7" height="7" rx="1.3"/><rect x="3" y="14" width="7" height="7" rx="1.3"/><rect x="14" y="14" width="7" height="7" rx="1.3"/></svg></span><span class="bn-lbl">Mercato</span></button>
+  <button class="bn-btn" data-v="analisi" title="Analisi"><span class="ti"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21M8 10.5l1.8 1.8L14 8.4"/></svg></span><span class="bn-lbl">Analisi</span></button>
+  <button class="bn-btn" data-v="track" title="Track record"><span class="ti"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".9" fill="currentColor" stroke="none"/></svg></span><span class="bn-lbl">Track record</span></button>
+  <button class="bn-btn" id="bottomNavMore" title="Altro"><span class="ti"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></span><span class="bn-lbl">Altro</span></button>
+</nav>
 
 <main class="wrap">
 
@@ -1161,6 +1200,23 @@ $('#nav').addEventListener('click',e=>{const b=e.target.closest('.tab');if(!b)re
   }
 });
 positionSideIndicator($('.side .tab.active')); // posizione iniziale, sul tab attivo di default (Mercato)
+
+// ── Bottom nav (telefono): scorciatoie dirette + sheet "Altro" per le sezioni restanti ──
+function openNavSheet(){ $('#nav').classList.add('open'); $('#navBackdrop').classList.add('open'); }
+function closeNavSheet(){ $('#nav').classList.remove('open'); $('#navBackdrop').classList.remove('open'); }
+function toggleNavSheet(){ $('#nav').classList.contains('open') ? closeNavSheet() : openNavSheet(); }
+$('#bottomNav').addEventListener('click',e=>{
+  const b=e.target.closest('.bn-btn');if(!b)return;
+  if(b.id==='bottomNavMore'){toggleNavSheet();return;}
+  const tab=document.querySelector('#nav .tab[data-v="'+b.dataset.v+'"]');
+  if(tab)tab.click();
+});
+$('#navBackdrop').addEventListener('click',closeNavSheet);
+$('#nav').addEventListener('click',e=>{
+  const b=e.target.closest('.tab');if(!b)return;
+  $$('.bn-btn[data-v]').forEach(x=>x.classList.toggle('active',x.dataset.v===b.dataset.v));
+  closeNavSheet();
+});
 
 // ── Orari di mercato ──
 const _MK=[
