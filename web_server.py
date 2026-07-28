@@ -183,6 +183,54 @@ def _claude_model_for_tab(tab):
     return override or _TIER_MODEL.get(tier, "claude-haiku-4-5")
 
 
+_MODEL_DISPLAY = {
+    "claude-opus-5": "Claude Opus 5",
+    "claude-sonnet-5": "Claude Sonnet 5",
+    "claude-haiku-4-5": "Claude Haiku 4.5",
+}
+
+
+def _ai_label_for_tab(tab):
+    """Etichetta leggibile del modello REALMENTE attivo per un tag _tab — riflette
+    AI_PROVIDER e la presenza della chiave Claude al momento della chiamata, non
+    un'assunzione statica (altrimenti si rischia di promettere un modello che sta
+    silenziosamente fallendo e ripiegando su Groq)."""
+    if _AI_PROVIDER != "claude" or not globals().get("_anthropic_client"):
+        return "Groq (gratis)"
+    model = _claude_model_for_tab(tab)
+    if model is None:
+        return "Groq (gratis)"
+    return _MODEL_DISPLAY.get(model, model)
+
+
+# ptype (id passato da "Mostra prompt" nel frontend) -> tag _tab reale usato
+# dalla chiamata AI corrispondente. Non sempre coincidono (es. i power-prompt
+# e "full" condividono tutti il tag "prompt"; "deep" usa "analisi"; "should-buy"
+# ha il trattino lato UI ma "should_buy" con underscore lato _TAB_TIER).
+_PTYPE_TO_TAB = {
+    "full": "prompt", "dcf": "prompt", "earnings": "prompt", "technical": "prompt",
+    "competitive": "prompt", "pattern": "prompt",
+    "deep": "analisi",
+    "should-buy": "should_buy",
+    "scan-insight": None,  # non taggato lato server: ricade sul default "haiku"
+    "timing": "timing", "compare": "compare", "deepreport": "deepreport",
+    "debate": "debate", "short": "short",
+}
+
+
+@app.get("/api/ai-tiers")
+async def api_ai_tiers():
+    """Modello AI usato per ciascuna sezione 'Mostra prompt' del frontend,
+    calcolato UNA volta a caricamento pagina (nessuna chiamata AI qui dentro)."""
+    labels = {ptype: _ai_label_for_tab(tab) for ptype, tab in _PTYPE_TO_TAB.items()}
+    labels["consensus"] = (
+        "Claude Opus 5 + Claude Sonnet 5 + 2× Groq"
+        if _AI_PROVIDER == "claude" and globals().get("_anthropic_client")
+        else "4× Groq"
+    )
+    return labels
+
+
 if groq_client is not None:
     try:
         # Nome deliberatamente diverso da quello usato più sotto dal wrapper
@@ -4946,16 +4994,30 @@ async def api_history_date(date: str):
             "stocks": enriched,
         })
 
-    # Mercato ancora aperto o dato intraday: fetch prezzi live
+    # Mercato ancora aperto o dato intraday: fetch prezzi live in UN solo batch
+    # (stesso pattern di /api/batch_quotes — un yf.download invece di N chiamate)
     def _get_current_prices(tickers: list) -> dict:
         import yfinance as yf
+        import pandas as pd
         result = {}
-        for t in tickers:
-            try:
-                fi = yf.Ticker(t).fast_info
-                result[t] = float(fi.last_price or 0)
-            except Exception:
-                result[t] = 0.0
+        if not tickers:
+            return result
+        try:
+            raw = yf.download(tickers, period="1d", interval="1d", auto_adjust=True, progress=False)
+            if raw.empty:
+                return result
+            close_df = raw["Close"] if isinstance(raw.columns, pd.MultiIndex) else (
+                raw[["Close"]].rename(columns={"Close": tickers[0]}) if len(tickers) == 1 else None
+            )
+            if close_df is None:
+                return result
+            for t in tickers:
+                if t in close_df.columns:
+                    vals = close_df[t].dropna()
+                    if len(vals):
+                        result[t] = float(vals.iloc[-1])
+        except Exception as e:
+            print(f"[history] fetch prezzi live: {e}")
         return result
 
     tickers = [s["ticker"] for s in stocks]

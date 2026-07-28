@@ -654,6 +654,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn" id="scanBtn">Analizza ora</button>
         <button class="mini-btn" id="tgBtn" onclick="sendTop10Telegram()" title="Invia la top 10 sul bot Telegram">📤 Telegram</button>
+        <span data-ai-ptype="scan-insight"></span>
         <button class="mini-btn" id="scan-prompt-btn" onclick="togglePromptSource('scan-insight','scan')">🔍 <span id="scan-prompt-btn-lbl">Mostra prompt</span></button>
       </div>
     </div>
@@ -675,6 +676,12 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
       <p>Misura la direzione dello score numerico dello screener (≥7 = rialzista, ≤4 = ribassista), confrontata con la chiusura sulle giornate di mercato già chiuse. Non è un giudizio dell'AI.</p></div>
     </div></div>
     <div id="track-page"><div class="lline" style="padding:24px 0">Caricamento track record…</div></div>
+    <div class="lead" style="margin-top:28px"><div>
+      <div class="lead-txt"><div class="eyebrow">Cronologia</div><h2>Cosa ha analizzato ogni giorno</h2>
+      <p>Scegli una data per vedere i titoli scansionati quella mattina e come stanno andando adesso.</p></div>
+    </div></div>
+    <div id="track-dates"><div class="lline" style="padding:12px 0">Caricamento date…</div></div>
+    <div id="track-day"></div>
   </section>
 
   <section data-view="analisi" hidden>
@@ -683,6 +690,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
       <div class="lead-txt"><div class="eyebrow">Report completo</div><h2>Analisi di un titolo</h2>
       <p>Inserisci un ticker e ottieni un report d'investimento completo: verdetto, consenso analisti, target, fondamentali, tecnica, rischi e titoli simili.</p></div>
     </div>
+      <span data-ai-ptype="full"></span>
       <button class="mini-btn" id="an-prompt-btn" onclick="togglePromptSource('full','an')">🔍 <span id="an-prompt-btn-lbl">Mostra prompt</span></button>
     </div>
     <div id="an-prompt-box" class="prompt-src" style="display:none"></div>
@@ -701,6 +709,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
       <div class="lead-txt"><div class="eyebrow">Tesi ribassista</div><h2>Analisi Short</h2>
       <p>Inserisci un ticker: tesi short professionale (orizzonte 7 giorni – 1 mese) con convinzione, scorecard, catalizzatori e costruzione del trade. Il verdetto può essere Strong Sell / Sell / Hold.</p></div>
     </div>
+      <span data-ai-ptype="short"></span>
       <button class="mini-btn" id="sh-prompt-btn" onclick="togglePromptSource('short','sh')">🔍 <span id="sh-prompt-btn-lbl">Mostra prompt</span></button>
     </div>
     <div id="sh-prompt-box" class="prompt-src" style="display:none"></div>
@@ -740,6 +749,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
       <div class="lead-txt"><div class="eyebrow">Market timing</div><h2>Quando entrare</h2>
       <p>L'AI analizza i tecnici e indica quando conviene entrare long e quando short.</p></div>
     </div>
+      <span data-ai-ptype="timing"></span>
       <button class="mini-btn" id="tm-prompt-btn" onclick="togglePromptSource('timing','tm')">🔍 <span id="tm-prompt-btn-lbl">Mostra prompt</span></button>
     </div>
     <div id="tm-prompt-box" class="prompt-src" style="display:none"></div>
@@ -775,6 +785,7 @@ footer.foot{text-align:center;padding:36px 20px 20px;color:var(--faint);font-siz
       <div class="lead-txt"><div class="eyebrow">Confronto AI</div><h2>Quale azione è meglio?</h2>
       <p>Metti due titoli a confronto: l'AI analizza i fondamentali e indica il vincitore.</p></div>
     </div>
+      <span data-ai-ptype="compare"></span>
       <button class="mini-btn" id="cmp-prompt-btn" onclick="togglePromptSource('compare','cmp')">🔍 <span id="cmp-prompt-btn-lbl">Mostra prompt</span></button>
     </div>
     <div id="cmp-prompt-box" class="prompt-src" style="display:none"></div>
@@ -1142,7 +1153,7 @@ $('#nav').addEventListener('click',e=>{const b=e.target.closest('.tab');if(!b)re
       if(mast){mast.classList.remove('mast-in');void mast.offsetWidth;mast.classList.add('mast-in');} // il masthead entra per primo, poi il resto della sezione
     }
   });
-  if(v==='track')loadTrackPage();
+  if(v==='track'){loadTrackPage();loadTrackHistory();}
   if(!_loaded[v]){_loaded[v]=true;
     if(v==='briefing')loadBriefing();
     if(v==='radar')loadRadar();
@@ -1256,6 +1267,19 @@ function cardHTML(s,rank){
       ${s.volume_ratio!=null?`<span class="rsi" title="Volume di oggi rispetto alla media">Vol ${(+s.volume_ratio).toFixed(1)}x</span>`:''}
       <a class="tv-link" href="${tvUrl(s.ticker)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Apri il grafico su TradingView">📈 TV</a>
     </div></div>`;
+}
+
+// ── Modello AI per ptype (badge sopra ogni "Mostra prompt") ──
+let _aiTiers={};
+async function loadAiTiers(){
+  _aiTiers=await J('/api/ai-tiers')||{};
+  // Riempie i placeholder statici (sezioni fuori dal drawer, già presenti nell'HTML)
+  $$('[data-ai-ptype]').forEach(el=>{ el.innerHTML=aiTierTag(el.dataset.aiPtype); });
+}
+loadAiTiers();
+function aiTierTag(ptype){
+  const m=_aiTiers[ptype];
+  return m?`<span class="ai-tag" title="${esc(m)}">${esc(m)}</span>`:'';
 }
 
 // ── Drawer ──
@@ -1372,7 +1396,10 @@ async function togglePromptSource(ptype,prefix){
 function rkick(title,ptype){
   return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
     <div class="res-kick">${title}</div>
-    <button class="mini-btn" onclick="togglePromptSource('${ptype}','dw')">🔍 <span id="dw-prompt-btn-lbl">${T('Mostra prompt','Show prompt')}</span></button>
+    <div style="text-align:right">
+      ${aiTierTag(ptype)}
+      <div><button class="mini-btn" onclick="togglePromptSource('${ptype}','dw')">🔍 <span id="dw-prompt-btn-lbl">${T('Mostra prompt','Show prompt')}</span></button></div>
+    </div>
   </div>
   <div id="dw-prompt-box" class="prompt-src" style="display:none"></div>`;
 }
@@ -1402,7 +1429,7 @@ async function runPrompt(k){
   const out=$('#prompt-out');if(!out||!curTk)return;
   $$('.prompt-btn').forEach(x=>x.classList.remove('on'));
   const btn=[...$$('.prompt-btn')].find(x=>x.getAttribute('onclick').includes("'"+k+"'"));if(btn)btn.classList.add('on');
-  const mini=$('#prompt-mini');if(mini)mini.innerHTML=`<div style="text-align:right"><button class="mini-btn" onclick="togglePromptSource('${k}','dw')">🔍 <span id="dw-prompt-btn-lbl">${T('Mostra prompt','Show prompt')}</span></button></div><div id="dw-prompt-box" class="prompt-src" style="display:none"></div>`;
+  const mini=$('#prompt-mini');if(mini)mini.innerHTML=`<div style="text-align:right">${aiTierTag(k)}<div><button class="mini-btn" onclick="togglePromptSource('${k}','dw')">🔍 <span id="dw-prompt-btn-lbl">${T('Mostra prompt','Show prompt')}</span></button></div></div><div id="dw-prompt-box" class="prompt-src" style="display:none"></div>`;
   out.innerHTML='<div class="lline">'+T('L\'analista AI sta lavorando… (può richiedere ~20s)','The AI analyst is working… (may take ~20s)')+'</div>';
   const d=await J('/api/stock/'+curTk+'/prompt?type='+k);
   if(!d||d.__err||d.error||!d.text){out.innerHTML='<div class="lline">'+T('Analisi non disponibile.','Analysis not available.')+'</div>';return;}
@@ -2251,6 +2278,40 @@ async function loadTrackPage(){
   }
   html+=`<p style="font-size:.7rem;color:var(--faint);margin-top:14px">Simulazione su prezzi storici reali · entry apertura, uscita chiusura, costo 0.10% incluso · esclude dividendi · i risultati passati non garantiscono quelli futuri.</p>`;
   box.innerHTML=html;
+}
+
+// ── Cronologia giornaliera: che titoli sono stati analizzati un dato giorno e come stanno andando ora ──
+let _trackDates=[], _trackDateSel=null;
+async function loadTrackHistory(){
+  const box=$('#track-dates');if(!box)return;
+  const dates=await J('/api/history');
+  if(!Array.isArray(dates)||!dates.length){
+    box.innerHTML='<div class="empty"><span class="ic">📅</span><h3>Ancora nessuna cronologia</h3><p>Si popola a partire dallo scan automatico delle 7:00 di domani.</p></div>';
+    $('#track-day').innerHTML='';
+    return;
+  }
+  _trackDates=dates;
+  box.innerHTML='<div class="wl-list">'+dates.map(d=>`
+    <div class="wl-row" style="cursor:pointer" onclick="loadTrackHistoryDate('${d.date}')">
+      <span class="tk" style="min-width:100px">${esc(d.date)}</span>
+      <span style="flex:1;font-size:.78rem;color:var(--dim)">${d.count} titoli${d.closed?' · chiuso':' · in corso'}</span>
+      <span class="px">${d.closed?'✓':'○'}</span>
+    </div>`).join('')+'</div>';
+  // Seleziona automaticamente la data più recente al primo caricamento
+  if(!_trackDateSel&&dates[0])loadTrackHistoryDate(dates[0].date);
+}
+async function loadTrackHistoryDate(date){
+  _trackDateSel=date;
+  const box=$('#track-day');if(!box)return;
+  box.innerHTML='<div class="lline" style="padding:16px 0">Caricamento '+esc(date)+'…</div>';
+  const d=await J('/api/history/'+encodeURIComponent(date));
+  if(!d||d.__err||d.error||!Array.isArray(d.stocks)){
+    box.innerHTML='<div class="lline">Dati non disponibili per questa data.</div>';
+    return;
+  }
+  const cards=d.stocks.map(s=>cardHTML({...s,day_change_pct:s.pct_since_analysis},null)).join('');
+  box.innerHTML=`<div class="flab" style="margin:18px 0 8px">${esc(date)} — ${d.closed?'giornata chiusa':'ancora in corso, prezzi live'}</div>
+    <div class="grid">${cards||'<div class="empty"><span class="ic">—</span><h3>Nessun titolo</h3></div>'}</div>`;
 }
 
 // Helper di traduzione condiviso (usato da opzioni, regime, prompt, ecc.)
