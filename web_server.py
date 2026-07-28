@@ -139,6 +139,113 @@ try:
 except Exception:
     groq_client = None
 
+# ─── Router AI a 3 livelli: Groq-only / Claude Haiku / Claude Sonnet ──────────
+# Disattivato di default (AI_PROVIDER=groq): comportamento identico a prima.
+# Con AI_PROVIDER=claude, ogni chiamata taggata con _tab="..." viene instradata
+# al livello giusto; se Claude fallisce (budget esaurito, rete, ecc.) ricade
+# automaticamente sulla vera chiamata Groq, quindi il sito continua a funzionare.
+_ANTHROPIC_KEY = os.getenv("ANTHROPIC_API_KEY")
+_AI_PROVIDER = os.getenv("AI_PROVIDER", "groq").lower()
+
+_TAB_TIER = {
+    "peers": "groq", "why_today": "groq", "market_sentiment": "groq",
+    "radar": "groq", "watchlist": "groq", "confessionale": "groq",
+    "market_bestbuy": "haiku", "should_buy": "haiku", "consensus": "haiku",
+    "debate": "haiku", "timing": "haiku", "chat": "haiku", "telegram": "haiku",
+    "portfolio": "haiku", "chartai": "haiku",
+    "analisi": "sonnet", "deepreport": "sonnet", "short": "sonnet",
+    "prompt": "sonnet", "compare": "sonnet", "briefing": "sonnet",
+}
+_TIER_MODEL = {
+    "haiku": os.getenv("CLAUDE_MODEL_HAIKU", "claude-haiku-4-5"),
+    "sonnet": os.getenv("CLAUDE_MODEL_SONNET", "claude-sonnet-5"),
+}
+
+
+def _claude_model_for_tab(tab):
+    """Modello Claude da usare, oppure None se questo tag deve restare su Groq."""
+    tier = _TAB_TIER.get(tab, "haiku")
+    if tier == "groq":
+        return None
+    override = os.getenv(f"CLAUDE_MODEL_{(tab or '').upper()}")  # scappatoia per-tab
+    return override or _TIER_MODEL.get(tier, "claude-haiku-4-5")
+
+
+if groq_client is not None:
+    try:
+        # Nome deliberatamente diverso da quello usato più sotto dal wrapper
+        # lingua (_orig_groq_create): sono entrambi a livello di modulo, quindi
+        # un nome uguale verrebbe sovrascritto e la chiusura di _ai_router_create
+        # (che risolve i nomi globali al momento della chiamata, non alla
+        # definizione) finirebbe per richiamare se stessa ricorsivamente invece
+        # della vera chiamata Groq — bug reale, trovato e corretto in verifica.
+        _orig_groq_create_raw = groq_client.chat.completions.create  # vera Groq, sempre il fallback
+
+        class _FakeMsg:
+            def __init__(self, content): self.content = content
+
+        class _FakeChoice:
+            def __init__(self, content): self.message = _FakeMsg(content)
+
+        class _FakeResp:
+            def __init__(self, content): self.choices = [_FakeChoice(content)]
+
+        _anthropic_client = None
+        if _ANTHROPIC_KEY:
+            from anthropic import AsyncAnthropic
+            _anthropic_client = AsyncAnthropic(api_key=_ANTHROPIC_KEY)
+
+        async def _ai_router_create(*args, **kwargs):
+            tab = kwargs.pop("_tab", None)  # sempre rimosso, qualunque sia provider/livello
+            if _AI_PROVIDER != "claude" or _anthropic_client is None:
+                return await _orig_groq_create_raw(*args, **kwargs)
+            model = _claude_model_for_tab(tab)
+            if model is None:  # livello "groq" — bypassa Claude, nessun costo/tentativo
+                return await _orig_groq_create_raw(*args, **kwargs)
+            msgs = kwargs.get("messages") or []
+            system_text, claude_msgs = None, []
+            for m in msgs:
+                if not isinstance(m, dict):
+                    continue
+                if m.get("role") == "system":
+                    system_text = (system_text + "\n\n" + m["content"]) if system_text else m["content"]
+                elif m.get("role") in ("user", "assistant"):
+                    claude_msgs.append({"role": m["role"], "content": m["content"]})
+            # I prompt esistenti sono scritti per l'output "nudo" di Groq
+            # (es. "MOTIVO: testo" sulla stessa riga). Claude a volte avvolge le
+            # etichette in markdown (**MOTIVO:**) o mette il valore sulla riga
+            # dopo — rompendo il parsing a marker esistente. Un'unica istruzione
+            # qui copre tutti gli endpoint instradati a Claude senza toccare
+            # i singoli prompt.
+            _fmt_note = ("\n\nFormattazione: non usare markdown (niente **, #, elenchi puntati) "
+                         "a meno che non sia esplicitamente richiesto. Quando ti viene chiesto un "
+                         "formato esatto tipo 'ETICHETTA: valore', scrivi etichetta e valore sulla "
+                         "STESSA riga, senza nient'altro su quella riga.")
+            call_kwargs = dict(model=model,
+                                max_tokens=kwargs.get("max_tokens") or 1024,
+                                messages=claude_msgs,
+                                # Alcuni modelli Claude (es. Sonnet 5) attivano il thinking adattivo
+                                # di default anche senza richiederlo, e lo conta dentro max_tokens —
+                                # su report brevi rischia di consumare tutto il budget in ragionamento
+                                # invisibile, lasciando zero token per il testo vero. Questi prompt
+                                # vogliono output diretto, non esplorazione: lo disattivo esplicitamente.
+                                thinking={"type": "disabled"})
+            if system_text:
+                call_kwargs["system"] = system_text + _fmt_note
+            if kwargs.get("temperature") is not None:
+                call_kwargs["temperature"] = kwargs["temperature"]
+            try:
+                resp = await _anthropic_client.messages.create(**call_kwargs)
+            except Exception as e:
+                print(f"[claude:{tab}] chiamata fallita, ripiego su Groq: {e}")
+                return await _orig_groq_create_raw(*args, **kwargs)
+            text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+            return _FakeResp(text)
+
+        groq_client.chat.completions.create = _ai_router_create
+    except Exception as e:
+        print(f"[ai-router] init fallito, resto su Groq puro: {e}")
+
 # ─── Lingua richiesta (risposte AI in EN/IT in base al toggle del frontend) ───
 import contextvars as _ctxvars
 _REQ_LANG = _ctxvars.ContextVar("req_lang", default="it")
@@ -1054,7 +1161,7 @@ async def _tg_batch_insights(top: list, emap: dict) -> dict:
               "titolo, niente altro.\n\n" + "\n".join(rows))
     try:
         resp = await groq_client.chat.completions.create(
-            model="openai/gpt-oss-120b", max_tokens=700, reasoning_effort="medium",
+            model="openai/gpt-oss-120b", max_tokens=700, reasoning_effort="medium", _tab="telegram",
             messages=[{"role": "system", "content": "Analista finanziario conciso e diretto, in italiano."},
                       {"role": "user", "content": prompt}])
         for line in resp.choices[0].message.content.strip().split("\n"):
@@ -1586,6 +1693,7 @@ async def api_ai_news(ticker: str = "", title: str = ""):
         resp = await groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             max_tokens=240,
+            _tab="radar",
             messages=[
                 {"role": "system", "content": "Sei un analista finanziario che spiega notizie di mercato in modo conciso e diretto, in italiano. Vai dritto al punto."},
                 {"role": "user", "content": prompt},
@@ -1825,6 +1933,7 @@ async def api_ai(ticker: str):
         resp = await groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             max_tokens=350,
+            _tab="analisi",
             messages=[
                 {"role": "system", "content": AP.SIGNAL},
                 {"role": "user",   "content": prompt},
@@ -1918,6 +2027,7 @@ async def api_longterm(ticker: str):
             resp = await groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 max_tokens=250,
+                _tab="analisi",
                 messages=[
                     {"role": "system", "content": AP.LONGTERM},
                     {"role": "user",   "content": prompt},
@@ -1972,7 +2082,7 @@ async def api_peers(ticker: str):
             f"NON includere {t}."
         )
         r = await groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile", max_tokens=120,
+            model="llama-3.3-70b-versatile", max_tokens=120, _tab="peers",
             messages=[{"role": "system", "content": "Esperto di mercati azionari: conosci i ticker di borsa delle aziende e i loro concorrenti diretti. Rispondi solo con ticker."},
                       {"role": "user", "content": prompt}])
         import re
@@ -2093,7 +2203,7 @@ async def api_best_buy(horizon: str = "short"):
                 "È un'analisi informativa, non un consiglio personalizzato. Italiano, diretto, concreto."
             )
             r = await groq_client.chat.completions.create(
-                model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="medium",
+                model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="medium", _tab="market_bestbuy",
                 messages=[{"role": "system", "content": AP.BEST_BUY},
                           {"role": "user", "content": prompt}])
             reasoning = r.choices[0].message.content.strip()
@@ -2238,7 +2348,7 @@ async def api_should_buy(ticker: str, horizon: str = "short"):
                 "MOTIVO: [2 frasi concrete riferite all'orizzonte indicato]\n"
             )
             r = await groq_client.chat.completions.create(
-                model="openai/gpt-oss-120b", max_tokens=1400, reasoning_effort="medium",
+                model="openai/gpt-oss-120b", max_tokens=1400, reasoning_effort="medium", _tab="should_buy",
                 messages=[{"role": "system", "content": AP.VERDICT},
                           {"role": "user", "content": prompt}])
             txt = r.choices[0].message.content.strip()
@@ -2333,7 +2443,7 @@ async def api_consensus(ticker: str):
     async def _ask(name, model, extra):
         try:
             r = await groq_client.chat.completions.create(
-                model=model, max_tokens=256, temperature=0.3,
+                model=model, max_tokens=256, temperature=0.3, _tab="consensus",
                 messages=[{"role": "system", "content": "Trader esperto che dà un verdetto netto e conciso in italiano."},
                           {"role": "user", "content": prompt}],
                 **extra)
@@ -2413,7 +2523,7 @@ async def api_debate(ticker: str):
               "Formato: esattamente 3 righe, ognuna inizia con '- '. Italiano, nient'altro.")
         try:
             r = await groq_client.chat.completions.create(
-                model="openai/gpt-oss-120b", max_tokens=900, reasoning_effort="medium",
+                model="openai/gpt-oss-120b", max_tokens=900, reasoning_effort="medium", _tab="debate",
                 messages=[{"role": "system", "content": sysm}, {"role": "user", "content": pr}])
             lines = [l.strip().lstrip("-•*").strip() for l in r.choices[0].message.content.split("\n")]
             return [l for l in lines if len(l) > 3][:3]
@@ -2434,7 +2544,7 @@ async def api_debate(ticker: str):
     winner, verdict, conf, synth = "PAREGGIO", "ASPETTA", 65, ""
     try:
         r = await groq_client.chat.completions.create(
-            model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="medium",
+            model="openai/gpt-oss-120b", max_tokens=1100, reasoning_effort="medium", _tab="debate",
             messages=[{"role": "system", "content": AP.JUDGE},
                       {"role": "user", "content": judge_pr}])
         for line in r.choices[0].message.content.split("\n"):
@@ -2572,6 +2682,7 @@ async def api_deep_report(ticker: str):
         resp = await groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             max_tokens=1700,
+            _tab="deepreport",
             messages=[
                 {"role": "system", "content": AP.REPORT},
                 {"role": "user", "content": prompt},
@@ -2886,7 +2997,7 @@ async def api_timing(ticker: str):
     )
     try:
         resp = await groq_client.chat.completions.create(
-            model="openai/gpt-oss-120b", max_tokens=700, reasoning_effort="medium",
+            model="openai/gpt-oss-120b", max_tokens=700, reasoning_effort="medium", _tab="timing",
             messages=[
                 {"role": "system", "content": AP.TIMING},
                 {"role": "user", "content": prompt},
@@ -3117,6 +3228,7 @@ async def api_deep_analysis(ticker: str):
             model="openai/gpt-oss-120b",
             max_tokens=1800,
             reasoning_effort="low",
+            _tab="analisi",
             messages=[
                 {"role": "system", "content": AP.DEEP},
                 {"role": "user", "content": prompt},
@@ -3207,7 +3319,7 @@ async def api_explain(ticker: str):
     )
     try:
         resp = await groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile", max_tokens=750,
+            model="llama-3.3-70b-versatile", max_tokens=750, _tab="analisi",
             messages=[
                 {"role": "system", "content": "Sei un divulgatore finanziario che spiega gli indicatori in modo semplice e concreto, in italiano, senza gergo inutile."},
                 {"role": "user", "content": prompt},
@@ -3485,6 +3597,7 @@ async def api_power_prompt(ticker: str, type: str = ""):
                 resp = await groq_client.chat.completions.create(
                     model="openai/gpt-oss-120b", max_tokens=max_tok,
                     reasoning_effort=effort, messages=messages,
+                    _tab=("short" if ptype == "short" else "prompt"),
                 )
                 break
             except Exception as tpm_err:
@@ -3576,6 +3689,7 @@ async def api_why_today(ticker: str):
             messages=[{"role": "user", "content": prompt}],
             max_tokens=150,
             temperature=0.4,
+            _tab="why_today",
         )
         text = resp.choices[0].message.content.strip()
         result = {"ticker": t, "bullets": text, "change_pct": change}
@@ -3626,6 +3740,7 @@ async def api_forecast(ticker: str):
             model="openai/gpt-oss-120b",
             max_tokens=700,
             reasoning_effort="medium",
+            _tab="analisi",
             messages=[
                 {"role": "system", "content": AP.FORECAST},
                 {"role": "user", "content": prompt},
@@ -4147,6 +4262,7 @@ async def api_portfolio_evaluate(req: PortfolioEvalRequest):
         resp = await groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             max_tokens=500,
+            _tab="portfolio",
             messages=[
                 {"role": "system", "content": _LEVEL_SYSTEM[level]},
                 {"role": "user", "content": prompt},
@@ -4404,6 +4520,7 @@ async def api_analyze_chart(body: ChartAnalysisBody):
     try:
         resp = await groq_client.chat.completions.create(
             model="meta-llama/llama-4-scout-17b-16e-instruct",
+            _tab="chartai",
             messages=[{
                 "role": "user",
                 "content": [
@@ -4495,6 +4612,7 @@ async def api_chart_pro(body: ChartAnalysisBody):
     try:
         resp = await groq_client.chat.completions.create(
             model="meta-llama/llama-4-scout-17b-16e-instruct",
+            _tab="chartai",
             messages=[
                 {"role": "system", "content": _CHART_PRO_SYSTEM},
                 {"role": "user", "content": [
@@ -4573,6 +4691,7 @@ async def api_confessionale(body: ConfessionaleBody):
         resp = await groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             max_tokens=max_tok,
+            _tab="confessionale",
             messages=[
                 {"role": "system", "content": sys_prompt},
                 {"role": "user", "content": user_prompt},
@@ -5173,6 +5292,7 @@ async def api_watchlist_judge(body: WatchlistJudgeBody):
             messages=[{"role": "user", "content": prompt}],
             max_tokens=400,
             temperature=0.35,
+            _tab="watchlist",
         )
         text = resp.choices[0].message.content.strip()
 
@@ -5237,7 +5357,7 @@ async def api_news(ticker: str):
         )
         try:
             resp = await groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile", max_tokens=60,
+                model="llama-3.3-70b-versatile", max_tokens=60, _tab="market_sentiment",
                 messages=[{"role": "user", "content": sent_prompt}]
             )
             for line in resp.choices[0].message.content.strip().split("\n"):
@@ -5581,6 +5701,7 @@ async def api_chat(body: ChatBody):
             messages=messages,
             max_tokens=max_tok,
             temperature=0.55,
+            _tab="chat",
         )
         return {"reply": resp.choices[0].message.content.strip()}
     except Exception as e:
@@ -5831,6 +5952,7 @@ async def api_compare(body: CompareBody):
         resp = await groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             max_tokens=700,
+            _tab="compare",
             messages=[
                 {"role": "system", "content": "Sei un analista finanziario esperto. Confronta oggettivamente due azioni come opportunità d'investimento, non solo come aziende. Sii diretto e dai un vincitore chiaro. Rispondi in italiano."},
                 {"role": "user", "content": prompt},
@@ -5978,6 +6100,7 @@ async def api_briefing():
         resp = await groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             max_tokens=500,
+            _tab="briefing",
             messages=[
                 {"role": "system", "content": sys_msg},
                 {"role": "user", "content": prompt},
