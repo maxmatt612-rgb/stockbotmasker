@@ -155,11 +155,13 @@ _TAB_TIER = {
     "market_bestbuy": "haiku",
     "timing": "haiku", "chat": "haiku",
     "portfolio": "haiku", "chartai": "haiku",
-    "deepreport": "sonnet", "short": "sonnet",
-    "prompt": "sonnet", "compare": "sonnet", "briefing": "sonnet",
+    "deepreport": "sonnet", "briefing": "sonnet",
     "analisi": "opus",  # tab "Analisi AI": richiesta esplicita, qualità massima
     "should_buy": "opus",  # tab "Compro?": richiesta esplicita, qualità massima
     "debate": "opus",  # tab "Dibattito": richiesta esplicita, qualità massima
+    "short": "opus",  # tab "Analisi Short": richiesta esplicita, qualità massima
+    "prompt": "opus",  # tab "Report completo" + i 5 power-prompt del drawer (DCF/earnings/tecnica/competitivo/pattern): stesso tag, salgono insieme
+    "compare": "opus",  # tab "Confronto AI": richiesta esplicita, qualità massima
     "consensus_sonnet": "sonnet",
     "consensus_opus": "opus",
     "telegram": "opus",  # insight scanner/Telegram: 1 sola chiamata batch su 10 titoli, costo trascurabile anche su Opus
