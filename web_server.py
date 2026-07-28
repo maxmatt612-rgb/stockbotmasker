@@ -1345,15 +1345,23 @@ async def _tg_evening_insights(ranked: list) -> dict:
     return out
 
 
-def _format_evening_recap(ranked: list, why: dict) -> str:
+def _format_evening_recap(ranked: list, emap: dict, why: dict) -> str:
     blocks = [f"\U0001F319 <b>MASKER — Recap serale</b>  ({datetime.now(ROME).strftime('%d/%m %H:%M')}) "
               f"— dal migliore al peggiore"]
-    for i, s in enumerate(ranked, 1):
+    for s in ranked:
         tk = s["ticker"]
+        e = emap.get(tk, {})
         delta = s.get("delta_pct", 0) or 0
         move_emoji = "\U0001F4C8" if delta >= 0 else "\U0001F4C9"  # 📈 / 📉
-        medal = "\U0001F3C6" if i == 1 else f"{i}."
-        parts = [f"{medal} <b>{tk}</b> {move_emoji} —  ${s.get('evening_price', 0):.2f}  ({delta:+.1f}%)"]
+        name = e.get("name") or ""
+        sc = e.get("score_10", s.get("score_10", 5)) or 5
+        title = f"{move_emoji} <b>{tk}</b>"
+        if name:
+            title += f" {name}"
+        title += f"  Score {sc:.1f}/10"
+        mp = s.get("current_price", 0) or 0
+        ep = s.get("evening_price", 0) or 0
+        parts = [title, f"${mp:.2f} → ${ep:.2f}  ({delta:+.2f}%)"]
         expl = why.get(tk)
         if expl:
             parts.append(f"\U0001F4A1 {expl}")
@@ -1378,8 +1386,18 @@ async def _send_evening_recap(ranked: list, force: bool = False) -> bool:
     if not force and _last_tg_evening_date == today:
         return False
     top = ranked[:10]
+    # Nome azienda + score aggiornato (best effort, come per _send_top10_rich)
+    emap: dict = {}
+    try:
+        enr = await asyncio.gather(*[asyncio.to_thread(get_enriched_analysis, s["ticker"]) for s in top],
+                                   return_exceptions=True)
+        for s, e in zip(top, enr):
+            if isinstance(e, dict):
+                emap[s["ticker"]] = e
+    except Exception as e:
+        print(f"[tg] evening enrich: {e}")
     why = await _tg_evening_insights(top)
-    msg = _format_evening_recap(top, why)
+    msg = _format_evening_recap(top, emap, why)
     ok = await asyncio.to_thread(_tg_send_chunks, msg)
     if ok:
         _last_tg_evening_date = today
