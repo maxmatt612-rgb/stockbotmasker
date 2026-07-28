@@ -7,7 +7,7 @@ import os
 import re
 import secrets
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from pathlib import Path
 from typing import Any, List, Optional
 from zoneinfo import ZoneInfo
@@ -1194,17 +1194,20 @@ async def _pdf_scheduler():
         if should_run(now, _time(7, 0), _last_run.get("scan")):
             print("[scheduler] Avvio scan mattutino (07:00 o catch-up)")
             _last_run["scan"] = now.date()
+            _save_sched_state()
             asyncio.create_task(_refresh_scan_background(10))
         # 07:05 — PDF analisi mattutina + snapshot storico
         if should_run(now, _time(7, 5), _last_run.get("morning")):
             print("[scheduler] Avvio PDF mattina + snapshot (07:05 o catch-up)")
             _last_run["morning"] = now.date()
+            _save_sched_state()
             await _generate_morning_pdf()
             await asyncio.to_thread(_save_history_snapshot_web, _morning_data)
         # 22:05 — recap serale (PDF + Telegram) + chiusura storico (previsione vs realtà)
         if should_run(now, _time(22, 5), _last_run.get("evening")):
             print("[scheduler] Avvio recap serale + chiusura (22:05 o catch-up)")
             _last_run["evening"] = now.date()
+            _save_sched_state()
             ranked = await _generate_evening_pdf()
             if await _send_evening_recap(ranked):
                 print("[scheduler] Recap serale inviato su Telegram")
@@ -1215,6 +1218,43 @@ async def _pdf_scheduler():
 # ─── Segnale Telegram: top 10 titoli dello scan ──────────────────────────────
 _last_tg_signal_date: str = ""
 _last_tg_evening_date: str = ""
+
+# ─── Stato scheduler/dedup persistito su disco ────────────────────────────────
+# Su Render (piano gratuito) il processo può riavviarsi ad ogni "risveglio" dopo
+# un periodo di inattività: senza persistenza, _last_run/_last_tg_signal_date/
+# _last_tg_evening_date tornano vuoti in memoria e lo scheduler (con la sua
+# logica di catch-up, v. should_run) rilancia scan+invio Telegram come se non
+# fossero mai girati oggi, anche se in realtà erano già stati inviati poco prima.
+_SCHED_STATE_FILE = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "scheduler_state.json"
+
+
+def _load_sched_state():
+    global _last_tg_signal_date, _last_tg_evening_date
+    try:
+        data = json.loads(_SCHED_STATE_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return
+    for k, v in (data.get("last_run") or {}).items():
+        try:
+            _last_run[k] = date.fromisoformat(v)
+        except Exception:
+            pass
+    _last_tg_signal_date = data.get("last_tg_signal_date") or ""
+    _last_tg_evening_date = data.get("last_tg_evening_date") or ""
+
+
+def _save_sched_state():
+    try:
+        _SCHED_STATE_FILE.write_text(json.dumps({
+            "last_run": {k: v.isoformat() for k, v in _last_run.items()},
+            "last_tg_signal_date": _last_tg_signal_date,
+            "last_tg_evening_date": _last_tg_evening_date,
+        }, ensure_ascii=False), encoding="utf-8")
+    except Exception as e:
+        print(f"[sched-state] errore salvataggio: {e}")
+
+
+_load_sched_state()
 
 
 def _tg_send(text: str) -> bool:
@@ -1410,6 +1450,7 @@ async def _send_top10_rich(stocks: list, force: bool = False) -> bool:
     ok = await asyncio.to_thread(_tg_send_chunks, msg)
     if ok:
         _last_tg_signal_date = today
+        _save_sched_state()
     return ok
 
 
@@ -1497,6 +1538,7 @@ async def _send_evening_recap(ranked: list, force: bool = False) -> bool:
     ok = await asyncio.to_thread(_tg_send_chunks, msg)
     if ok:
         _last_tg_evening_date = today
+        _save_sched_state()
     return ok
 
 
