@@ -18,7 +18,7 @@ ROME = ZoneInfo("Europe/Rome")
 
 from fastapi import FastAPI, Header, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 from analyzer import get_enriched_analysis, scan_cheap_stocks, get_longterm_analysis, wilder_rsi
@@ -361,6 +361,49 @@ class _LangASGIMiddleware:
 
 
 app.add_middleware(_LangASGIMiddleware)
+
+
+# ─── Password unica per l'intero sito ─────────────────────────────────────────
+# Protegge il budget Claude/Groq da chiunque trovi l'URL: se SITE_PASSWORD è
+# impostata, OGNI richiesta (pagina e API, non solo il frontend) richiede HTTP
+# Basic Auth — il browser mostra il popup nativo di login, nessuna pagina o
+# gestione sessione da scrivere. Se non impostata (default), nessuna gate:
+# comportamento identico a prima, il dev locale non è mai bloccato per errore.
+_SITE_PASSWORD = os.getenv("SITE_PASSWORD")
+_AUTH_EXEMPT_PATHS = {"/healthz"}  # health check di Render: nessuna credenziale disponibile
+
+
+@app.get("/healthz")
+async def api_healthz():
+    return {"ok": True}
+
+
+class _BasicAuthASGIMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http" or not _SITE_PASSWORD or scope.get("path") in _AUTH_EXEMPT_PATHS:
+            await self.app(scope, receive, send)
+            return
+        headers = dict(scope.get("headers") or [])
+        auth = headers.get(b"authorization", b"").decode("latin-1", "replace")
+        ok = False
+        if auth.startswith("Basic "):
+            try:
+                import base64
+                _, _, pwd = base64.b64decode(auth[6:]).decode("utf-8", "replace").partition(":")
+                ok = hmac.compare_digest(pwd, _SITE_PASSWORD)
+            except Exception:
+                ok = False
+        if not ok:
+            resp = Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="Masker"'})
+            await resp(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(_BasicAuthASGIMiddleware)
 
 
 @app.get("/api/realtime-token")

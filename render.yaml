@@ -9,6 +9,7 @@ services:
     branch: master
     buildCommand: "pip install -r requirements.txt"
     startCommand: "uvicorn web_server:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /healthz    # esente da SITE_PASSWORD, così Render non segna il servizio come giù
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
@@ -22,3 +23,5 @@ services:
         sync: false                # username del bot SENZA @ (facoltativo)
       - key: FINNHUB_KEY
         sync: false                # real-time prezzi USA (facoltativo)
+      - key: SITE_PASSWORD
+        sync: false                # se impostata, richiede questa password (HTTP Basic Auth) per aprire il sito
